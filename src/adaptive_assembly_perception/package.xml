@@ -3,13 +3,15 @@
 <package format="3">
   <name>adaptive_assembly_perception</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>Fake perception inputs for simulated adaptive assembly.</description>
   <maintainer email="chunzhi.wu@mailbox.tu-dresden.de">nate</maintainer>
   <license>TODO: License declaration</license>
 
   <depend>rclpy</depend>
   <depend>geometry_msgs</depend>
   <depend>tf2_ros</depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

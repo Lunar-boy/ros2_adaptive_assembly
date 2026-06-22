@@ -1,0 +1,70 @@
+# Adaptive Assembly Perception
+
+This ROS 2 Jazzy package provides simulated perception inputs for the adaptive
+assembly pipeline. The `fake_object_pose_node` publishes a randomized
+`geometry_msgs/msg/PoseStamped` on `/target_pose` and broadcasts the same pose
+as the `world` to `target_object` TF transform.
+
+## Parameters
+
+| Parameter | Default | Description |
+| --- | ---: | --- |
+| `publish_period_sec` | `5.0` | Seconds between randomized poses |
+| `x_min` | `0.35` | Minimum target x position in meters |
+| `x_max` | `0.55` | Maximum target x position in meters |
+| `y_min` | `-0.25` | Minimum target y position in meters |
+| `y_max` | `0.25` | Maximum target y position in meters |
+| `z` | `0.15` | Fixed target z position in meters |
+
+The published pose uses the `world` frame. Its orientation is a random yaw
+represented by a unit quaternion.
+
+## Build
+
+From the workspace root:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+colcon build --symlink-install --packages-select adaptive_assembly_perception
+source install/setup.bash
+```
+
+## Run
+
+Launch with the default parameters:
+
+```bash
+ros2 launch adaptive_assembly_perception fake_perception.launch.py
+```
+
+Run the node directly:
+
+```bash
+ros2 run adaptive_assembly_perception fake_object_pose_node
+```
+
+Parameters can be overridden from the launch command, for example:
+
+```bash
+ros2 launch adaptive_assembly_perception fake_perception.launch.py \
+  publish_period_sec:=2.0
+```
+
+## Test
+
+In separate terminals after building and sourcing the workspace:
+
+```bash
+ros2 topic echo /target_pose
+```
+
+```bash
+ros2 run tf2_ros tf2_echo world target_object
+```
+
+Run the package tests with:
+
+```bash
+colcon test --packages-select adaptive_assembly_perception
+colcon test-result --verbose
+```
