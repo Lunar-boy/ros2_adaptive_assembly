@@ -40,6 +40,9 @@ This is a simple configurable starting point. Later PRs can refine the adapter
 with better approach directions, grasp frames, collision-aware offsets, or
 PlanningScene context.
 
+PR9 adds static PlanningScene objects to the Panda planning demo. It does not
+change the pose adapter behavior.
+
 ## Build
 
 ```bash
@@ -69,10 +72,10 @@ The launch remains plan-only:
 - trajectories are not executed
 - Gazebo is not used
 - ros2_control is not used by this project
-- PlanningScene collision objects are not included yet
+- PlanningScene collision objects are static and handled by a separate node
 - real hardware is not used
 
 ## Next PR
 
-A future PR can add simple PlanningScene collision objects after the planning
-frame is stable.
+A future PR can add dynamic target collision objects or planning diagnostics
+after the static scene baseline is stable.
