@@ -81,6 +81,19 @@ This is a demo bringup only; it does not yet send `/pre_grasp_pose` or
 `/assembly_pose` to MoveIt2 for planning. See
 [docs/moveit2_panda_demo.md](docs/moveit2_panda_demo.md).
 
+## Plan-only MoveIt2 planning bridge
+
+The plan-only bridge launches the current adaptive assembly pipeline, the Panda
+MoveIt2 demo, and a minimal node that asks MoveIt2 to plan to `/pre_grasp_pose`:
+
+```bash
+ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_demo.launch.py
+```
+
+This launch plans only. It does not execute robot motion, use Gazebo, or require
+real hardware. See
+[docs/pre_grasp_planning_bridge.md](docs/pre_grasp_planning_bridge.md).
+
 ## Roadmap
 
 - PR1: fake perception node
@@ -88,4 +101,5 @@ This is a demo bringup only; it does not yet send `/pre_grasp_pose` or
 - PR3: bringup launch for the non-MoveIt pipeline
 - PR4: validation scripts and documentation cleanup
 - PR5: optional Panda MoveIt2 demo bringup
-- Future PR: MoveIt2 planning integration
+- PR6: plan-only MoveIt2 pre-grasp planning bridge
+- Future PR: PlanningScene collision objects and planning refinements

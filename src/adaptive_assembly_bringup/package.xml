@@ -12,6 +12,7 @@
   <depend>launch_ros</depend>
   <depend>adaptive_assembly_perception</depend>
   <depend>adaptive_assembly_task</depend>
+  <depend>adaptive_assembly_planning</depend>
   <depend>moveit_resources_panda_moveit_config</depend>
 
   <test_depend>ament_copyright</test_depend>

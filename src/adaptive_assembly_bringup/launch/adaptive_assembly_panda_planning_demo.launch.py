@@ -1,0 +1,36 @@
+"""Launch the Panda MoveIt2 demo with the plan-only pre-grasp bridge."""
+
+from launch import LaunchDescription
+from launch.actions import IncludeLaunchDescription
+from launch.actions import LogInfo
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import PathJoinSubstitution
+from launch_ros.substitutions import FindPackageShare
+
+
+def generate_launch_description() -> LaunchDescription:
+    """Start adaptive assembly, Panda demo, and plan-only planning bridge."""
+    panda_demo_launch = PathJoinSubstitution([
+        FindPackageShare('adaptive_assembly_bringup'),
+        'launch',
+        'adaptive_assembly_panda_demo.launch.py',
+    ])
+    pre_grasp_planning_launch = PathJoinSubstitution([
+        FindPackageShare('adaptive_assembly_planning'),
+        'launch',
+        'pre_grasp_planning.launch.py',
+    ])
+
+    return LaunchDescription([
+        LogInfo(
+            msg='Launching adaptive assembly Panda planning demo: fake '
+            'perception, task pose generation, standard Panda MoveIt2 demo, '
+            'and plan-only pre-grasp planning bridge. Execution is disabled.'
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(panda_demo_launch),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(pre_grasp_planning_launch),
+        ),
+    ])
