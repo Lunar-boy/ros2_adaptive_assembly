@@ -9,6 +9,9 @@ This remains plan-only. No trajectories are executed.
 PR10 adds planning diagnostics to `pre_grasp_planning_node`. It does not change
 the static PlanningScene behavior described here.
 
+PR11 benchmark scripts can be used to measure planning behavior while these
+static PlanningScene objects are enabled.
+
 Initial objects:
 
 - `work_table`: a broad table/workcell box in frame `panda_link0`

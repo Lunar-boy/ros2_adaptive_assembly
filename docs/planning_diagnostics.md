@@ -62,6 +62,12 @@ bash scripts/echo_planning_diagnostics_once.sh
 python3 scripts/check_planning_status_format.py
 ```
 
+## Benchmark recording
+
+PR11 records these PR10 diagnostic events into CSV and summarizes success,
+failure, skipped-event counts, and planning duration statistics. See
+[planning_benchmark.md](planning_benchmark.md).
+
 This PR is diagnostics only:
 
 - no trajectory execution
