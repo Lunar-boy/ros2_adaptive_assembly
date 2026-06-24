@@ -1,8 +1,9 @@
 # Plan-only pre-grasp planning bridge
 
-PR6 adds a minimal MoveIt2 bridge that subscribes to `/pre_grasp_pose` and asks
-MoveIt2 to plan a Panda arm trajectory to that pose. The node reports whether
-planning succeeded, but it does not execute trajectories.
+PR6 added a minimal MoveIt2 bridge that asks MoveIt2 to plan a Panda arm
+trajectory. PR7 adds a Panda-specific adapter in front of that bridge so the
+normal planning launch uses `/panda_pre_grasp_pose` instead of the task-level
+`/pre_grasp_pose`.
 
 ```text
 fake_object_pose_node
@@ -17,11 +18,22 @@ assembly_task_node
 /pre_grasp_pose
      │
      ▼
+panda_pre_grasp_pose_adapter_node
+     │
+     ▼
+/panda_pre_grasp_pose
+     │
+     ▼
 pre_grasp_planning_node
      │
      ├── MoveIt2 plan request to panda_arm
      └── /pre_grasp_plan_success
 ```
+
+When launched through `pre_grasp_planning.launch.py`, the planning bridge now
+subscribes to `/panda_pre_grasp_pose`. The C++ node still supports a configurable
+`input_topic` parameter and defaults to `/pre_grasp_pose` if launched manually
+without parameters.
 
 The bridge is intentionally plan-only. Gazebo, ros2_control integration for this
 project, real robot hardware, and PlanningScene collision objects are not added
@@ -58,9 +70,10 @@ ros2 topic echo /pre_grasp_plan_success
 Expected behavior:
 
 - `/target_pose`, `/pre_grasp_pose`, and `/assembly_pose` are still published
+- `/panda_pre_grasp_pose` is published by the Panda pose adapter
 - The Panda MoveIt2 demo starts
-- `pre_grasp_planning_node` attempts planning when `/pre_grasp_pose` changes
-  enough
+- `pre_grasp_planning_node` attempts planning when `/panda_pre_grasp_pose`
+  changes enough
 - `/pre_grasp_plan_success` publishes `true` or `false`
 - No execution occurs
 

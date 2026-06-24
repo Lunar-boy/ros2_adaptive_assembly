@@ -13,6 +13,7 @@ def generate_launch_description() -> LaunchDescription:
             name='pre_grasp_planning_node',
             output='screen',
             parameters=[{
+                'input_topic': '/panda_pre_grasp_pose',
                 'planning_group': 'panda_arm',
                 'planning_time_sec': 5.0,
                 'position_tolerance': 0.01,
