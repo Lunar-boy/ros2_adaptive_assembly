@@ -105,6 +105,18 @@ with the standard Panda MoveIt2 demo.
 
 See [docs/panda_pre_grasp_pose_adapter.md](docs/panda_pre_grasp_pose_adapter.md).
 
+## Static PlanningScene objects
+
+The Panda planning demo also starts a static PlanningScene node that applies
+simple collision objects for the table/workcell:
+
+```bash
+ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_demo.launch.py
+```
+
+This adds static collision objects only and still does not execute trajectories.
+See [docs/static_planning_scene.md](docs/static_planning_scene.md).
+
 ## Roadmap
 
 - PR1: fake perception node
@@ -115,4 +127,5 @@ See [docs/panda_pre_grasp_pose_adapter.md](docs/panda_pre_grasp_pose_adapter.md)
 - PR6: plan-only MoveIt2 pre-grasp planning bridge
 - PR7: Panda pre-grasp pose adapter for robot-aware planning targets
 - PR8: frame-aware Panda pre-grasp pose adapter
-- Future PR: PlanningScene collision objects and planning refinements
+- PR9: static PlanningScene collision objects for Panda planning demo
+- Future PR: dynamic PlanningScene updates and planning refinements

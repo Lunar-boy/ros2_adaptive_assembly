@@ -39,9 +39,13 @@ When launched through `panda_pre_grasp_pose_adapter.launch.py`,
 `/panda_pre_grasp_pose` defaults to frame `panda_link0`. This reduces frame
 mismatch risk with the standard Panda MoveIt2 demo.
 
+When launched through the Panda planning demo, the planning bridge now also runs
+alongside static PlanningScene collision objects from
+`static_planning_scene_node`.
+
 The bridge is intentionally plan-only. Gazebo, ros2_control integration for this
 project, real robot hardware, and PlanningScene collision objects are not added
-yet.
+by the bridge, and trajectory execution is still disabled.
 
 ## Install dependencies
 
@@ -83,5 +87,5 @@ Expected behavior:
 
 ## Next PR
 
-A future PR can add PlanningScene collision objects or a more robust
-pose-to-planning adapter.
+A future PR can add dynamic target collision objects or more detailed planning
+diagnostics.
