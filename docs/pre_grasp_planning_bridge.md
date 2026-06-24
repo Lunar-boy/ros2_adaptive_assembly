@@ -27,7 +27,9 @@ panda_pre_grasp_pose_adapter_node
 pre_grasp_planning_node
      │
      ├── MoveIt2 plan request to panda_arm
-     └── /pre_grasp_plan_success
+     ├── /pre_grasp_plan_success
+     ├── /pre_grasp_planning_status
+     └── /pre_grasp_planning_duration_ms
 ```
 
 When launched through `pre_grasp_planning.launch.py`, the planning bridge now
@@ -42,6 +44,16 @@ mismatch risk with the standard Panda MoveIt2 demo.
 When launched through the Panda planning demo, the planning bridge now also runs
 alongside static PlanningScene collision objects from
 `static_planning_scene_node`.
+
+PR10 adds planning diagnostics. `/pre_grasp_plan_success` is still available for
+compatibility, but it is no longer the only status signal. The bridge also
+publishes:
+
+- `/pre_grasp_planning_status`: a human-readable key-value event string
+- `/pre_grasp_planning_duration_ms`: wall-clock planning duration in milliseconds
+
+The status topic distinguishes `failure` from `skipped_small_motion`, which
+means a small target update did not trigger a new MoveIt2 planning request.
 
 The bridge is intentionally plan-only. Gazebo, ros2_control integration for this
 project, real robot hardware, and PlanningScene collision objects are not added
@@ -72,7 +84,11 @@ ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_demo.laun
 
 ```bash
 bash scripts/check_planning_bridge_available.sh
+bash scripts/check_planning_diagnostics.sh
+python3 scripts/check_planning_status_format.py
 ros2 topic echo /pre_grasp_plan_success
+ros2 topic echo /pre_grasp_planning_status
+ros2 topic echo /pre_grasp_planning_duration_ms
 ```
 
 Expected behavior:
@@ -83,9 +99,12 @@ Expected behavior:
 - `pre_grasp_planning_node` attempts planning when `/panda_pre_grasp_pose`
   changes enough
 - `/pre_grasp_plan_success` publishes `true` or `false`
+- `/pre_grasp_planning_status` publishes `success`, `failure`, or
+  `skipped_small_motion`
+- `/pre_grasp_planning_duration_ms` publishes the latest planning attempt
+  duration
 - No execution occurs
 
 ## Next PR
 
-A future PR can add dynamic target collision objects or more detailed planning
-diagnostics.
+A future PR can add dynamic target collision objects or planning benchmarking.

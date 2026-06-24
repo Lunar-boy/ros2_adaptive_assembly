@@ -117,6 +117,23 @@ ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_demo.laun
 This adds static collision objects only and still does not execute trajectories.
 See [docs/static_planning_scene.md](docs/static_planning_scene.md).
 
+## Planning diagnostics
+
+The plan-only bridge publishes compatibility and diagnostic topics:
+
+- `/pre_grasp_plan_success`
+- `/pre_grasp_planning_status`
+- `/pre_grasp_planning_duration_ms`
+
+Validation helpers:
+
+```bash
+bash scripts/check_planning_diagnostics.sh
+python3 scripts/check_planning_status_format.py
+```
+
+See [docs/planning_diagnostics.md](docs/planning_diagnostics.md).
+
 ## Roadmap
 
 - PR1: fake perception node
@@ -128,4 +145,5 @@ See [docs/static_planning_scene.md](docs/static_planning_scene.md).
 - PR7: Panda pre-grasp pose adapter for robot-aware planning targets
 - PR8: frame-aware Panda pre-grasp pose adapter
 - PR9: static PlanningScene collision objects for Panda planning demo
+- PR10: planning diagnostics and timing topics
 - Future PR: dynamic PlanningScene updates and planning refinements
