@@ -1,0 +1,23 @@
+"""Launch the plan-only pre-grasp MoveIt2 planning bridge."""
+
+from launch import LaunchDescription
+from launch_ros.actions import Node
+
+
+def generate_launch_description() -> LaunchDescription:
+    """Start the pre-grasp planning node without launching robot bringup."""
+    return LaunchDescription([
+        Node(
+            package='adaptive_assembly_planning',
+            executable='pre_grasp_planning_node',
+            name='pre_grasp_planning_node',
+            output='screen',
+            parameters=[{
+                'planning_group': 'panda_arm',
+                'planning_time_sec': 5.0,
+                'position_tolerance': 0.01,
+                'orientation_tolerance': 0.10,
+                'min_replan_distance': 0.03,
+            }],
+        ),
+    ])
