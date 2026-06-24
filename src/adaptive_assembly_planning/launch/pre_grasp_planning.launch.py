@@ -14,6 +14,10 @@ def generate_launch_description() -> LaunchDescription:
             output='screen',
             parameters=[{
                 'input_topic': '/panda_pre_grasp_pose',
+                'success_topic': '/pre_grasp_plan_success',
+                'status_topic': '/pre_grasp_planning_status',
+                'duration_topic': '/pre_grasp_planning_duration_ms',
+                'publish_diagnostics': True,
                 'planning_group': 'panda_arm',
                 'planning_time_sec': 5.0,
                 'position_tolerance': 0.01,
