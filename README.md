@@ -1,16 +1,16 @@
 # ROS2 Adaptive Assembly
 
-A ROS2 Jazzy + MoveIt2 project for simulated adaptive robotic assembly.
+A ROS2 Jazzy project for simulated adaptive robotic assembly.
 
 ## Target
 
-This project aims to build a minimal but complete adaptive manipulation pipeline:
+This project aims to build a minimal, testable adaptive manipulation pipeline:
 
 1. Fake perception publishes randomized target object poses.
 2. TF2 broadcasts the object frame.
 3. A task node computes pre-grasp and assembly poses.
-4. MoveIt2 plans robot motion for a simulated Panda arm.
-5. Later versions will add PlanningScene updates, replanning, and benchmark scripts.
+4. Future versions will add MoveIt2 planning, PlanningScene updates, and
+   replanning behavior.
 
 ## Environment
 
@@ -27,11 +27,51 @@ cd ~/ros2_adaptive_assembly_ws
 source /opt/ros/jazzy/setup.bash
 colcon build --symlink-install
 source install/setup.bash
-## Roadmap
-* PR1: fake perception node
-* PR2: Panda MoveIt2 bringup
-* PR3: task node for pre-grasp and assembly poses
-* PR4: MoveIt2 planning integration
+```
 
-### Active Dev Session
-* CLI Resume: `codex resume 019eef8e-994c-7791-8542-7caf4ccc2c0c`
+## Current pipeline
+
+The current non-MoveIt pipeline provides:
+
+- `/target_pose`: randomized target object pose from fake perception
+- `/pre_grasp_pose`: task-level pose above the target object
+- `/assembly_pose`: task-level pose near the assembly target
+- TF `world -> target_object`: transform matching the target object pose
+
+MoveIt2 planning, Gazebo, RViz, robot models, and ros2_control are not launched
+by the current pipeline.
+
+## Run the current pipeline
+
+```bash
+cd ~/ros2_adaptive_assembly_ws
+source /opt/ros/jazzy/setup.bash
+colcon build --symlink-install
+source install/setup.bash
+ros2 launch adaptive_assembly_bringup adaptive_assembly_pipeline.launch.py
+```
+
+## Validate the current pipeline
+
+Start the pipeline in one terminal, then run the validation scripts from another
+terminal:
+
+```bash
+cd ~/ros2_adaptive_assembly_ws
+source install/setup.bash
+bash scripts/check_pipeline_topics.sh
+python3 scripts/check_pipeline_offsets.py
+bash scripts/run_pipeline_validation.sh
+bash scripts/echo_pipeline_once.sh
+```
+
+See [docs/current_pipeline.md](docs/current_pipeline.md) for the architecture
+and validation workflow.
+
+## Roadmap
+
+- PR1: fake perception node
+- PR2: task pose generation node
+- PR3: bringup launch for the non-MoveIt pipeline
+- PR4: validation scripts and documentation cleanup
+- Future PR: MoveIt2 planning integration
