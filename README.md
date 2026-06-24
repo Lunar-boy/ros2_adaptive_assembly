@@ -68,10 +68,24 @@ bash scripts/echo_pipeline_once.sh
 See [docs/current_pipeline.md](docs/current_pipeline.md) for the architecture
 and validation workflow.
 
+## Optional MoveIt2 Panda demo
+
+If MoveIt2 and the Panda demo resources are installed, the current adaptive
+assembly pipeline can be launched alongside the standard Panda MoveIt2 demo:
+
+```bash
+ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_demo.launch.py
+```
+
+This is a demo bringup only; it does not yet send `/pre_grasp_pose` or
+`/assembly_pose` to MoveIt2 for planning. See
+[docs/moveit2_panda_demo.md](docs/moveit2_panda_demo.md).
+
 ## Roadmap
 
 - PR1: fake perception node
 - PR2: task pose generation node
 - PR3: bringup launch for the non-MoveIt pipeline
 - PR4: validation scripts and documentation cleanup
+- PR5: optional Panda MoveIt2 demo bringup
 - Future PR: MoveIt2 planning integration
