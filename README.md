@@ -32,3 +32,6 @@ source install/setup.bash
 * PR2: Panda MoveIt2 bringup
 * PR3: task node for pre-grasp and assembly poses
 * PR4: MoveIt2 planning integration
+
+### Active Dev Session
+* CLI Resume: `codex resume 019eef8e-994c-7791-8542-7caf4ccc2c0c`

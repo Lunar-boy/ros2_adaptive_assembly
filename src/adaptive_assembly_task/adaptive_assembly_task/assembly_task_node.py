@@ -1,0 +1,143 @@
+"""Compute task-level poses from perceived assembly target poses."""
+
+import math
+
+from geometry_msgs.msg import PoseStamped
+import rclpy
+from rclpy.node import Node
+
+
+class AssemblyTaskNode(Node):
+    """Publish pre-grasp and assembly poses for each perceived target."""
+
+    def __init__(self) -> None:
+        """Initialize parameters, publishers, and target pose subscription."""
+        super().__init__('assembly_task_node')
+
+        self.declare_parameter('pre_grasp_height_offset', 0.20)
+        self.declare_parameter('assembly_height_offset', 0.05)
+        self.declare_parameter('replan_distance_threshold', 0.03)
+
+        self._pre_grasp_height_offset = self.get_parameter(
+            'pre_grasp_height_offset'
+        ).value
+        self._assembly_height_offset = self.get_parameter(
+            'assembly_height_offset'
+        ).value
+        self._replan_distance_threshold = self.get_parameter(
+            'replan_distance_threshold'
+        ).value
+        self._validate_parameters()
+
+        self._pre_grasp_publisher = self.create_publisher(
+            PoseStamped, '/pre_grasp_pose', 10
+        )
+        self._assembly_publisher = self.create_publisher(
+            PoseStamped, '/assembly_pose', 10
+        )
+        self._target_subscription = self.create_subscription(
+            PoseStamped, '/target_pose', self._target_pose_callback, 10
+        )
+        self._previous_target_pose = None
+
+    def _validate_parameters(self) -> None:
+        """Reject a negative replanning distance threshold."""
+        if self._replan_distance_threshold < 0.0:
+            raise ValueError(
+                'replan_distance_threshold must be greater than or equal to '
+                'zero'
+            )
+
+    def _target_pose_callback(self, target_pose: PoseStamped) -> None:
+        """Compute and publish task poses for a received target pose."""
+        position = target_pose.pose.position
+        self.get_logger().info(
+            'Received target pose: '
+            f'x={position.x:.3f}, y={position.y:.3f}, z={position.z:.3f}'
+        )
+
+        self._log_replanning_decision(target_pose)
+
+        pre_grasp_pose = self._offset_pose(
+            target_pose, self._pre_grasp_height_offset
+        )
+        assembly_pose = self._offset_pose(
+            target_pose, self._assembly_height_offset
+        )
+
+        self._pre_grasp_publisher.publish(pre_grasp_pose)
+        self._assembly_publisher.publish(assembly_pose)
+
+        self.get_logger().info(
+            'Computed pre-grasp pose: '
+            f'x={pre_grasp_pose.pose.position.x:.3f}, '
+            f'y={pre_grasp_pose.pose.position.y:.3f}, '
+            f'z={pre_grasp_pose.pose.position.z:.3f}'
+        )
+        self.get_logger().info(
+            'Computed assembly pose: '
+            f'x={assembly_pose.pose.position.x:.3f}, '
+            f'y={assembly_pose.pose.position.y:.3f}, '
+            f'z={assembly_pose.pose.position.z:.3f}'
+        )
+
+        self._previous_target_pose = target_pose
+
+    def _log_replanning_decision(self, target_pose: PoseStamped) -> None:
+        """Log whether target movement requires planning or replanning."""
+        if self._previous_target_pose is None:
+            self.get_logger().info(
+                'First target pose accepted; initial planning is required'
+            )
+            return
+
+        current = target_pose.pose.position
+        previous = self._previous_target_pose.pose.position
+        distance = math.sqrt(
+            (current.x - previous.x) ** 2
+            + (current.y - previous.y) ** 2
+            + (current.z - previous.z) ** 2
+        )
+
+        if distance > self._replan_distance_threshold:
+            self.get_logger().info(
+                'Target moved '
+                f'{distance:.3f} m; replanning is required'
+            )
+        else:
+            self.get_logger().info(
+                'Target moved '
+                f'{distance:.3f} m; target change is small and no replanning '
+                'is required'
+            )
+
+    @staticmethod
+    def _offset_pose(
+        target_pose: PoseStamped, height_offset: float
+    ) -> PoseStamped:
+        """Return a pose with a vertical offset and copied orientation."""
+        result = PoseStamped()
+        result.header = target_pose.header
+        result.pose.position.x = target_pose.pose.position.x
+        result.pose.position.y = target_pose.pose.position.y
+        result.pose.position.z = target_pose.pose.position.z + height_offset
+        result.pose.orientation = target_pose.pose.orientation
+        return result
+
+
+def main(args=None) -> None:
+    """Run the assembly task node."""
+    rclpy.init(args=args)
+    node = AssemblyTaskNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()
