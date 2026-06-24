@@ -24,3 +24,7 @@ htmlcov/
 *.swp
 *.swo
 *~
+
+# generated benchmark outputs
+benchmark_results/
+*.csv

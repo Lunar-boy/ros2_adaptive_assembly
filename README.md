@@ -134,6 +134,17 @@ python3 scripts/check_planning_status_format.py
 
 See [docs/planning_diagnostics.md](docs/planning_diagnostics.md).
 
+## Planning benchmark recording
+
+Planning diagnostics can be recorded to CSV and summarized into
+success/failure/skipped counts plus duration statistics:
+
+```bash
+MAX_EVENTS=20 TIMEOUT_SEC=120 OUTPUT=benchmark_results/planning_diagnostics.csv bash scripts/run_planning_benchmark.sh
+```
+
+See [docs/planning_benchmark.md](docs/planning_benchmark.md).
+
 ## Roadmap
 
 - PR1: fake perception node
@@ -146,4 +157,5 @@ See [docs/planning_diagnostics.md](docs/planning_diagnostics.md).
 - PR8: frame-aware Panda pre-grasp pose adapter
 - PR9: static PlanningScene collision objects for Panda planning demo
 - PR10: planning diagnostics and timing topics
+- PR11: planning diagnostics CSV benchmark recorder
 - Future PR: dynamic PlanningScene updates and planning refinements
