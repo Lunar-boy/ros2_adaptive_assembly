@@ -1,4 +1,4 @@
-"""Launch the Panda-specific pre-grasp pose adapter."""
+"""Adapt task-level pre-grasp poses into the Panda planning frame."""
 
 from launch import LaunchDescription
 from launch_ros.actions import Node
@@ -15,6 +15,7 @@ def generate_launch_description() -> LaunchDescription:
             parameters=[{
                 'input_topic': '/pre_grasp_pose',
                 'output_topic': '/panda_pre_grasp_pose',
+                'output_frame_id': 'panda_link0',
                 'x_offset': 0.0,
                 'y_offset': 0.0,
                 'z_offset': 0.0,

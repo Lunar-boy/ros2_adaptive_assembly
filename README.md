@@ -100,6 +100,8 @@ real hardware. See
 `/pre_grasp_pose` is task-level. `/panda_pre_grasp_pose` is robot-specific and
 uses a configurable Panda-oriented end-effector orientation. The Panda planning
 demo uses `/panda_pre_grasp_pose` as the planning bridge input.
+By default, `/panda_pre_grasp_pose` uses frame `panda_link0` for compatibility
+with the standard Panda MoveIt2 demo.
 
 See [docs/panda_pre_grasp_pose_adapter.md](docs/panda_pre_grasp_pose_adapter.md).
 
@@ -112,4 +114,5 @@ See [docs/panda_pre_grasp_pose_adapter.md](docs/panda_pre_grasp_pose_adapter.md)
 - PR5: optional Panda MoveIt2 demo bringup
 - PR6: plan-only MoveIt2 pre-grasp planning bridge
 - PR7: Panda pre-grasp pose adapter for robot-aware planning targets
+- PR8: frame-aware Panda pre-grasp pose adapter
 - Future PR: PlanningScene collision objects and planning refinements
