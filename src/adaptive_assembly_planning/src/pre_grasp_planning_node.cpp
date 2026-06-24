@@ -13,6 +13,7 @@ class PreGraspPlanningBridge
 public:
   explicit PreGraspPlanningBridge(const rclcpp::Node::SharedPtr & node)
   : node_(node),
+    input_topic_(declare_parameter<std::string>("input_topic", "/pre_grasp_pose")),
     planning_group_(declare_parameter<std::string>("planning_group", "panda_arm")),
     planning_time_sec_(declare_parameter<double>("planning_time_sec", 5.0)),
     position_tolerance_(declare_parameter<double>("position_tolerance", 0.01)),
@@ -28,16 +29,16 @@ public:
       "/pre_grasp_plan_success", 10);
     pre_grasp_subscription_ =
       node_->create_subscription<geometry_msgs::msg::PoseStamped>(
-      "/pre_grasp_pose", 10,
+      input_topic_, 10,
       [this](const geometry_msgs::msg::PoseStamped::SharedPtr message) {
         pre_grasp_pose_callback(*message);
       });
 
     RCLCPP_INFO(
       node_->get_logger(),
-      "Pre-grasp planning bridge ready for group '%s'. Planning only; execution is "
-      "intentionally disabled in this PR.",
-      planning_group_.c_str());
+      "Pre-grasp planning bridge ready for group '%s' using input topic '%s'. "
+      "Planning only; execution is intentionally disabled in this PR.",
+      planning_group_.c_str(), input_topic_.c_str());
   }
 
 private:
@@ -117,6 +118,7 @@ private:
   }
 
   rclcpp::Node::SharedPtr node_;
+  std::string input_topic_;
   std::string planning_group_;
   double planning_time_sec_;
   double position_tolerance_;

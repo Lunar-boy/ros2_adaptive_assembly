@@ -29,8 +29,20 @@ ament_target_dependencies(
   moveit_msgs
 )
 
+add_executable(
+  panda_pre_grasp_pose_adapter_node
+  src/panda_pre_grasp_pose_adapter_node.cpp
+)
+ament_target_dependencies(
+  panda_pre_grasp_pose_adapter_node
+  rclcpp
+  geometry_msgs
+)
+
 install(
-  TARGETS pre_grasp_planning_node
+  TARGETS
+    pre_grasp_planning_node
+    panda_pre_grasp_pose_adapter_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
