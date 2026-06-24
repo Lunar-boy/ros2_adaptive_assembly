@@ -70,6 +70,13 @@ python3 scripts/summarize_planning_diagnostics_csv.py --input benchmark_results/
 
 The benchmark scripts assume the Panda planning demo is already running.
 
+## Reproducible seeded benchmark profile
+
+PR12 adds a deterministic launch profile for more repeatable benchmark CSV
+results. It uses seeded fake perception parameters and the same PR11 recording
+tools. See
+[reproducible_benchmark_profile.md](reproducible_benchmark_profile.md).
+
 This benchmark tooling is deliberately minimal:
 
 - no Gazebo
