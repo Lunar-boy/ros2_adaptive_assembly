@@ -15,9 +15,19 @@ as the `world` to `target_object` TF transform.
 | `y_min` | `-0.25` | Minimum target y position in meters |
 | `y_max` | `0.25` | Maximum target y position in meters |
 | `z` | `0.15` | Fixed target z position in meters |
+| `random_seed` | `-1` | Seed for deterministic pose generation; negative values keep non-deterministic behavior |
+| `frame_id` | `world` | Frame used by `/target_pose` and TF parent |
+| `target_frame_id` | `target_object` | TF child frame for the target object |
+| `yaw_min` | `-pi` | Minimum sampled target yaw in radians |
+| `yaw_max` | `pi` | Maximum sampled target yaw in radians |
+| `publish_immediately` | `true` | Publish one pose immediately on startup before the timer |
 
-The published pose uses the `world` frame. Its orientation is a random yaw
-represented by a unit quaternion.
+The published pose uses `frame_id`. Its orientation is a sampled yaw represented
+by a unit quaternion.
+
+For deterministic benchmark mode, set `random_seed` to a non-negative integer.
+The same seed and parameter ranges produce the same pose sequence. A negative
+`random_seed` preserves non-deterministic behavior.
 
 ## Build
 
@@ -41,6 +51,12 @@ Run the node directly:
 
 ```bash
 ros2 run adaptive_assembly_perception fake_object_pose_node
+```
+
+Run the node directly with deterministic pose generation:
+
+```bash
+ros2 run adaptive_assembly_perception fake_object_pose_node --ros-args -p random_seed:=42
 ```
 
 Parameters can be overridden from the launch command, for example:

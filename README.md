@@ -145,6 +145,25 @@ MAX_EVENTS=20 TIMEOUT_SEC=120 OUTPUT=benchmark_results/planning_diagnostics.csv 
 
 See [docs/planning_benchmark.md](docs/planning_benchmark.md).
 
+## Reproducible benchmark profile
+
+The seeded benchmark profile uses deterministic fake perception with
+`random_seed: 42`. Default demo behavior remains unchanged and
+non-deterministic.
+
+```bash
+ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_benchmark.launch.py
+```
+
+Record the seeded benchmark:
+
+```bash
+MAX_EVENTS=20 TIMEOUT_SEC=120 OUTPUT=benchmark_results/seeded_planning_diagnostics.csv bash scripts/run_seeded_planning_benchmark.sh
+```
+
+See
+[docs/reproducible_benchmark_profile.md](docs/reproducible_benchmark_profile.md).
+
 ## Roadmap
 
 - PR1: fake perception node
@@ -158,4 +177,5 @@ See [docs/planning_benchmark.md](docs/planning_benchmark.md).
 - PR9: static PlanningScene collision objects for Panda planning demo
 - PR10: planning diagnostics and timing topics
 - PR11: planning diagnostics CSV benchmark recorder
+- PR12: reproducible seeded planning benchmark profile
 - Future PR: dynamic PlanningScene updates and planning refinements

@@ -33,6 +33,11 @@ fake_object_pose_node
 `adaptive_assembly_bringup` provides the single launch entry point and parameter
 file for the current pipeline.
 
+The pipeline launch supports a `params_file` launch argument. Without this
+argument it uses the default demo parameters. Passing another YAML file allows
+the same launch entry point to run alternate profiles, such as the seeded
+benchmark profile.
+
 ## Run the pipeline
 
 ```bash
@@ -41,6 +46,13 @@ source /opt/ros/jazzy/setup.bash
 colcon build --symlink-install
 source install/setup.bash
 ros2 launch adaptive_assembly_bringup adaptive_assembly_pipeline.launch.py
+```
+
+Run with an explicit parameter file:
+
+```bash
+ros2 launch adaptive_assembly_bringup adaptive_assembly_pipeline.launch.py \
+  params_file:=/path/to/params.yaml
 ```
 
 ## Validate the pipeline

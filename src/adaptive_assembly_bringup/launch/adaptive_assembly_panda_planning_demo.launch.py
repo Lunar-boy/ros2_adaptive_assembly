@@ -1,9 +1,11 @@
 """Launch the Panda MoveIt2 demo with adapted plan-only pre-grasp planning."""
 
 from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
 from launch.actions import LogInfo
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
 from launch.substitutions import PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 
@@ -15,6 +17,12 @@ def generate_launch_description() -> LaunchDescription:
         'launch',
         'adaptive_assembly_panda_demo.launch.py',
     ])
+    default_params_file = PathJoinSubstitution([
+        FindPackageShare('adaptive_assembly_bringup'),
+        'config',
+        'adaptive_assembly_params.yaml',
+    ])
+    params_file = LaunchConfiguration('params_file')
     static_planning_scene_launch = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_planning'),
         'launch',
@@ -32,6 +40,11 @@ def generate_launch_description() -> LaunchDescription:
     ])
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'params_file',
+            default_value=default_params_file,
+            description='Parameter YAML for adaptive assembly pipeline nodes.',
+        ),
         LogInfo(
             msg='Launching adaptive assembly Panda planning demo: fake '
             'perception, task pose generation, standard Panda MoveIt2 demo, '
@@ -40,6 +53,7 @@ def generate_launch_description() -> LaunchDescription:
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(panda_demo_launch),
+            launch_arguments={'params_file': params_file}.items(),
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(static_planning_scene_launch),
