@@ -12,6 +12,7 @@ public:
   : node_(node),
     input_topic_(declare_parameter<std::string>("input_topic", "/pre_grasp_pose")),
     output_topic_(declare_parameter<std::string>("output_topic", "/panda_pre_grasp_pose")),
+    output_frame_id_(declare_parameter<std::string>("output_frame_id", "")),
     x_offset_(declare_parameter<double>("x_offset", 0.0)),
     y_offset_(declare_parameter<double>("y_offset", 0.0)),
     z_offset_(declare_parameter<double>("z_offset", 0.0)),
@@ -35,8 +36,8 @@ public:
     RCLCPP_INFO(
       node_->get_logger(),
       "Panda pre-grasp pose adapter ready: input_topic='%s', output_topic='%s', "
-      "use_fixed_orientation=%s.",
-      input_topic_.c_str(), output_topic_.c_str(),
+      "output_frame_id='%s', use_fixed_orientation=%s.",
+      input_topic_.c_str(), output_topic_.c_str(), output_frame_id_.c_str(),
       use_fixed_orientation_ ? "true" : "false");
   }
 
@@ -61,6 +62,9 @@ private:
 
     geometry_msgs::msg::PoseStamped output_pose;
     output_pose.header = input_pose.header;
+    if (!output_frame_id_.empty()) {
+      output_pose.header.frame_id = output_frame_id_;
+    }
     output_pose.pose.position.x = input_pose.pose.position.x + x_offset_;
     output_pose.pose.position.y = input_pose.pose.position.y + y_offset_;
     output_pose.pose.position.z = input_pose.pose.position.z + z_offset_;
@@ -84,11 +88,13 @@ private:
     const auto & output_orientation = output_pose.pose.orientation;
     RCLCPP_INFO(
       node_->get_logger(),
-      "Published Panda pre-grasp pose: frame='%s', x=%.3f, y=%.3f, z=%.3f, "
+      "Published Panda pre-grasp pose: input_frame='%s', output_frame='%s', "
+      "x=%.3f, y=%.3f, z=%.3f, "
       "qx=%.3f, qy=%.3f, qz=%.3f, qw=%.3f, fixed_orientation=%s",
-      output_pose.header.frame_id.c_str(), output_position.x, output_position.y,
-      output_position.z, output_orientation.x, output_orientation.y,
-      output_orientation.z, output_orientation.w,
+      input_pose.header.frame_id.c_str(), output_pose.header.frame_id.c_str(),
+      output_position.x, output_position.y, output_position.z,
+      output_orientation.x, output_orientation.y, output_orientation.z,
+      output_orientation.w,
       use_fixed_orientation_ ? "true" : "false");
   }
 
@@ -120,6 +126,7 @@ private:
   rclcpp::Node::SharedPtr node_;
   std::string input_topic_;
   std::string output_topic_;
+  std::string output_frame_id_;
   double x_offset_;
   double y_offset_;
   double z_offset_;

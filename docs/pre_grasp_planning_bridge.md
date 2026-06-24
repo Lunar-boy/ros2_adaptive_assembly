@@ -35,6 +35,10 @@ subscribes to `/panda_pre_grasp_pose`. The C++ node still supports a configurabl
 `input_topic` parameter and defaults to `/pre_grasp_pose` if launched manually
 without parameters.
 
+When launched through `panda_pre_grasp_pose_adapter.launch.py`,
+`/panda_pre_grasp_pose` defaults to frame `panda_link0`. This reduces frame
+mismatch risk with the standard Panda MoveIt2 demo.
+
 The bridge is intentionally plan-only. Gazebo, ros2_control integration for this
 project, real robot hardware, and PlanningScene collision objects are not added
 yet.

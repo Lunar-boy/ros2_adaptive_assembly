@@ -1,23 +1,27 @@
 # Panda pre-grasp pose adapter
 
-`/pre_grasp_pose` is a task-level pose derived from the target object. Its
-orientation is copied from the object, which is useful for task abstraction but
-is not always a suitable Panda end-effector orientation for MoveIt2 IK and
-planning.
+`/pre_grasp_pose` is a task-level pose derived from the target object. It comes
+from the fake perception/task pipeline in frame `world`, and its orientation is
+copied from the object. That is useful for task abstraction, but object
+orientation is not always a suitable Panda end-effector orientation for MoveIt2
+IK and planning.
 
-PR7 adds `panda_pre_grasp_pose_adapter_node`, which converts the task-level pose
-into a robot-specific `/panda_pre_grasp_pose`. This keeps the task layer generic
-while giving the Panda planning bridge a more explicit robot-aware target.
+`/panda_pre_grasp_pose` is robot-specific. PR7 introduced the adapter and PR8
+makes it frame-aware: the default launch now publishes the adapted pose in frame
+`panda_link0`, which is appropriate for the standard Panda MoveIt2 demo.
+
+The numeric position is currently copied from the task pose, with optional
+configured offsets. The frame and orientation are adapted for the Panda demo.
 
 ```text
 /pre_grasp_pose
-     │
+     │ frame: world
      ▼
 panda_pre_grasp_pose_adapter_node
-     │
+     │ output_frame_id: panda_link0
      ▼
 /panda_pre_grasp_pose
-     │
+     │ frame: panda_link0
      ▼
 pre_grasp_planning_node
      │
@@ -55,14 +59,20 @@ ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_demo.laun
 
 ```bash
 bash scripts/check_panda_adapted_pose.sh
-python3 scripts/check_panda_pose_adapter_orientation.py
-ros2 topic echo /panda_pre_grasp_pose
-ros2 topic echo /pre_grasp_plan_success
+bash scripts/check_panda_adapted_pose_frame.sh
+python3 scripts/check_panda_pose_adapter_orientation.py --expected-frame panda_link0
+ros2 topic echo --once /panda_pre_grasp_pose
 ```
 
 The launch remains plan-only:
 
 - trajectories are not executed
 - Gazebo is not used
+- ros2_control is not used by this project
 - PlanningScene collision objects are not included yet
 - real hardware is not used
+
+## Next PR
+
+A future PR can add simple PlanningScene collision objects after the planning
+frame is stable.
