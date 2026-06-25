@@ -31,11 +31,24 @@ public:
     position_tolerance_(declare_parameter<double>("position_tolerance", 0.01)),
     orientation_tolerance_(declare_parameter<double>("orientation_tolerance", 0.10)),
     min_replan_distance_(declare_parameter<double>("min_replan_distance", 0.03)),
+    planner_id_(declare_parameter<std::string>("planner_id", "")),
+    num_planning_attempts_(declare_parameter<int>("num_planning_attempts", 1)),
+    max_velocity_scaling_factor_(declare_parameter<double>(
+        "max_velocity_scaling_factor", 1.0)),
+    max_acceleration_scaling_factor_(declare_parameter<double>(
+        "max_acceleration_scaling_factor", 1.0)),
     move_group_(node_, planning_group_)
   {
+    validate_planner_settings();
     move_group_.setPlanningTime(planning_time_sec_);
     move_group_.setGoalPositionTolerance(position_tolerance_);
     move_group_.setGoalOrientationTolerance(orientation_tolerance_);
+    if (!planner_id_.empty()) {
+      move_group_.setPlannerId(planner_id_);
+    }
+    move_group_.setNumPlanningAttempts(num_planning_attempts_);
+    move_group_.setMaxVelocityScalingFactor(max_velocity_scaling_factor_);
+    move_group_.setMaxAccelerationScalingFactor(max_acceleration_scaling_factor_);
 
     plan_success_publisher_ = node_->create_publisher<std_msgs::msg::Bool>(
       success_topic_, 10);
@@ -54,11 +67,14 @@ public:
       node_->get_logger(),
       "Pre-grasp planning bridge ready for group '%s' using input topic '%s'. "
       "success_topic='%s', status_topic='%s', duration_topic='%s', "
-      "publish_diagnostics=%s. Planning only; execution is intentionally "
-      "disabled in this PR.",
+      "publish_diagnostics=%s. planner_id='%s', num_planning_attempts=%d, "
+      "max_velocity_scaling_factor=%.3f, max_acceleration_scaling_factor=%.3f. "
+      "Planning only; execution is intentionally disabled in this PR.",
       planning_group_.c_str(), input_topic_.c_str(), success_topic_.c_str(),
       status_topic_.c_str(), duration_topic_.c_str(),
-      publish_diagnostics_ ? "true" : "false");
+      publish_diagnostics_ ? "true" : "false", planner_id_.c_str(),
+      num_planning_attempts_, max_velocity_scaling_factor_,
+      max_acceleration_scaling_factor_);
   }
 
 private:
@@ -69,6 +85,43 @@ private:
       node_->declare_parameter<ParameterT>(name, default_value);
     }
     return node_->get_parameter(name).get_value<ParameterT>();
+  }
+
+  void validate_planner_settings()
+  {
+    if (num_planning_attempts_ < 1) {
+      RCLCPP_WARN(
+        node_->get_logger(),
+        "num_planning_attempts=%d is invalid; clamping to 1.",
+        num_planning_attempts_);
+      num_planning_attempts_ = 1;
+    }
+
+    max_velocity_scaling_factor_ = clamp_scaling_factor(
+      "max_velocity_scaling_factor", max_velocity_scaling_factor_);
+    max_acceleration_scaling_factor_ = clamp_scaling_factor(
+      "max_acceleration_scaling_factor", max_acceleration_scaling_factor_);
+  }
+
+  double clamp_scaling_factor(
+    const std::string & parameter_name,
+    const double value) const
+  {
+    if (value <= 0.0) {
+      RCLCPP_WARN(
+        node_->get_logger(),
+        "%s=%.3f is invalid; clamping to 1.0.",
+        parameter_name.c_str(), value);
+      return 1.0;
+    }
+    if (value > 1.0) {
+      RCLCPP_WARN(
+        node_->get_logger(),
+        "%s=%.3f is invalid; clamping to 1.0.",
+        parameter_name.c_str(), value);
+      return 1.0;
+    }
+    return value;
   }
 
   void pre_grasp_pose_callback(const geometry_msgs::msg::PoseStamped & pose)
@@ -197,6 +250,10 @@ private:
     stream << ";min_replan_distance=" << min_replan_distance_;
     stream << ";duration_ms=" << duration_ms;
     stream << ";execution=false";
+    stream << ";planner_id=" << planner_id_;
+    stream << ";num_planning_attempts=" << num_planning_attempts_;
+    stream << ";max_velocity_scaling_factor=" << max_velocity_scaling_factor_;
+    stream << ";max_acceleration_scaling_factor=" << max_acceleration_scaling_factor_;
     return stream.str();
   }
 
@@ -211,6 +268,10 @@ private:
   double position_tolerance_;
   double orientation_tolerance_;
   double min_replan_distance_;
+  std::string planner_id_;
+  int num_planning_attempts_;
+  double max_velocity_scaling_factor_;
+  double max_acceleration_scaling_factor_;
   moveit::planning_interface::MoveGroupInterface move_group_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr plan_success_publisher_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr planning_status_publisher_;

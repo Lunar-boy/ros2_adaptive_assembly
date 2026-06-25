@@ -23,6 +23,10 @@ def generate_launch_description() -> LaunchDescription:
                 'position_tolerance': 0.01,
                 'orientation_tolerance': 0.10,
                 'min_replan_distance': 0.03,
+                'planner_id': '',
+                'num_planning_attempts': 1,
+                'max_velocity_scaling_factor': 1.0,
+                'max_acceleration_scaling_factor': 1.0,
             }],
         ),
     ])

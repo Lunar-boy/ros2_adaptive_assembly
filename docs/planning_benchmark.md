@@ -86,6 +86,18 @@ profile runs.
 
 See [benchmark_profile_suite.md](benchmark_profile_suite.md).
 
+## Planner setting metadata
+
+PR20 records planner setting fields in benchmark CSV output:
+
+- `planner_id`
+- `num_planning_attempts`
+- `max_velocity_scaling_factor`
+- `max_acceleration_scaling_factor`
+
+This makes it possible to compare benchmark runs produced with different
+MoveIt2 planner settings. See [planner_settings.md](planner_settings.md).
+
 ## Markdown report export
 
 PR19 adds Markdown report export for CSV comparisons:
