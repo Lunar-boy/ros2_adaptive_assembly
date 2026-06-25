@@ -203,6 +203,25 @@ python3 scripts/compare_planning_benchmark_csvs.py \
 
 See [docs/benchmark_profile_suite.md](docs/benchmark_profile_suite.md).
 
+## Benchmark report export
+
+Benchmark CSV comparisons can also be exported as Markdown:
+
+```bash
+python3 scripts/compare_planning_benchmark_csvs.py \
+  --input no_dynamic=benchmark_results/no_dynamic_target.csv \
+  --input with_dynamic=benchmark_results/with_dynamic_target.csv \
+  --output-markdown benchmark_results/dynamic_target_ab_report.md
+```
+
+Validate report export:
+
+```bash
+bash scripts/check_benchmark_report_export.sh
+```
+
+See [docs/benchmark_report_export.md](docs/benchmark_report_export.md).
+
 ## Dynamic target PlanningScene object
 
 The Panda planning demo now starts a dynamic target scene node. It subscribes
@@ -285,4 +304,5 @@ See
 - PR16: dynamic target PlanningScene clear/reset service
 - PR17: static PlanningScene clear/reapply services
 - PR18: unified PlanningScene reset workflow
+- PR19: Markdown benchmark report export
 - Future PR: dynamic PlanningScene updates and planning refinements

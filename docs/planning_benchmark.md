@@ -86,6 +86,19 @@ profile runs.
 
 See [benchmark_profile_suite.md](benchmark_profile_suite.md).
 
+## Markdown report export
+
+PR19 adds Markdown report export for CSV comparisons:
+
+```bash
+python3 scripts/compare_planning_benchmark_csvs.py \
+  --input baseline=benchmark_results/baseline.csv \
+  --input narrow=benchmark_results/narrow.csv \
+  --output-markdown benchmark_results/benchmark_report.md
+```
+
+See [benchmark_report_export.md](benchmark_report_export.md).
+
 This benchmark tooling is deliberately minimal:
 
 - no Gazebo
