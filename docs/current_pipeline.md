@@ -38,6 +38,11 @@ argument it uses the default demo parameters. Passing another YAML file allows
 the same launch entry point to run alternate profiles, such as the seeded
 benchmark profile.
 
+The optional Panda planning stack adds a Panda-specific pose adapter downstream
+of this non-MoveIt pipeline. PR22 adds an optional TF2 transform mode to that
+adapter and a status topic, `/panda_pose_adapter_status`. The default pipeline
+and default adapter launch behavior remain unchanged.
+
 ## Run the pipeline
 
 ```bash
