@@ -68,6 +68,15 @@ In another terminal:
 MAX_EVENTS=20 TIMEOUT_SEC=120 OUTPUT=benchmark_results/seeded_planning_diagnostics.csv bash scripts/run_seeded_planning_benchmark.sh
 ```
 
+## Benchmark profile suite
+
+PR13 adds narrow, wide, and fixed-yaw deterministic benchmark profiles on top
+of the baseline seeded profile. These profiles let users compare planning
+success/failure/skipped counts and duration statistics across repeatable target
+distributions.
+
+See [benchmark_profile_suite.md](benchmark_profile_suite.md).
+
 This profile is still plan-only:
 
 - no trajectory execution
@@ -78,6 +87,5 @@ This profile is still plan-only:
 
 ## Next PR
 
-A future PR can add controlled benchmark profiles for wider or narrower target
-distributions, or compare planning with and without static PlanningScene
-objects.
+A future PR can compare planning with and without static PlanningScene objects,
+or add more structured planning diagnostics/benchmark reports.

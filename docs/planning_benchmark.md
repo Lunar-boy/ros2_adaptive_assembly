@@ -77,6 +77,15 @@ results. It uses seeded fake perception parameters and the same PR11 recording
 tools. See
 [reproducible_benchmark_profile.md](reproducible_benchmark_profile.md).
 
+## Comparing multiple benchmark CSV files
+
+PR13 adds deterministic baseline, narrow, wide, and fixed-yaw benchmark
+profiles plus a CSV comparison helper. This makes it possible to compare
+success/failure/skipped counts and duration statistics across repeatable
+profile runs.
+
+See [benchmark_profile_suite.md](benchmark_profile_suite.md).
+
 This benchmark tooling is deliberately minimal:
 
 - no Gazebo

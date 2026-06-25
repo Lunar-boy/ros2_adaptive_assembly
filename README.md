@@ -164,6 +164,30 @@ MAX_EVENTS=20 TIMEOUT_SEC=120 OUTPUT=benchmark_results/seeded_planning_diagnosti
 See
 [docs/reproducible_benchmark_profile.md](docs/reproducible_benchmark_profile.md).
 
+## Benchmark profile suite
+
+The benchmark suite provides deterministic baseline, narrow, wide, and
+fixed-yaw target-pose profiles for comparing planning diagnostics CSV files.
+
+Validate the installed profile suite:
+
+```bash
+bash scripts/check_benchmark_profile_suite.sh
+bash scripts/check_benchmark_profile_params.sh
+```
+
+Compare recorded benchmark CSV files:
+
+```bash
+python3 scripts/compare_planning_benchmark_csvs.py \
+  --input baseline=benchmark_results/baseline.csv \
+  --input narrow=benchmark_results/narrow.csv \
+  --input wide=benchmark_results/wide.csv \
+  --input fixed_yaw=benchmark_results/fixed_yaw.csv
+```
+
+See [docs/benchmark_profile_suite.md](docs/benchmark_profile_suite.md).
+
 ## Roadmap
 
 - PR1: fake perception node
@@ -178,4 +202,5 @@ See
 - PR10: planning diagnostics and timing topics
 - PR11: planning diagnostics CSV benchmark recorder
 - PR12: reproducible seeded planning benchmark profile
+- PR13: deterministic benchmark profile suite and CSV comparison tools
 - Future PR: dynamic PlanningScene updates and planning refinements
