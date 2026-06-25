@@ -36,6 +36,12 @@ Benchmark-specific launch profiles can set different values in
 `adaptive_assembly_planning/launch/pre_grasp_planning.launch.py` or include the
 node with custom parameters.
 
+## Planner-settings benchmark profiles
+
+PR21 adds deterministic launch profiles for comparing default attempts,
+increased planning attempts, and slower velocity/acceleration scaling. See
+[planner_settings_benchmark_profiles.md](planner_settings_benchmark_profiles.md).
+
 ## Validate
 
 With the Panda planning demo already running:
