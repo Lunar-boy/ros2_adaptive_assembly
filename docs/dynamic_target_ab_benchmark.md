@@ -39,6 +39,16 @@ ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_benchmark
 
 Run one benchmark launch at a time.
 
+Before recording each CSV, you can reset the PlanningScene to a clean baseline:
+
+```bash
+bash scripts/reset_planning_scene_once.sh
+```
+
+This clears the dynamic target object, clears static objects, and reapplies
+static objects. See
+[planning_scene_reset_workflow.md](planning_scene_reset_workflow.md).
+
 Without dynamic target:
 
 ```bash
