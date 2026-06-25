@@ -12,6 +12,10 @@ the static PlanningScene behavior described here.
 PR11 benchmark scripts can be used to measure planning behavior while these
 static PlanningScene objects are enabled.
 
+PR14 adds a separate dynamic target collision object node. The static table and
+support behavior described here remains unchanged. See
+[dynamic_target_scene.md](dynamic_target_scene.md).
+
 Initial objects:
 
 - `work_table`: a broad table/workcell box in frame `panda_link0`
@@ -66,5 +70,5 @@ The PlanningScene integration is deliberately minimal:
 
 ## Next PR
 
-A future PR can add dynamic target collision objects or planning
-diagnostics/benchmarking.
+A future PR can add object removal/reset utilities or compare benchmark results
+with different PlanningScene configurations.

@@ -70,6 +70,10 @@ MAX_EVENTS=20 TIMEOUT_SEC=120 OUTPUT=benchmark_results/baseline.csv bash scripts
 
 Repeat with a different output file for each profile.
 
+PR14 adds a dynamic target PlanningScene object to the Panda planning demo.
+Future comparisons can use the same profile suite to measure planning
+diagnostics with that dynamic target object enabled.
+
 ## Compare CSV files
 
 ```bash

@@ -188,6 +188,26 @@ python3 scripts/compare_planning_benchmark_csvs.py \
 
 See [docs/benchmark_profile_suite.md](docs/benchmark_profile_suite.md).
 
+## Dynamic target PlanningScene object
+
+The Panda planning demo now starts a dynamic target scene node. It subscribes
+to `/panda_pre_grasp_pose`, applies or updates the `target_object_dynamic`
+collision object, and publishes:
+
+- `/dynamic_target_scene_ready`
+- `/dynamic_target_scene_status`
+
+Validation helpers:
+
+```bash
+bash scripts/check_dynamic_target_scene_available.sh
+bash scripts/check_dynamic_target_scene_ready.sh
+python3 scripts/check_dynamic_target_scene_status.py
+```
+
+This remains plan-only; no trajectory execution is added. See
+[docs/dynamic_target_scene.md](docs/dynamic_target_scene.md).
+
 ## Roadmap
 
 - PR1: fake perception node
@@ -203,4 +223,5 @@ See [docs/benchmark_profile_suite.md](docs/benchmark_profile_suite.md).
 - PR11: planning diagnostics CSV benchmark recorder
 - PR12: reproducible seeded planning benchmark profile
 - PR13: deterministic benchmark profile suite and CSV comparison tools
+- PR14: dynamic target collision object in PlanningScene
 - Future PR: dynamic PlanningScene updates and planning refinements
