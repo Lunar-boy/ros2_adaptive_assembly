@@ -46,6 +46,13 @@ The node publishes:
 - `/dynamic_target_scene_status`: `std_msgs/msg/String`, semicolon-separated
   key-value event status
 
+The node also provides `/clear_dynamic_target_scene` as a
+`std_srvs/srv/Trigger` service. Calling this service removes
+`target_object_dynamic`, resets internal state, publishes
+`/dynamic_target_scene_ready` as `false`, and emits a `cleared` or
+`clear_failed` status event. This is useful before repeated demos or benchmark
+comparisons.
+
 ## Build
 
 ```bash
@@ -67,6 +74,8 @@ ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_demo.laun
 bash scripts/check_dynamic_target_scene_available.sh
 bash scripts/check_dynamic_target_scene_ready.sh
 python3 scripts/check_dynamic_target_scene_status.py
+bash scripts/check_dynamic_target_clear_service.sh
+bash scripts/clear_dynamic_target_scene_once.sh
 ros2 topic echo /dynamic_target_scene_status
 ```
 
@@ -93,4 +102,4 @@ This PR is deliberately limited:
 ## Next PR
 
 A future PR can compare benchmarks with and without the dynamic target object,
-or add object removal/reset utilities.
+or add richer PlanningScene diagnostics.

@@ -196,6 +196,7 @@ collision object, and publishes:
 
 - `/dynamic_target_scene_ready`
 - `/dynamic_target_scene_status`
+- `/clear_dynamic_target_scene`
 
 Validation helpers:
 
@@ -203,9 +204,13 @@ Validation helpers:
 bash scripts/check_dynamic_target_scene_available.sh
 bash scripts/check_dynamic_target_scene_ready.sh
 python3 scripts/check_dynamic_target_scene_status.py
+bash scripts/check_dynamic_target_clear_service.sh
+bash scripts/clear_dynamic_target_scene_once.sh
 ```
 
-This remains plan-only; no trajectory execution is added. See
+The clear service removes `target_object_dynamic` and resets the ready flag,
+which is useful before repeated demos or benchmark comparisons. This remains
+plan-only; no trajectory execution is added. See
 [docs/dynamic_target_scene.md](docs/dynamic_target_scene.md).
 
 ## Dynamic target A/B benchmark
@@ -239,4 +244,5 @@ See
 - PR13: deterministic benchmark profile suite and CSV comparison tools
 - PR14: dynamic target collision object in PlanningScene
 - PR15: dynamic target PlanningScene toggle and A/B benchmark profiles
+- PR16: dynamic target PlanningScene clear/reset service
 - Future PR: dynamic PlanningScene updates and planning refinements
