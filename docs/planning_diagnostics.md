@@ -15,7 +15,7 @@ New diagnostic topics:
 The status message is a semicolon-separated key-value string. Example:
 
 ```text
-event=failure;frame=panda_link0;x=0.450000;y=0.000000;z=0.350000;distance_from_last_plan=none;min_replan_distance=0.030000;duration_ms=1001.234000;execution=false
+event=failure;frame=panda_link0;x=0.450000;y=0.000000;z=0.350000;distance_from_last_plan=none;min_replan_distance=0.030000;duration_ms=1001.234000;execution=false;planner_id=;num_planning_attempts=1;max_velocity_scaling_factor=1.000000;max_acceleration_scaling_factor=1.000000
 ```
 
 Supported event values:
@@ -27,6 +27,15 @@ Supported event values:
 
 This separates true planning failure from skipped replanning, provides timing
 data for future benchmarking, and makes demos easier to debug.
+
+PR20 adds planner setting metadata to each status message:
+
+- `planner_id`
+- `num_planning_attempts`
+- `max_velocity_scaling_factor`
+- `max_acceleration_scaling_factor`
+
+See [planner_settings.md](planner_settings.md).
 
 ```text
 /panda_pre_grasp_pose
@@ -60,6 +69,7 @@ ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_demo.laun
 bash scripts/check_planning_diagnostics.sh
 bash scripts/echo_planning_diagnostics_once.sh
 python3 scripts/check_planning_status_format.py
+bash scripts/check_planner_parameter_status.sh
 ```
 
 ## Benchmark recording

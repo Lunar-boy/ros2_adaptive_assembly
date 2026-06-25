@@ -21,6 +21,10 @@ REQUIRED_KEYS = {
     'min_replan_distance',
     'duration_ms',
     'execution',
+    'planner_id',
+    'num_planning_attempts',
+    'max_velocity_scaling_factor',
+    'max_acceleration_scaling_factor',
 }
 VALID_EVENTS = {'success', 'failure', 'skipped_small_motion'}
 
@@ -77,10 +81,29 @@ def _validate_status(status: str) -> int:
     if execution is not None and execution != 'false':
         failures.append(f'execution must be false, got: {execution}')
 
-    for key in ('x', 'y', 'z', 'duration_ms'):
+    for key in (
+        'x',
+        'y',
+        'z',
+        'duration_ms',
+        'max_velocity_scaling_factor',
+        'max_acceleration_scaling_factor',
+    ):
         value = fields.get(key)
         if value is not None and not _is_float(value):
             failures.append(f'{key} is not parseable as float: {value}')
+
+    attempts = fields.get('num_planning_attempts')
+    if attempts is not None:
+        try:
+            if int(attempts) < 1:
+                failures.append(
+                    f'num_planning_attempts must be >= 1, got: {attempts}'
+                )
+        except ValueError:
+            failures.append(
+                f'num_planning_attempts is not parseable as int: {attempts}'
+            )
 
     if failures:
         print('FAIL: /pre_grasp_planning_status has invalid format')

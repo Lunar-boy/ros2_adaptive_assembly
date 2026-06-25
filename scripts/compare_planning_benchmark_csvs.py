@@ -215,10 +215,23 @@ def _markdown_row(values: Sequence[str]) -> str:
     return '| ' + ' | '.join(values) + ' |'
 
 
+def _planner_id_values(rows: Sequence[dict]) -> List[str]:
+    if not rows or 'planner_id' not in rows[0]:
+        return []
+
+    values = sorted({
+        row.get('planner_id', '').strip() or '<default>'
+        for row in rows
+        if row.get('planner_id', '').strip() or 'planner_id' in row
+    })
+    return values
+
+
 def _write_markdown_report(
     output_path: Path,
     inputs: Sequence[BenchmarkInput],
     summaries: Sequence[BenchmarkSummary],
+    rows_by_label: dict[str, List[dict]],
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -273,6 +286,25 @@ def _write_markdown_report(
             summary.max_duration_ms,
         ]))
 
+    planner_lines = []
+    for benchmark_input in inputs:
+        planner_values = _planner_id_values(rows_by_label[benchmark_input.label])
+        if planner_values:
+            planner_lines.append(
+                f'- `{benchmark_input.label}`: '
+                + ', '.join(f'`{value}`' for value in planner_values)
+            )
+
+    if planner_lines:
+        lines.extend([
+            '',
+            '## Planner metadata',
+            '',
+            'Unique `planner_id` values by input:',
+            '',
+        ])
+        lines.extend(planner_lines)
+
     lines.extend([
         '',
         '## Notes',
@@ -291,15 +323,18 @@ def main() -> int:
     try:
         inputs = []
         summaries = []
+        rows_by_label = {}
         for input_value in args.input:
             label, input_path = _parse_input(input_value)
             benchmark_input = BenchmarkInput(label=label, path=input_path)
             inputs.append(benchmark_input)
-            summaries.append(_summarize(label, _read_rows(input_path)))
+            rows = _read_rows(input_path)
+            rows_by_label[label] = rows
+            summaries.append(_summarize(label, rows))
         _print_table(summaries)
         if args.output_markdown:
             output_path = Path(args.output_markdown)
-            _write_markdown_report(output_path, inputs, summaries)
+            _write_markdown_report(output_path, inputs, summaries, rows_by_label)
             print(f'Wrote Markdown report: {output_path}')
     except RuntimeError as error:
         print(f'FAIL: {error}')

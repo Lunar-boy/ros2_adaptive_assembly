@@ -149,6 +149,26 @@ python3 scripts/check_planning_status_format.py
 
 See [docs/planning_diagnostics.md](docs/planning_diagnostics.md).
 
+## Planner settings for benchmarking
+
+The plan-only MoveIt2 bridge exposes planner settings for benchmark metadata:
+
+- `planner_id`
+- `num_planning_attempts`
+- `max_velocity_scaling_factor`
+- `max_acceleration_scaling_factor`
+
+These fields are published in `/pre_grasp_planning_status`, recorded in
+benchmark CSV output, and included in Markdown report metadata when available.
+
+Validation helper:
+
+```bash
+bash scripts/check_planner_parameter_status.sh
+```
+
+See [docs/planner_settings.md](docs/planner_settings.md).
+
 ## Planning benchmark recording
 
 Planning diagnostics can be recorded to CSV and summarized into
@@ -305,4 +325,5 @@ See
 - PR17: static PlanningScene clear/reapply services
 - PR18: unified PlanningScene reset workflow
 - PR19: Markdown benchmark report export
+- PR20: configurable MoveIt2 planner settings for benchmarks
 - Future PR: dynamic PlanningScene updates and planning refinements

@@ -24,6 +24,12 @@ REQUIRED_FIELDS = (
     'duration_ms',
     'execution',
 )
+OPTIONAL_FIELDS = (
+    'planner_id',
+    'num_planning_attempts',
+    'max_velocity_scaling_factor',
+    'max_acceleration_scaling_factor',
+)
 CSV_COLUMNS = (
     'wall_time_sec',
     'event',
@@ -35,6 +41,10 @@ CSV_COLUMNS = (
     'min_replan_distance',
     'duration_ms',
     'execution',
+    'planner_id',
+    'num_planning_attempts',
+    'max_velocity_scaling_factor',
+    'max_acceleration_scaling_factor',
     'raw_status',
 )
 
@@ -88,6 +98,8 @@ class PlanningDiagnosticsCsvRecorder(Node):
             'raw_status': message.data,
         }
         for field in REQUIRED_FIELDS:
+            row[field] = fields.get(field, '')
+        for field in OPTIONAL_FIELDS:
             row[field] = fields.get(field, '')
 
         self._csv_writer.writerow(row)

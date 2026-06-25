@@ -14,6 +14,10 @@ The report reuses the same metrics printed by
 - overall success fraction
 - planning duration statistics
 
+When PR20 planner-setting columns are present in the input CSV files, the
+Markdown report also lists unique `planner_id` values per input. Empty
+`planner_id` values are shown as `<default>`.
+
 Example:
 
 ```bash
