@@ -31,6 +31,15 @@ def generate_launch_description() -> LaunchDescription:
     max_acceleration_scaling_factor = LaunchConfiguration(
         'max_acceleration_scaling_factor'
     )
+    enable_request_guard = LaunchConfiguration('enable_request_guard')
+    required_frame_id = LaunchConfiguration('required_frame_id')
+    workspace_min_x = LaunchConfiguration('workspace_min_x')
+    workspace_max_x = LaunchConfiguration('workspace_max_x')
+    workspace_min_y = LaunchConfiguration('workspace_min_y')
+    workspace_max_y = LaunchConfiguration('workspace_max_y')
+    workspace_min_z = LaunchConfiguration('workspace_min_z')
+    workspace_max_z = LaunchConfiguration('workspace_max_z')
+    min_quaternion_norm = LaunchConfiguration('min_quaternion_norm')
     static_planning_scene_launch = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_planning'),
         'launch',
@@ -85,6 +94,51 @@ def generate_launch_description() -> LaunchDescription:
             default_value='1.0',
             description='MoveIt2 acceleration scaling factor in (0.0, 1.0].',
         ),
+        DeclareLaunchArgument(
+            'enable_request_guard',
+            default_value='false',
+            description='Enable pre-MoveIt2 planning request safety checks.',
+        ),
+        DeclareLaunchArgument(
+            'required_frame_id',
+            default_value='',
+            description='Required input pose frame when request guard is enabled.',
+        ),
+        DeclareLaunchArgument(
+            'workspace_min_x',
+            default_value='-10.0',
+            description='Minimum allowed x when request guard is enabled.',
+        ),
+        DeclareLaunchArgument(
+            'workspace_max_x',
+            default_value='10.0',
+            description='Maximum allowed x when request guard is enabled.',
+        ),
+        DeclareLaunchArgument(
+            'workspace_min_y',
+            default_value='-10.0',
+            description='Minimum allowed y when request guard is enabled.',
+        ),
+        DeclareLaunchArgument(
+            'workspace_max_y',
+            default_value='10.0',
+            description='Maximum allowed y when request guard is enabled.',
+        ),
+        DeclareLaunchArgument(
+            'workspace_min_z',
+            default_value='-10.0',
+            description='Minimum allowed z when request guard is enabled.',
+        ),
+        DeclareLaunchArgument(
+            'workspace_max_z',
+            default_value='10.0',
+            description='Maximum allowed z when request guard is enabled.',
+        ),
+        DeclareLaunchArgument(
+            'min_quaternion_norm',
+            default_value='1e-6',
+            description='Minimum allowed quaternion norm when guard is enabled.',
+        ),
         LogInfo(
             msg='Launching adaptive assembly Panda planning demo: fake '
             'perception, task pose generation, standard Panda MoveIt2 demo, '
@@ -94,7 +148,8 @@ def generate_launch_description() -> LaunchDescription:
             'target object is launched. Planner settings can be overridden '
             'with planner_id, num_planning_attempts, '
             'max_velocity_scaling_factor, and '
-            'max_acceleration_scaling_factor. Execution is disabled.'
+            'max_acceleration_scaling_factor. enable_request_guard can enable '
+            'pre-MoveIt2 request checks. Execution is disabled.'
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(panda_demo_launch),
@@ -117,6 +172,15 @@ def generate_launch_description() -> LaunchDescription:
                 'num_planning_attempts': num_planning_attempts,
                 'max_velocity_scaling_factor': max_velocity_scaling_factor,
                 'max_acceleration_scaling_factor': max_acceleration_scaling_factor,
+                'enable_request_guard': enable_request_guard,
+                'required_frame_id': required_frame_id,
+                'workspace_min_x': workspace_min_x,
+                'workspace_max_x': workspace_max_x,
+                'workspace_min_y': workspace_min_y,
+                'workspace_max_y': workspace_max_y,
+                'workspace_min_z': workspace_min_z,
+                'workspace_max_z': workspace_max_z,
+                'min_quaternion_norm': min_quaternion_norm,
             }.items(),
         ),
     ])

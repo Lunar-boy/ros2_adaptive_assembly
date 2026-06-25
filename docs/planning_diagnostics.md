@@ -24,6 +24,8 @@ Supported event values:
 - `failure`: MoveIt2 planning was attempted and failed
 - `skipped_small_motion`: planning was skipped because the pose moved less than
   `min_replan_distance`
+- `guard_rejected`: an enabled request guard rejected the pose before MoveIt2
+  planning
 
 This separates true planning failure from skipped replanning, provides timing
 data for future benchmarking, and makes demos easier to debug.
@@ -36,6 +38,14 @@ PR20 adds planner setting metadata to each status message:
 - `max_acceleration_scaling_factor`
 
 See [planner_settings.md](planner_settings.md).
+
+PR23 adds request guard metadata to each status message:
+
+- `guard_enabled`
+- `guard_passed`
+- `guard_reason`
+
+See [planning_request_guard.md](planning_request_guard.md).
 
 ```text
 /panda_pre_grasp_pose
@@ -70,6 +80,7 @@ bash scripts/check_planning_diagnostics.sh
 bash scripts/echo_planning_diagnostics_once.sh
 python3 scripts/check_planning_status_format.py
 bash scripts/check_planner_parameter_status.sh
+bash scripts/check_planning_request_guard_status.sh
 ```
 
 ## Benchmark recording

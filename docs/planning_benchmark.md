@@ -102,6 +102,19 @@ PR21 adds planner-settings benchmark launch profiles for attempts/scaling
 comparisons. See
 [planner_settings_benchmark_profiles.md](planner_settings_benchmark_profiles.md).
 
+## Planning request guard metadata
+
+PR23 adds optional request guard fields to planning status and benchmark CSV
+output:
+
+- `guard_enabled`
+- `guard_passed`
+- `guard_reason`
+
+The guarded benchmark launch can be used to record the same planning metrics
+with pre-MoveIt2 request validation enabled. See
+[planning_request_guard.md](planning_request_guard.md).
+
 ## Markdown report export
 
 PR19 adds Markdown report export for CSV comparisons:

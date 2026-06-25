@@ -25,8 +25,16 @@ REQUIRED_KEYS = {
     'num_planning_attempts',
     'max_velocity_scaling_factor',
     'max_acceleration_scaling_factor',
+    'guard_enabled',
+    'guard_passed',
+    'guard_reason',
 }
-VALID_EVENTS = {'success', 'failure', 'skipped_small_motion'}
+VALID_EVENTS = {
+    'success',
+    'failure',
+    'skipped_small_motion',
+    'guard_rejected',
+}
 
 
 class PlanningStatusChecker(Node):
@@ -80,6 +88,15 @@ def _validate_status(status: str) -> int:
     execution = fields.get('execution')
     if execution is not None and execution != 'false':
         failures.append(f'execution must be false, got: {execution}')
+
+    for key in ('guard_enabled', 'guard_passed'):
+        value = fields.get(key)
+        if value is not None and value not in {'true', 'false'}:
+            failures.append(f'{key} must be true or false, got: {value}')
+
+    guard_reason = fields.get('guard_reason')
+    if guard_reason is not None and guard_reason == '':
+        failures.append('guard_reason must not be empty')
 
     for key in (
         'x',

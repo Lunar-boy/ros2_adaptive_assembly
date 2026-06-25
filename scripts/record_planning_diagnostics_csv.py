@@ -29,6 +29,9 @@ OPTIONAL_FIELDS = (
     'num_planning_attempts',
     'max_velocity_scaling_factor',
     'max_acceleration_scaling_factor',
+    'guard_enabled',
+    'guard_passed',
+    'guard_reason',
 )
 CSV_COLUMNS = (
     'wall_time_sec',
@@ -45,6 +48,9 @@ CSV_COLUMNS = (
     'num_planning_attempts',
     'max_velocity_scaling_factor',
     'max_acceleration_scaling_factor',
+    'guard_enabled',
+    'guard_passed',
+    'guard_reason',
     'raw_status',
 )
 
