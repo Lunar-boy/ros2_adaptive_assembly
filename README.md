@@ -122,6 +122,30 @@ python3 scripts/check_panda_pose_adapter_status.py
 
 See [docs/tf2_pose_adapter.md](docs/tf2_pose_adapter.md).
 
+## RViz marker visualization
+
+The Panda planning demo publishes lightweight pose markers by default:
+
+- `/target_pose`: sphere
+- `/pre_grasp_pose`: arrow
+- `/assembly_pose`: cube
+- `/panda_pre_grasp_pose`: arrow
+
+Marker topics:
+
+- `/adaptive_assembly_markers`
+- `/adaptive_assembly_marker_status`
+
+Validation helpers:
+
+```bash
+bash scripts/check_adaptive_assembly_markers_available.sh
+python3 scripts/check_adaptive_assembly_marker_status.py
+```
+
+This is visualization-only; it does not modify the PlanningScene or execute
+trajectories. See [docs/rviz_markers.md](docs/rviz_markers.md).
+
 ## Static PlanningScene objects
 
 The Panda planning demo also starts a static PlanningScene node that applies
@@ -421,4 +445,5 @@ See
 - PR22: TF2-based Panda pose adapter with status diagnostics
 - PR23: planning request guard and safety filter
 - PR24: PlanningScene object audit tool
+- PR25: simple RViz marker visualization
 - Future PR: dynamic PlanningScene updates and planning refinements
