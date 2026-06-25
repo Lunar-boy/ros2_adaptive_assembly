@@ -74,6 +74,10 @@ PR14 adds a dynamic target PlanningScene object to the Panda planning demo.
 Future comparisons can use the same profile suite to measure planning
 diagnostics with that dynamic target object enabled.
 
+PR15 adds explicit A/B benchmark launch profiles for comparing the baseline
+seeded profile with and without the dynamic target object. See
+[dynamic_target_ab_benchmark.md](dynamic_target_ab_benchmark.md).
+
 ## Compare CSV files
 
 ```bash

@@ -4,6 +4,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
 from launch.actions import LogInfo
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch.substitutions import PathJoinSubstitution
@@ -23,6 +24,7 @@ def generate_launch_description() -> LaunchDescription:
         'adaptive_assembly_params.yaml',
     ])
     params_file = LaunchConfiguration('params_file')
+    use_dynamic_target_scene = LaunchConfiguration('use_dynamic_target_scene')
     static_planning_scene_launch = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_planning'),
         'launch',
@@ -50,12 +52,20 @@ def generate_launch_description() -> LaunchDescription:
             default_value=default_params_file,
             description='Parameter YAML for adaptive assembly pipeline nodes.',
         ),
+        DeclareLaunchArgument(
+            'use_dynamic_target_scene',
+            default_value='true',
+            description=(
+                'Whether to include the dynamic target PlanningScene object.'
+            ),
+        ),
         LogInfo(
             msg='Launching adaptive assembly Panda planning demo: fake '
             'perception, task pose generation, standard Panda MoveIt2 demo, '
             'static PlanningScene collision objects, Panda pre-grasp pose '
             'adapter, dynamic target collision object, and plan-only planning '
-            'bridge. Execution is disabled.'
+            'bridge. use_dynamic_target_scene controls whether the dynamic '
+            'target object is launched. Execution is disabled.'
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(panda_demo_launch),
@@ -69,6 +79,7 @@ def generate_launch_description() -> LaunchDescription:
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(dynamic_target_scene_launch),
+            condition=IfCondition(use_dynamic_target_scene),
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(pre_grasp_planning_launch),

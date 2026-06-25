@@ -208,6 +208,20 @@ python3 scripts/check_dynamic_target_scene_status.py
 This remains plan-only; no trajectory execution is added. See
 [docs/dynamic_target_scene.md](docs/dynamic_target_scene.md).
 
+## Dynamic target A/B benchmark
+
+The dynamic target scene can be enabled or disabled from launch for benchmark
+comparison:
+
+```bash
+ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_benchmark_no_dynamic_target.launch.py
+ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_benchmark_with_dynamic_target.launch.py
+bash scripts/run_dynamic_target_ab_benchmark_hint.sh
+```
+
+See
+[docs/dynamic_target_ab_benchmark.md](docs/dynamic_target_ab_benchmark.md).
+
 ## Roadmap
 
 - PR1: fake perception node
@@ -224,4 +238,5 @@ This remains plan-only; no trajectory execution is added. See
 - PR12: reproducible seeded planning benchmark profile
 - PR13: deterministic benchmark profile suite and CSV comparison tools
 - PR14: dynamic target collision object in PlanningScene
+- PR15: dynamic target PlanningScene toggle and A/B benchmark profiles
 - Future PR: dynamic PlanningScene updates and planning refinements

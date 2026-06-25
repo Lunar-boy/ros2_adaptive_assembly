@@ -70,6 +70,18 @@ python3 scripts/check_dynamic_target_scene_status.py
 ros2 topic echo /dynamic_target_scene_status
 ```
 
+## Launch toggle
+
+PR15 makes this node optional from the Panda planning demo launch:
+
+```bash
+ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_demo.launch.py use_dynamic_target_scene:=false
+```
+
+The default is `use_dynamic_target_scene:=true`, preserving existing behavior.
+Disabling the node is useful for A/B benchmark comparisons. See
+[dynamic_target_ab_benchmark.md](dynamic_target_ab_benchmark.md).
+
 This PR is deliberately limited:
 
 - no trajectory execution
