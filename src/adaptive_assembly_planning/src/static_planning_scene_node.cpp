@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <chrono>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -10,6 +11,8 @@
 #include <rclcpp/rclcpp.hpp>
 #include <shape_msgs/msg/solid_primitive.hpp>
 #include <std_msgs/msg/bool.hpp>
+#include <std_msgs/msg/string.hpp>
+#include <std_srvs/srv/trigger.hpp>
 
 using namespace std::chrono_literals;
 
@@ -38,19 +41,39 @@ public:
     ready_publisher_ = node_->create_publisher<std_msgs::msg::Bool>(
       "/planning_scene_objects_ready",
       rclcpp::QoS(1).transient_local().reliable());
+    status_publisher_ = node_->create_publisher<std_msgs::msg::String>(
+      "/static_planning_scene_status",
+      rclcpp::QoS(10).transient_local().reliable());
+
+    clear_service_ = node_->create_service<std_srvs::srv::Trigger>(
+      "/clear_static_planning_scene",
+      [this](
+        const std::shared_ptr<std_srvs::srv::Trigger::Request>/* request */,
+        std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+        clear_service_callback(response);
+      });
+
+    reapply_service_ = node_->create_service<std_srvs::srv::Trigger>(
+      "/reapply_static_planning_scene",
+      [this](
+        const std::shared_ptr<std_srvs::srv::Trigger::Request>/* request */,
+        std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+        reapply_service_callback(response);
+      });
 
     const auto delay = std::chrono::duration<double>(
       std::max(0.0, apply_delay_sec_));
     apply_timer_ = node_->create_wall_timer(
       std::chrono::duration_cast<std::chrono::nanoseconds>(delay),
       [this]() {
-        apply_static_objects();
+        apply_static_objects(true);
       });
 
     RCLCPP_INFO(
       node_->get_logger(),
       "Static PlanningScene node ready for frame '%s'. Static collision "
-      "objects only; trajectory execution is disabled in this PR.",
+      "objects only; trajectory execution is disabled. Services available: "
+      "/clear_static_planning_scene and /reapply_static_planning_scene.",
       planning_frame_.c_str());
   }
 
@@ -64,9 +87,11 @@ private:
     return node_->get_parameter(name).get_value<ParameterT>();
   }
 
-  void apply_static_objects()
+  void apply_static_objects(const bool cancel_timer)
   {
-    apply_timer_->cancel();
+    if (cancel_timer && apply_timer_) {
+      apply_timer_->cancel();
+    }
 
     std::vector<moveit_msgs::msg::CollisionObject> collision_objects;
     if (add_work_table_) {
@@ -87,6 +112,7 @@ private:
         node_->get_logger(),
         "No static PlanningScene collision objects are enabled.");
       publish_ready(false);
+      publish_status("no_objects_enabled");
       return;
     }
 
@@ -98,6 +124,7 @@ private:
     const bool applied = planning_scene_interface_.applyCollisionObjects(
       collision_objects);
     publish_ready(applied);
+    publish_status(applied ? "applied" : "apply_failed");
 
     if (applied) {
       RCLCPP_INFO(
@@ -108,6 +135,83 @@ private:
       RCLCPP_ERROR(
         node_->get_logger(),
         "Failed to apply static PlanningScene collision objects.");
+    }
+  }
+
+  void clear_service_callback(
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+  {
+    const auto object_ids = enabled_object_ids();
+    if (object_ids.empty()) {
+      ready_ = false;
+      publish_ready(false);
+      publish_status("cleared");
+      response->success = true;
+      response->message = "No static PlanningScene collision objects are enabled.";
+      RCLCPP_WARN(
+        node_->get_logger(),
+        "Static PlanningScene clear requested, but no static objects are enabled.");
+      return;
+    }
+
+    try {
+      planning_scene_interface_.removeCollisionObjects(object_ids);
+      ready_ = false;
+      publish_ready(false);
+      publish_status("cleared");
+      response->success = true;
+      response->message = "Removed static PlanningScene objects: " +
+        join_object_ids(object_ids);
+
+      RCLCPP_INFO(
+        node_->get_logger(),
+        "Cleared static PlanningScene objects: %s.",
+        join_object_ids(object_ids).c_str());
+    } catch (const std::exception & exception) {
+      publish_status("clear_failed");
+      response->success = false;
+      response->message = "Failed to clear static PlanningScene objects: " +
+        std::string(exception.what());
+      RCLCPP_ERROR(
+        node_->get_logger(),
+        "Failed to clear static PlanningScene objects: %s",
+        exception.what());
+    }
+  }
+
+  void reapply_service_callback(
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+  {
+    const auto object_ids = enabled_object_ids();
+    if (object_ids.empty()) {
+      ready_ = false;
+      publish_ready(false);
+      publish_status("no_objects_enabled");
+      response->success = true;
+      response->message = "No static PlanningScene collision objects are enabled.";
+      RCLCPP_WARN(
+        node_->get_logger(),
+        "Static PlanningScene reapply requested, but no static objects are enabled.");
+      return;
+    }
+
+    try {
+      apply_static_objects(false);
+      response->success = ready_;
+      response->message = ready_ ?
+        "Reapplied static PlanningScene objects: " + join_object_ids(object_ids) :
+        "Failed to reapply static PlanningScene objects: " + join_object_ids(object_ids);
+    } catch (const std::exception & exception) {
+      ready_ = false;
+      publish_ready(false);
+      publish_status("apply_failed");
+      response->success = false;
+      response->message = "Failed to reapply static PlanningScene objects: " +
+        std::string(exception.what());
+      RCLCPP_ERROR(
+        node_->get_logger(),
+        "Failed to reapply static PlanningScene objects: %s",
+        exception.what());
     }
   }
 
@@ -151,9 +255,54 @@ private:
 
   void publish_ready(const bool ready)
   {
+    ready_ = ready;
     std_msgs::msg::Bool message;
     message.data = ready;
     ready_publisher_->publish(message);
+  }
+
+  void publish_status(const std::string & event)
+  {
+    std_msgs::msg::String message;
+    message.data =
+      "event=" + event +
+      ";object_ids=" + join_object_ids(enabled_object_ids()) +
+      ";frame=" + planning_frame_ +
+      ";ready=" + std::string(ready_ ? "true" : "false");
+    status_publisher_->publish(message);
+
+    RCLCPP_INFO(
+      node_->get_logger(),
+      "Static PlanningScene status: %s",
+      message.data.c_str());
+  }
+
+  std::vector<std::string> enabled_object_ids() const
+  {
+    std::vector<std::string> object_ids;
+    if (add_work_table_) {
+      object_ids.push_back("work_table");
+    }
+    if (add_target_support_) {
+      object_ids.push_back("target_support");
+    }
+    return object_ids;
+  }
+
+  std::string join_object_ids(const std::vector<std::string> & object_ids) const
+  {
+    if (object_ids.empty()) {
+      return "none";
+    }
+
+    std::ostringstream stream;
+    for (std::size_t index = 0; index < object_ids.size(); ++index) {
+      if (index > 0) {
+        stream << ",";
+      }
+      stream << object_ids[index];
+    }
+    return stream.str();
   }
 
   rclcpp::Node::SharedPtr node_;
@@ -173,8 +322,12 @@ private:
   double target_support_size_x_;
   double target_support_size_y_;
   double target_support_size_z_;
+  bool ready_{false};
   moveit::planning_interface::PlanningSceneInterface planning_scene_interface_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr ready_publisher_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_publisher_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr clear_service_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reapply_service_;
   rclcpp::TimerBase::SharedPtr apply_timer_;
 };
 

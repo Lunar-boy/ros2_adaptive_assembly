@@ -115,6 +115,21 @@ ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_demo.laun
 ```
 
 This adds static collision objects only and still does not execute trajectories.
+The static objects can also be reset without restarting the demo through:
+
+- `/clear_static_planning_scene`
+- `/reapply_static_planning_scene`
+- `/static_planning_scene_status`
+
+Validation helpers:
+
+```bash
+bash scripts/check_static_planning_scene_services.sh
+bash scripts/clear_static_planning_scene_once.sh
+bash scripts/reapply_static_planning_scene_once.sh
+python3 scripts/check_static_planning_scene_status.py
+```
+
 See [docs/static_planning_scene.md](docs/static_planning_scene.md).
 
 ## Planning diagnostics
@@ -213,6 +228,8 @@ which is useful before repeated demos or benchmark comparisons. This remains
 plan-only; no trajectory execution is added. See
 [docs/dynamic_target_scene.md](docs/dynamic_target_scene.md).
 
+Static and dynamic PlanningScene objects can now be reset independently.
+
 ## Dynamic target A/B benchmark
 
 The dynamic target scene can be enabled or disabled from launch for benchmark
@@ -245,4 +262,5 @@ See
 - PR14: dynamic target collision object in PlanningScene
 - PR15: dynamic target PlanningScene toggle and A/B benchmark profiles
 - PR16: dynamic target PlanningScene clear/reset service
+- PR17: static PlanningScene clear/reapply services
 - Future PR: dynamic PlanningScene updates and planning refinements
