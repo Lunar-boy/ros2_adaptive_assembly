@@ -33,6 +33,11 @@ def generate_launch_description() -> LaunchDescription:
         'launch',
         'panda_pre_grasp_pose_adapter.launch.py',
     ])
+    dynamic_target_scene_launch = PathJoinSubstitution([
+        FindPackageShare('adaptive_assembly_planning'),
+        'launch',
+        'dynamic_target_scene.launch.py',
+    ])
     pre_grasp_planning_launch = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_planning'),
         'launch',
@@ -49,7 +54,8 @@ def generate_launch_description() -> LaunchDescription:
             msg='Launching adaptive assembly Panda planning demo: fake '
             'perception, task pose generation, standard Panda MoveIt2 demo, '
             'static PlanningScene collision objects, Panda pre-grasp pose '
-            'adapter, and plan-only planning bridge. Execution is disabled.'
+            'adapter, dynamic target collision object, and plan-only planning '
+            'bridge. Execution is disabled.'
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(panda_demo_launch),
@@ -60,6 +66,9 @@ def generate_launch_description() -> LaunchDescription:
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(panda_pose_adapter_launch),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(dynamic_target_scene_launch),
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(pre_grasp_planning_launch),

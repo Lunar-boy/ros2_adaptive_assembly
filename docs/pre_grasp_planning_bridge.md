@@ -43,7 +43,8 @@ mismatch risk with the standard Panda MoveIt2 demo.
 
 When launched through the Panda planning demo, the planning bridge now also runs
 alongside static PlanningScene collision objects from
-`static_planning_scene_node`.
+`static_planning_scene_node` and the dynamic target collision object from
+`dynamic_target_scene_node`.
 
 PR10 adds planning diagnostics. `/pre_grasp_plan_success` is still available for
 compatibility, but it is no longer the only status signal. The bridge also
@@ -107,4 +108,5 @@ Expected behavior:
 
 ## Next PR
 
-A future PR can add dynamic target collision objects or planning benchmarking.
+A future PR can compare planning benchmarks with and without dynamic target
+scene updates or add object removal/reset utilities.
