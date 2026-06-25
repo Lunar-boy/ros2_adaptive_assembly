@@ -18,6 +18,10 @@ When PR20 planner-setting columns are present in the input CSV files, the
 Markdown report also lists unique `planner_id` values per input. Empty
 `planner_id` values are shown as `<default>`.
 
+PR21 planner-settings benchmark profiles are a direct use case for Markdown
+report export. See
+[planner_settings_benchmark_profiles.md](planner_settings_benchmark_profiles.md).
+
 Example:
 
 ```bash

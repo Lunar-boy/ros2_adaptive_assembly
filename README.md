@@ -169,6 +169,31 @@ bash scripts/check_planner_parameter_status.sh
 
 See [docs/planner_settings.md](docs/planner_settings.md).
 
+## Planner-settings benchmark profiles
+
+Deterministic benchmark profiles compare different planner settings:
+
+```bash
+ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_benchmark_attempts1.launch.py
+ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_benchmark_attempts5.launch.py
+ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_benchmark_slow_scaling.launch.py
+```
+
+Validate installed profiles:
+
+```bash
+bash scripts/check_planner_benchmark_profiles.sh
+```
+
+Manual workflow hint:
+
+```bash
+bash scripts/run_planner_settings_benchmark_hint.sh
+```
+
+See
+[docs/planner_settings_benchmark_profiles.md](docs/planner_settings_benchmark_profiles.md).
+
 ## Planning benchmark recording
 
 Planning diagnostics can be recorded to CSV and summarized into
@@ -326,4 +351,5 @@ See
 - PR18: unified PlanningScene reset workflow
 - PR19: Markdown benchmark report export
 - PR20: configurable MoveIt2 planner settings for benchmarks
+- PR21: planner-settings benchmark profiles
 - Future PR: dynamic PlanningScene updates and planning refinements

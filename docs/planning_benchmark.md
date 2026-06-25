@@ -98,6 +98,10 @@ PR20 records planner setting fields in benchmark CSV output:
 This makes it possible to compare benchmark runs produced with different
 MoveIt2 planner settings. See [planner_settings.md](planner_settings.md).
 
+PR21 adds planner-settings benchmark launch profiles for attempts/scaling
+comparisons. See
+[planner_settings_benchmark_profiles.md](planner_settings_benchmark_profiles.md).
+
 ## Markdown report export
 
 PR19 adds Markdown report export for CSV comparisons:
