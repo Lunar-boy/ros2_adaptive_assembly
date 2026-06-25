@@ -71,12 +71,22 @@ ament_target_dependencies(
   shape_msgs
 )
 
+add_executable(planning_scene_audit_node src/planning_scene_audit_node.cpp)
+ament_target_dependencies(
+  planning_scene_audit_node
+  rclcpp
+  std_msgs
+  moveit_ros_planning_interface
+  moveit_msgs
+)
+
 install(
   TARGETS
     pre_grasp_planning_node
     panda_pre_grasp_pose_adapter_node
     static_planning_scene_node
     dynamic_target_scene_node
+    planning_scene_audit_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
