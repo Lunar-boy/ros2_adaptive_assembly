@@ -105,6 +105,23 @@ with the standard Panda MoveIt2 demo.
 
 See [docs/panda_pre_grasp_pose_adapter.md](docs/panda_pre_grasp_pose_adapter.md).
 
+## Optional TF2 Panda pose adapter mode
+
+The Panda pose adapter can optionally transform incoming poses into the Panda
+planning frame with TF2. The default launch behavior remains unchanged:
+`use_tf_transform` is `false`, so the adapter keeps the existing frame override
+and numeric-copy behavior. The adapter now also publishes
+`/panda_pose_adapter_status`.
+
+Validation helpers:
+
+```bash
+bash scripts/check_panda_pose_adapter_tf2_params.sh
+python3 scripts/check_panda_pose_adapter_status.py
+```
+
+See [docs/tf2_pose_adapter.md](docs/tf2_pose_adapter.md).
+
 ## Static PlanningScene objects
 
 The Panda planning demo also starts a static PlanningScene node that applies
@@ -352,4 +369,5 @@ See
 - PR19: Markdown benchmark report export
 - PR20: configurable MoveIt2 planner settings for benchmarks
 - PR21: planner-settings benchmark profiles
+- PR22: TF2-based Panda pose adapter with status diagnostics
 - Future PR: dynamic PlanningScene updates and planning refinements

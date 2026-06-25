@@ -41,6 +41,12 @@ When launched through `panda_pre_grasp_pose_adapter.launch.py`,
 `/panda_pre_grasp_pose` defaults to frame `panda_link0`. This reduces frame
 mismatch risk with the standard Panda MoveIt2 demo.
 
+PR22 adds optional TF2 transform support to `panda_pre_grasp_pose_adapter_node`.
+By default, the adapter still uses the existing frame-override behavior. If
+`use_tf_transform` is set to `true`, it transforms incoming poses into
+`target_frame_id` before publishing `/panda_pre_grasp_pose`. The adapter also
+publishes `/panda_pose_adapter_status` for each input pose.
+
 When launched through the Panda planning demo, the planning bridge now also runs
 alongside static PlanningScene collision objects from
 `static_planning_scene_node` and the dynamic target collision object from
@@ -85,6 +91,8 @@ ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_demo.laun
 
 ```bash
 bash scripts/check_planning_bridge_available.sh
+bash scripts/check_panda_pose_adapter_tf2_params.sh
+python3 scripts/check_panda_pose_adapter_status.py
 bash scripts/check_planning_diagnostics.sh
 python3 scripts/check_planning_status_format.py
 ros2 topic echo /pre_grasp_plan_success
