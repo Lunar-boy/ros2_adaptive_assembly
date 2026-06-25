@@ -230,6 +230,27 @@ plan-only; no trajectory execution is added. See
 
 Static and dynamic PlanningScene objects can now be reset independently.
 
+## Unified PlanningScene reset workflow
+
+Before repeated demos or A/B benchmark recording, the scene can be reset with:
+
+```bash
+bash scripts/reset_planning_scene_once.sh
+```
+
+This clears the dynamic target object, clears static objects, and reapplies the
+static table/support objects. The dynamic target may be recreated automatically
+when new `/panda_pre_grasp_pose` messages arrive.
+
+Validate the workflow scripts:
+
+```bash
+bash scripts/check_planning_scene_reset_workflow.sh
+```
+
+See
+[docs/planning_scene_reset_workflow.md](docs/planning_scene_reset_workflow.md).
+
 ## Dynamic target A/B benchmark
 
 The dynamic target scene can be enabled or disabled from launch for benchmark
@@ -263,4 +284,5 @@ See
 - PR15: dynamic target PlanningScene toggle and A/B benchmark profiles
 - PR16: dynamic target PlanningScene clear/reset service
 - PR17: static PlanningScene clear/reapply services
+- PR18: unified PlanningScene reset workflow
 - Future PR: dynamic PlanningScene updates and planning refinements

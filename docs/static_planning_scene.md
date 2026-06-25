@@ -87,6 +87,16 @@ These services are useful before repeated demos or benchmark comparisons. The
 dynamic target object has its own independent reset service documented in
 [dynamic_target_scene.md](dynamic_target_scene.md).
 
+For repeated demos or A/B benchmark recording, use the unified reset workflow:
+
+```bash
+bash scripts/reset_planning_scene_once.sh
+```
+
+It clears the dynamic target, clears static objects, and reapplies static
+objects in a fixed order. See
+[planning_scene_reset_workflow.md](planning_scene_reset_workflow.md).
+
 The PlanningScene integration is deliberately minimal:
 
 - no Gazebo

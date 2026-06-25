@@ -57,6 +57,17 @@ The static table/support objects are reset independently through
 `/clear_static_planning_scene` and `/reapply_static_planning_scene`. This keeps
 static workcell hygiene separate from the dynamic target object.
 
+For repeated demos or A/B benchmark recording, use the unified reset workflow:
+
+```bash
+bash scripts/reset_planning_scene_once.sh
+```
+
+The workflow clears the dynamic target first, then clears and reapplies the
+static objects. If `/panda_pre_grasp_pose` continues publishing, the dynamic
+target may be recreated automatically on the next adapted pose. See
+[planning_scene_reset_workflow.md](planning_scene_reset_workflow.md).
+
 ## Build
 
 ```bash
