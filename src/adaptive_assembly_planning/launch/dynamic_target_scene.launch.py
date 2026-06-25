@@ -23,6 +23,7 @@ def generate_launch_description() -> LaunchDescription:
                 'z_offset': -0.20,
                 'min_update_distance': 0.02,
                 'publish_updates': True,
+                'clear_service_name': '/clear_dynamic_target_scene',
             }],
         ),
     ])

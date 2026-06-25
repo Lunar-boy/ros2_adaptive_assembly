@@ -26,8 +26,16 @@ VALID_EVENTS = {
     'skipped_small_motion',
     'failed',
     'skipped_empty_frame',
+    'cleared',
+    'clear_failed',
 }
-NORMAL_EVENTS = {'updated', 'skipped_small_motion', 'failed'}
+NORMAL_EVENTS = {
+    'updated',
+    'skipped_small_motion',
+    'failed',
+    'cleared',
+    'clear_failed',
+}
 
 
 class DynamicTargetSceneStatusChecker(Node):

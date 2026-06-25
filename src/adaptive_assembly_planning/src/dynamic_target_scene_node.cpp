@@ -13,6 +13,7 @@
 #include <shape_msgs/msg/solid_primitive.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/string.hpp>
+#include <std_srvs/srv/trigger.hpp>
 
 class DynamicTargetSceneNode
 {
@@ -29,7 +30,9 @@ public:
     y_offset_(declare_parameter<double>("y_offset", 0.0)),
     z_offset_(declare_parameter<double>("z_offset", -0.20)),
     min_update_distance_(declare_parameter<double>("min_update_distance", 0.02)),
-    publish_updates_(declare_parameter<bool>("publish_updates", true))
+    publish_updates_(declare_parameter<bool>("publish_updates", true)),
+    clear_service_name_(declare_parameter<std::string>(
+        "clear_service_name", "/clear_dynamic_target_scene"))
   {
     ready_publisher_ = node_->create_publisher<std_msgs::msg::Bool>(
       "/dynamic_target_scene_ready",
@@ -41,16 +44,23 @@ public:
       [this](const geometry_msgs::msg::PoseStamped::SharedPtr message) {
         pose_callback(*message);
       });
+    clear_service_ = node_->create_service<std_srvs::srv::Trigger>(
+      clear_service_name_,
+      [this](
+        const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+        std::shared_ptr<std_srvs::srv::Trigger::Response> response) {
+        clear_service_callback(request, response);
+      });
 
     RCLCPP_INFO(
       node_->get_logger(),
       "Dynamic target scene node ready: input_pose_topic='%s', object_id='%s', "
       "size=(%.3f, %.3f, %.3f), offsets=(%.3f, %.3f, %.3f), "
-      "min_update_distance=%.3f, publish_updates=%s. This node updates the "
-      "PlanningScene only and does not execute motion.",
+      "min_update_distance=%.3f, publish_updates=%s, clear_service_name='%s'. "
+      "This node updates the PlanningScene only and does not execute motion.",
       input_pose_topic_.c_str(), object_id_.c_str(), size_x_, size_y_, size_z_,
       x_offset_, y_offset_, z_offset_, min_update_distance_,
-      publish_updates_ ? "true" : "false");
+      publish_updates_ ? "true" : "false", clear_service_name_.c_str());
   }
 
 private:
@@ -115,6 +125,7 @@ private:
     if (applied) {
       ready_ = true;
       last_applied_pose_ = object_pose;
+      last_frame_id_ = input_pose.header.frame_id;
       publish_ready(true);
       publish_status(
         "updated", input_pose.header.frame_id, object_pose,
@@ -132,6 +143,43 @@ private:
         node_->get_logger(),
         "Failed to apply dynamic target collision object '%s'.",
         object_id_.c_str());
+    }
+  }
+
+  void clear_service_callback(
+    const std::shared_ptr<std_srvs::srv::Trigger::Request>/* request */,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+  {
+    const std::string status_frame = last_frame_id_.empty() ? "none" : last_frame_id_;
+    const geometry_msgs::msg::Pose status_pose =
+      last_applied_pose_.value_or(geometry_msgs::msg::Pose());
+
+    try {
+      planning_scene_interface_.removeCollisionObjects({object_id_});
+      ready_ = false;
+      last_applied_pose_ = std::nullopt;
+      last_frame_id_.clear();
+      publish_ready(false);
+      publish_status("cleared", status_frame, status_pose, std::nullopt);
+
+      response->success = true;
+      response->message =
+        "Removed dynamic target collision object '" + object_id_ + "'.";
+      RCLCPP_INFO(
+        node_->get_logger(),
+        "Cleared dynamic target collision object '%s'. Ready state reset.",
+        object_id_.c_str());
+    } catch (const std::exception & error) {
+      publish_status("clear_failed", status_frame, status_pose, std::nullopt);
+
+      response->success = false;
+      response->message =
+        "Failed to remove dynamic target collision object '" + object_id_ +
+        "': " + error.what();
+      RCLCPP_ERROR(
+        node_->get_logger(),
+        "Failed to clear dynamic target collision object '%s': %s",
+        object_id_.c_str(), error.what());
     }
   }
 
@@ -235,12 +283,15 @@ private:
   double z_offset_;
   double min_update_distance_;
   bool publish_updates_;
+  std::string clear_service_name_;
   bool ready_{false};
   moveit::planning_interface::PlanningSceneInterface planning_scene_interface_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr ready_publisher_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_publisher_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pose_subscription_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr clear_service_;
   std::optional<geometry_msgs::msg::Pose> last_applied_pose_;
+  std::string last_frame_id_;
 };
 
 int main(int argc, char * argv[])
