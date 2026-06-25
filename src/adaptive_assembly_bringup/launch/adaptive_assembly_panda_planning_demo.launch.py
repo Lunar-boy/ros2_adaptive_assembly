@@ -26,6 +26,7 @@ def generate_launch_description() -> LaunchDescription:
     params_file = LaunchConfiguration('params_file')
     use_dynamic_target_scene = LaunchConfiguration('use_dynamic_target_scene')
     use_planning_scene_audit = LaunchConfiguration('use_planning_scene_audit')
+    use_rviz_markers = LaunchConfiguration('use_rviz_markers')
     planner_id = LaunchConfiguration('planner_id')
     num_planning_attempts = LaunchConfiguration('num_planning_attempts')
     max_velocity_scaling_factor = LaunchConfiguration('max_velocity_scaling_factor')
@@ -61,6 +62,11 @@ def generate_launch_description() -> LaunchDescription:
         'launch',
         'planning_scene_audit.launch.py',
     ])
+    adaptive_assembly_markers_launch = PathJoinSubstitution([
+        FindPackageShare('adaptive_assembly_planning'),
+        'launch',
+        'adaptive_assembly_markers.launch.py',
+    ])
     pre_grasp_planning_launch = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_planning'),
         'launch',
@@ -84,6 +90,11 @@ def generate_launch_description() -> LaunchDescription:
             'use_planning_scene_audit',
             default_value='true',
             description='Whether to include the read-only PlanningScene audit node.',
+        ),
+        DeclareLaunchArgument(
+            'use_rviz_markers',
+            default_value='true',
+            description='Whether to publish lightweight RViz MarkerArray poses.',
         ),
         DeclareLaunchArgument(
             'planner_id',
@@ -158,7 +169,9 @@ def generate_launch_description() -> LaunchDescription:
             'audit, and plan-only planning bridge. use_dynamic_target_scene '
             'controls whether the dynamic target object is launched. '
             'use_planning_scene_audit controls whether the audit node is '
-            'launched. Planner settings can be overridden with planner_id, '
+            'launched. use_rviz_markers controls whether lightweight pose '
+            'markers are published for RViz. Planner settings can be '
+            'overridden with planner_id, '
             'num_planning_attempts, '
             'max_velocity_scaling_factor, and '
             'max_acceleration_scaling_factor. enable_request_guard can enable '
@@ -181,6 +194,10 @@ def generate_launch_description() -> LaunchDescription:
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(planning_scene_audit_launch),
             condition=IfCondition(use_planning_scene_audit),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(adaptive_assembly_markers_launch),
+            condition=IfCondition(use_rviz_markers),
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(pre_grasp_planning_launch),
