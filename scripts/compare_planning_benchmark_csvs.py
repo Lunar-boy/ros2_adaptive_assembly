@@ -4,6 +4,7 @@
 import argparse
 import csv
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 import statistics
 import sys
@@ -34,6 +35,14 @@ class BenchmarkSummary:
     max_duration_ms: str
 
 
+@dataclass
+class BenchmarkInput:
+    """Resolved benchmark CSV input."""
+
+    label: str
+    path: Path
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description='Compare planning diagnostics benchmark CSV files.'
@@ -46,6 +55,10 @@ def _parse_args() -> argparse.Namespace:
             'Input CSV. Use label=path for explicit labels, or pass a plain '
             'path to use the file stem.'
         ),
+    )
+    parser.add_argument(
+        '--output-markdown',
+        help='Optional path for a Markdown benchmark comparison report.',
     )
     return parser.parse_args()
 
@@ -198,15 +211,96 @@ def _print_table(summaries: Sequence[BenchmarkSummary]) -> None:
         ))
 
 
+def _markdown_row(values: Sequence[str]) -> str:
+    return '| ' + ' | '.join(values) + ' |'
+
+
+def _write_markdown_report(
+    output_path: Path,
+    inputs: Sequence[BenchmarkInput],
+    summaries: Sequence[BenchmarkSummary],
+) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    headers = [
+        'profile',
+        'total',
+        'success',
+        'failure',
+        'skipped',
+        'attempts',
+        'plan_success_rate',
+        'overall_success',
+        'avg_ms',
+        'median_ms',
+        'min_ms',
+        'max_ms',
+    ]
+
+    lines = [
+        '# Planning Benchmark Comparison',
+        '',
+        f'Generated: {datetime.now(timezone.utc).isoformat()}',
+        '',
+        '## Inputs',
+        '',
+    ]
+    lines.extend(
+        f'- `{benchmark_input.label}`: `{benchmark_input.path}`'
+        for benchmark_input in inputs
+    )
+    lines.extend([
+        '',
+        '## Metrics',
+        '',
+        _markdown_row(headers),
+        _markdown_row(['---'] * len(headers)),
+    ])
+
+    for summary in summaries:
+        lines.append(_markdown_row([
+            summary.label,
+            str(summary.total_events),
+            str(summary.success_count),
+            str(summary.failure_count),
+            str(summary.skipped_count),
+            str(summary.planning_attempts),
+            summary.planning_success_rate,
+            summary.overall_success_fraction,
+            summary.average_duration_ms,
+            summary.median_duration_ms,
+            summary.min_duration_ms,
+            summary.max_duration_ms,
+        ]))
+
+    lines.extend([
+        '',
+        '## Notes',
+        '',
+        '- `skipped_small_motion` is not counted as planning failure.',
+        '- Trajectories are not executed.',
+        '',
+    ])
+
+    output_path.write_text('\n'.join(lines), encoding='utf-8')
+
+
 def main() -> int:
     """Compare one or more planning diagnostics CSV files."""
     args = _parse_args()
     try:
+        inputs = []
         summaries = []
         for input_value in args.input:
             label, input_path = _parse_input(input_value)
+            benchmark_input = BenchmarkInput(label=label, path=input_path)
+            inputs.append(benchmark_input)
             summaries.append(_summarize(label, _read_rows(input_path)))
         _print_table(summaries)
+        if args.output_markdown:
+            output_path = Path(args.output_markdown)
+            _write_markdown_report(output_path, inputs, summaries)
+            print(f'Wrote Markdown report: {output_path}')
     except RuntimeError as error:
         print(f'FAIL: {error}')
         return 1

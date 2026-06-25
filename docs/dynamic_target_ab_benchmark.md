@@ -67,6 +67,17 @@ MAX_EVENTS=20 TIMEOUT_SEC=120 OUTPUT=benchmark_results/with_dynamic_target.csv b
 python3 scripts/compare_planning_benchmark_csvs.py --input no_dynamic=benchmark_results/no_dynamic_target.csv --input with_dynamic=benchmark_results/with_dynamic_target.csv
 ```
 
+To save the comparison as Markdown:
+
+```bash
+python3 scripts/compare_planning_benchmark_csvs.py \
+  --input no_dynamic=benchmark_results/no_dynamic_target.csv \
+  --input with_dynamic=benchmark_results/with_dynamic_target.csv \
+  --output-markdown benchmark_results/dynamic_target_ab_report.md
+```
+
+See [benchmark_report_export.md](benchmark_report_export.md).
+
 For a manual command checklist:
 
 ```bash

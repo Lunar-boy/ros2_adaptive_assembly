@@ -88,6 +88,19 @@ python3 scripts/compare_planning_benchmark_csvs.py \
   --input fixed_yaw=benchmark_results/fixed_yaw.csv
 ```
 
+To also write a Markdown report:
+
+```bash
+python3 scripts/compare_planning_benchmark_csvs.py \
+  --input baseline=benchmark_results/baseline.csv \
+  --input narrow=benchmark_results/narrow.csv \
+  --input wide=benchmark_results/wide.csv \
+  --input fixed_yaw=benchmark_results/fixed_yaw.csv \
+  --output-markdown benchmark_results/profile_suite_report.md
+```
+
+See [benchmark_report_export.md](benchmark_report_export.md).
+
 For a manual step-by-step checklist:
 
 ```bash
