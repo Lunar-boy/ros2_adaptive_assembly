@@ -57,6 +57,10 @@ The static table/support objects are reset independently through
 `/clear_static_planning_scene` and `/reapply_static_planning_scene`. This keeps
 static workcell hygiene separate from the dynamic target object.
 
+PR24 adds a read-only PlanningScene audit node that checks whether the dynamic
+target object and static objects are visible in MoveIt2. See
+[planning_scene_audit.md](planning_scene_audit.md).
+
 For repeated demos or A/B benchmark recording, use the unified reset workflow:
 
 ```bash
@@ -91,6 +95,8 @@ bash scripts/check_dynamic_target_scene_ready.sh
 python3 scripts/check_dynamic_target_scene_status.py
 bash scripts/check_dynamic_target_clear_service.sh
 bash scripts/clear_dynamic_target_scene_once.sh
+python3 scripts/check_planning_scene_audit_status.py
+bash scripts/check_planning_scene_audit_ready.sh
 ros2 topic echo /dynamic_target_scene_status
 ```
 

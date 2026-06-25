@@ -335,6 +335,31 @@ plan-only; no trajectory execution is added. See
 
 Static and dynamic PlanningScene objects can now be reset independently.
 
+## PlanningScene audit
+
+The Panda planning demo starts a read-only audit node by default. It checks
+whether expected collision objects are visible in MoveIt2:
+
+- `work_table`
+- `target_support`
+- `target_object_dynamic`
+
+Published audit topics:
+
+- `/planning_scene_audit_ready`
+- `/planning_scene_audit_status`
+
+Validation helpers:
+
+```bash
+bash scripts/check_planning_scene_audit_available.sh
+python3 scripts/check_planning_scene_audit_status.py
+bash scripts/check_planning_scene_audit_ready.sh
+```
+
+This is introspection-only; it does not modify the PlanningScene or execute
+trajectories. See [docs/planning_scene_audit.md](docs/planning_scene_audit.md).
+
 ## Unified PlanningScene reset workflow
 
 Before repeated demos or A/B benchmark recording, the scene can be reset with:
@@ -395,4 +420,5 @@ See
 - PR21: planner-settings benchmark profiles
 - PR22: TF2-based Panda pose adapter with status diagnostics
 - PR23: planning request guard and safety filter
+- PR24: PlanningScene object audit tool
 - Future PR: dynamic PlanningScene updates and planning refinements

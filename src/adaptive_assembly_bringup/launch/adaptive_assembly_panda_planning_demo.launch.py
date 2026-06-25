@@ -25,6 +25,7 @@ def generate_launch_description() -> LaunchDescription:
     ])
     params_file = LaunchConfiguration('params_file')
     use_dynamic_target_scene = LaunchConfiguration('use_dynamic_target_scene')
+    use_planning_scene_audit = LaunchConfiguration('use_planning_scene_audit')
     planner_id = LaunchConfiguration('planner_id')
     num_planning_attempts = LaunchConfiguration('num_planning_attempts')
     max_velocity_scaling_factor = LaunchConfiguration('max_velocity_scaling_factor')
@@ -55,6 +56,11 @@ def generate_launch_description() -> LaunchDescription:
         'launch',
         'dynamic_target_scene.launch.py',
     ])
+    planning_scene_audit_launch = PathJoinSubstitution([
+        FindPackageShare('adaptive_assembly_planning'),
+        'launch',
+        'planning_scene_audit.launch.py',
+    ])
     pre_grasp_planning_launch = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_planning'),
         'launch',
@@ -73,6 +79,11 @@ def generate_launch_description() -> LaunchDescription:
             description=(
                 'Whether to include the dynamic target PlanningScene object.'
             ),
+        ),
+        DeclareLaunchArgument(
+            'use_planning_scene_audit',
+            default_value='true',
+            description='Whether to include the read-only PlanningScene audit node.',
         ),
         DeclareLaunchArgument(
             'planner_id',
@@ -143,10 +154,12 @@ def generate_launch_description() -> LaunchDescription:
             msg='Launching adaptive assembly Panda planning demo: fake '
             'perception, task pose generation, standard Panda MoveIt2 demo, '
             'static PlanningScene collision objects, Panda pre-grasp pose '
-            'adapter, dynamic target collision object, and plan-only planning '
-            'bridge. use_dynamic_target_scene controls whether the dynamic '
-            'target object is launched. Planner settings can be overridden '
-            'with planner_id, num_planning_attempts, '
+            'adapter, dynamic target collision object, read-only PlanningScene '
+            'audit, and plan-only planning bridge. use_dynamic_target_scene '
+            'controls whether the dynamic target object is launched. '
+            'use_planning_scene_audit controls whether the audit node is '
+            'launched. Planner settings can be overridden with planner_id, '
+            'num_planning_attempts, '
             'max_velocity_scaling_factor, and '
             'max_acceleration_scaling_factor. enable_request_guard can enable '
             'pre-MoveIt2 request checks. Execution is disabled.'
@@ -164,6 +177,10 @@ def generate_launch_description() -> LaunchDescription:
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(dynamic_target_scene_launch),
             condition=IfCondition(use_dynamic_target_scene),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(planning_scene_audit_launch),
+            condition=IfCondition(use_planning_scene_audit),
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(pre_grasp_planning_launch),

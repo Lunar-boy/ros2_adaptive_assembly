@@ -17,6 +17,10 @@ If the demo is still publishing `/panda_pre_grasp_pose`, the dynamic target
 object may be re-created automatically by `dynamic_target_scene_node` when the
 next adapted pose arrives. That behavior is expected.
 
+PR24 adds a read-only PlanningScene audit node. After reset, the audit can be
+used to check which expected collision objects are currently visible in MoveIt2.
+See [planning_scene_audit.md](planning_scene_audit.md).
+
 ## Run
 
 Start the Panda planning demo first:
@@ -42,6 +46,7 @@ Optional status checks after a reset:
 ```bash
 python3 scripts/check_static_planning_scene_status.py
 python3 scripts/check_dynamic_target_scene_status.py
+python3 scripts/check_planning_scene_audit_status.py
 ```
 
 This workflow is useful before A/B benchmark recording because it gives each

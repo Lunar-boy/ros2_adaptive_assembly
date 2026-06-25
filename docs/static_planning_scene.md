@@ -20,6 +20,10 @@ PR17 adds reset support for the static objects. The node now exposes services
 to clear and reapply `work_table` and `target_support` without restarting the
 demo.
 
+PR24 adds a read-only PlanningScene audit node that can verify whether
+`work_table`, `target_support`, and `target_object_dynamic` are present in the
+MoveIt2 PlanningScene. See [planning_scene_audit.md](planning_scene_audit.md).
+
 Initial objects:
 
 - `work_table`: a broad table/workcell box in frame `panda_link0`
@@ -64,6 +68,8 @@ ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_demo.laun
 bash scripts/check_static_planning_scene_available.sh
 bash scripts/check_static_planning_scene_ready.sh
 bash scripts/check_static_planning_scene_services.sh
+python3 scripts/check_planning_scene_audit_status.py
+bash scripts/check_planning_scene_audit_ready.sh
 python3 scripts/check_static_planning_scene_status.py
 bash scripts/clear_static_planning_scene_once.sh
 bash scripts/reapply_static_planning_scene_once.sh
