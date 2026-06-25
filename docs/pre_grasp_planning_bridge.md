@@ -62,6 +62,11 @@ publishes:
 The status topic distinguishes `failure` from `skipped_small_motion`, which
 means a small target update did not trigger a new MoveIt2 planning request.
 
+PR23 adds an optional planning request guard. When enabled, the bridge rejects
+invalid requests before calling MoveIt2 and publishes `event=guard_rejected`
+with `guard_enabled`, `guard_passed`, and `guard_reason` fields. The guard is
+disabled by default. See [planning_request_guard.md](planning_request_guard.md).
+
 The bridge is intentionally plan-only. Gazebo, ros2_control integration for this
 project, real robot hardware, and PlanningScene collision objects are not added
 by the bridge, and trajectory execution is still disabled.
@@ -95,6 +100,7 @@ bash scripts/check_panda_pose_adapter_tf2_params.sh
 python3 scripts/check_panda_pose_adapter_status.py
 bash scripts/check_planning_diagnostics.sh
 python3 scripts/check_planning_status_format.py
+bash scripts/check_planning_request_guard_status.sh
 ros2 topic echo /pre_grasp_plan_success
 ros2 topic echo /pre_grasp_planning_status
 ros2 topic echo /pre_grasp_planning_duration_ms
@@ -109,7 +115,7 @@ Expected behavior:
   changes enough
 - `/pre_grasp_plan_success` publishes `true` or `false`
 - `/pre_grasp_planning_status` publishes `success`, `failure`, or
-  `skipped_small_motion`
+  `skipped_small_motion`; guarded launches may also publish `guard_rejected`
 - `/pre_grasp_planning_duration_ms` publishes the latest planning attempt
   duration
 - No execution occurs

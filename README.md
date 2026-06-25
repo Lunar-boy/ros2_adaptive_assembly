@@ -166,6 +166,30 @@ python3 scripts/check_planning_status_format.py
 
 See [docs/planning_diagnostics.md](docs/planning_diagnostics.md).
 
+## Planning request guard
+
+The plan-only bridge can optionally reject invalid requests before calling
+MoveIt2. The guard is disabled by default. Guarded status messages include:
+
+- `guard_enabled`
+- `guard_passed`
+- `guard_reason`
+
+Validate guard metadata:
+
+```bash
+bash scripts/check_guarded_benchmark_launch.sh
+bash scripts/check_planning_request_guard_status.sh
+```
+
+Run the guarded seeded benchmark profile:
+
+```bash
+ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_benchmark_guarded.launch.py
+```
+
+See [docs/planning_request_guard.md](docs/planning_request_guard.md).
+
 ## Planner settings for benchmarking
 
 The plan-only MoveIt2 bridge exposes planner settings for benchmark metadata:
@@ -370,4 +394,5 @@ See
 - PR20: configurable MoveIt2 planner settings for benchmarks
 - PR21: planner-settings benchmark profiles
 - PR22: TF2-based Panda pose adapter with status diagnostics
+- PR23: planning request guard and safety filter
 - Future PR: dynamic PlanningScene updates and planning refinements

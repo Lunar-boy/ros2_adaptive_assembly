@@ -5,6 +5,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <utility>
 
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <moveit/move_group_interface/move_group_interface.hpp>
@@ -37,6 +38,15 @@ public:
         "max_velocity_scaling_factor", 1.0)),
     max_acceleration_scaling_factor_(declare_parameter<double>(
         "max_acceleration_scaling_factor", 1.0)),
+    enable_request_guard_(declare_parameter<bool>("enable_request_guard", false)),
+    required_frame_id_(declare_parameter<std::string>("required_frame_id", "")),
+    workspace_min_x_(declare_parameter<double>("workspace_min_x", -10.0)),
+    workspace_max_x_(declare_parameter<double>("workspace_max_x", 10.0)),
+    workspace_min_y_(declare_parameter<double>("workspace_min_y", -10.0)),
+    workspace_max_y_(declare_parameter<double>("workspace_max_y", 10.0)),
+    workspace_min_z_(declare_parameter<double>("workspace_min_z", -10.0)),
+    workspace_max_z_(declare_parameter<double>("workspace_max_z", 10.0)),
+    min_quaternion_norm_(declare_parameter<double>("min_quaternion_norm", 1e-6)),
     move_group_(node_, planning_group_)
   {
     validate_planner_settings();
@@ -69,12 +79,17 @@ public:
       "success_topic='%s', status_topic='%s', duration_topic='%s', "
       "publish_diagnostics=%s. planner_id='%s', num_planning_attempts=%d, "
       "max_velocity_scaling_factor=%.3f, max_acceleration_scaling_factor=%.3f. "
+      "request_guard=%s, required_frame_id='%s', workspace=[x %.3f..%.3f, "
+      "y %.3f..%.3f, z %.3f..%.3f], min_quaternion_norm=%.6f. "
       "Planning only; execution is intentionally disabled in this PR.",
       planning_group_.c_str(), input_topic_.c_str(), success_topic_.c_str(),
       status_topic_.c_str(), duration_topic_.c_str(),
       publish_diagnostics_ ? "true" : "false", planner_id_.c_str(),
       num_planning_attempts_, max_velocity_scaling_factor_,
-      max_acceleration_scaling_factor_);
+      max_acceleration_scaling_factor_,
+      enable_request_guard_ ? "enabled" : "disabled", required_frame_id_.c_str(),
+      workspace_min_x_, workspace_max_x_, workspace_min_y_, workspace_max_y_,
+      workspace_min_z_, workspace_max_z_, min_quaternion_norm_);
   }
 
 private:
@@ -131,6 +146,19 @@ private:
       node_->get_logger(),
       "Received pre-grasp pose: frame='%s', x=%.3f, y=%.3f, z=%.3f",
       pose.header.frame_id.c_str(), position.x, position.y, position.z);
+
+    const auto guard_result = validate_request_guard(pose);
+    if (!guard_result.first) {
+      RCLCPP_WARN(
+        node_->get_logger(),
+        "Planning request rejected by guard before MoveIt2 call: %s",
+        guard_result.second.c_str());
+      publish_plan_success(false);
+      publish_planning_diagnostics(
+        "guard_rejected", pose, std::nullopt, 0.0, false,
+        guard_result.second);
+      return;
+    }
 
     std::optional<double> distance_from_last_plan;
     if (last_planned_pose_.has_value()) {
@@ -210,7 +238,9 @@ private:
     const std::string & event,
     const geometry_msgs::msg::PoseStamped & pose,
     const std::optional<double> & distance_from_last_plan,
-    const double duration_ms)
+    const double duration_ms,
+    const bool guard_passed = true,
+    const std::string & guard_reason = "none")
   {
     if (!publish_diagnostics_) {
       return;
@@ -218,7 +248,8 @@ private:
 
     std_msgs::msg::String status_message;
     status_message.data = build_status_message(
-      event, pose, distance_from_last_plan, duration_ms);
+      event, pose, distance_from_last_plan, duration_ms, guard_passed,
+      guard_reason);
     planning_status_publisher_->publish(status_message);
 
     std_msgs::msg::Float64 duration_message;
@@ -230,7 +261,9 @@ private:
     const std::string & event,
     const geometry_msgs::msg::PoseStamped & pose,
     const std::optional<double> & distance_from_last_plan,
-    const double duration_ms) const
+    const double duration_ms,
+    const bool guard_passed,
+    const std::string & guard_reason) const
   {
     const auto & position = pose.pose.position;
 
@@ -254,7 +287,50 @@ private:
     stream << ";num_planning_attempts=" << num_planning_attempts_;
     stream << ";max_velocity_scaling_factor=" << max_velocity_scaling_factor_;
     stream << ";max_acceleration_scaling_factor=" << max_acceleration_scaling_factor_;
+    stream << ";guard_enabled=" << (enable_request_guard_ ? "true" : "false");
+    stream << ";guard_passed=" << (guard_passed ? "true" : "false");
+    stream << ";guard_reason=" << guard_reason;
     return stream.str();
+  }
+
+  std::pair<bool, std::string> validate_request_guard(
+    const geometry_msgs::msg::PoseStamped & pose) const
+  {
+    if (!enable_request_guard_) {
+      return {true, "none"};
+    }
+
+    const auto & frame_id = pose.header.frame_id;
+    const auto & position = pose.pose.position;
+    const auto & orientation = pose.pose.orientation;
+
+    if (frame_id.empty()) {
+      return {false, "empty_frame"};
+    }
+    if (!required_frame_id_.empty() && frame_id != required_frame_id_) {
+      return {false, "frame_mismatch"};
+    }
+    if (!std::isfinite(position.x) || !std::isfinite(position.y) ||
+      !std::isfinite(position.z))
+    {
+      return {false, "nonfinite_position"};
+    }
+    if (
+      position.x < workspace_min_x_ || position.x > workspace_max_x_ ||
+      position.y < workspace_min_y_ || position.y > workspace_max_y_ ||
+      position.z < workspace_min_z_ || position.z > workspace_max_z_)
+    {
+      return {false, "outside_workspace"};
+    }
+
+    const double quaternion_norm = std::sqrt(
+      orientation.x * orientation.x + orientation.y * orientation.y +
+      orientation.z * orientation.z + orientation.w * orientation.w);
+    if (quaternion_norm < min_quaternion_norm_) {
+      return {false, "invalid_quaternion_norm"};
+    }
+
+    return {true, "none"};
   }
 
   rclcpp::Node::SharedPtr node_;
@@ -272,6 +348,15 @@ private:
   int num_planning_attempts_;
   double max_velocity_scaling_factor_;
   double max_acceleration_scaling_factor_;
+  bool enable_request_guard_;
+  std::string required_frame_id_;
+  double workspace_min_x_;
+  double workspace_max_x_;
+  double workspace_min_y_;
+  double workspace_max_y_;
+  double workspace_min_z_;
+  double workspace_max_z_;
+  double min_quaternion_norm_;
   moveit::planning_interface::MoveGroupInterface move_group_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr plan_success_publisher_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr planning_status_publisher_;

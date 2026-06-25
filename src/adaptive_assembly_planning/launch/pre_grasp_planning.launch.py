@@ -15,6 +15,15 @@ def generate_launch_description() -> LaunchDescription:
     max_acceleration_scaling_factor = LaunchConfiguration(
         'max_acceleration_scaling_factor'
     )
+    enable_request_guard = LaunchConfiguration('enable_request_guard')
+    required_frame_id = LaunchConfiguration('required_frame_id')
+    workspace_min_x = LaunchConfiguration('workspace_min_x')
+    workspace_max_x = LaunchConfiguration('workspace_max_x')
+    workspace_min_y = LaunchConfiguration('workspace_min_y')
+    workspace_max_y = LaunchConfiguration('workspace_max_y')
+    workspace_min_z = LaunchConfiguration('workspace_min_z')
+    workspace_max_z = LaunchConfiguration('workspace_max_z')
+    min_quaternion_norm = LaunchConfiguration('min_quaternion_norm')
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -36,6 +45,51 @@ def generate_launch_description() -> LaunchDescription:
             'max_acceleration_scaling_factor',
             default_value='1.0',
             description='MoveIt2 acceleration scaling factor in (0.0, 1.0].',
+        ),
+        DeclareLaunchArgument(
+            'enable_request_guard',
+            default_value='false',
+            description='Enable pre-MoveIt2 planning request safety checks.',
+        ),
+        DeclareLaunchArgument(
+            'required_frame_id',
+            default_value='',
+            description='Required input pose frame when request guard is enabled.',
+        ),
+        DeclareLaunchArgument(
+            'workspace_min_x',
+            default_value='-10.0',
+            description='Minimum allowed x when request guard is enabled.',
+        ),
+        DeclareLaunchArgument(
+            'workspace_max_x',
+            default_value='10.0',
+            description='Maximum allowed x when request guard is enabled.',
+        ),
+        DeclareLaunchArgument(
+            'workspace_min_y',
+            default_value='-10.0',
+            description='Minimum allowed y when request guard is enabled.',
+        ),
+        DeclareLaunchArgument(
+            'workspace_max_y',
+            default_value='10.0',
+            description='Maximum allowed y when request guard is enabled.',
+        ),
+        DeclareLaunchArgument(
+            'workspace_min_z',
+            default_value='-10.0',
+            description='Minimum allowed z when request guard is enabled.',
+        ),
+        DeclareLaunchArgument(
+            'workspace_max_z',
+            default_value='10.0',
+            description='Maximum allowed z when request guard is enabled.',
+        ),
+        DeclareLaunchArgument(
+            'min_quaternion_norm',
+            default_value='1e-6',
+            description='Minimum allowed quaternion norm when guard is enabled.',
         ),
         Node(
             package='adaptive_assembly_planning',
@@ -64,6 +118,21 @@ def generate_launch_description() -> LaunchDescription:
                 ),
                 'max_acceleration_scaling_factor': ParameterValue(
                     max_acceleration_scaling_factor,
+                    value_type=float,
+                ),
+                'enable_request_guard': ParameterValue(
+                    enable_request_guard,
+                    value_type=bool,
+                ),
+                'required_frame_id': required_frame_id,
+                'workspace_min_x': ParameterValue(workspace_min_x, value_type=float),
+                'workspace_max_x': ParameterValue(workspace_max_x, value_type=float),
+                'workspace_min_y': ParameterValue(workspace_min_y, value_type=float),
+                'workspace_max_y': ParameterValue(workspace_max_y, value_type=float),
+                'workspace_min_z': ParameterValue(workspace_min_z, value_type=float),
+                'workspace_max_z': ParameterValue(workspace_max_z, value_type=float),
+                'min_quaternion_norm': ParameterValue(
+                    min_quaternion_norm,
                     value_type=float,
                 ),
             }],
