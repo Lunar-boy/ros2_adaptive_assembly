@@ -53,6 +53,10 @@ The node also provides `/clear_dynamic_target_scene` as a
 `clear_failed` status event. This is useful before repeated demos or benchmark
 comparisons.
 
+The static table/support objects are reset independently through
+`/clear_static_planning_scene` and `/reapply_static_planning_scene`. This keeps
+static workcell hygiene separate from the dynamic target object.
+
 ## Build
 
 ```bash
