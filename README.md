@@ -129,6 +129,29 @@ The default sequence launch still uses `start_state_mode=current`. The fixed
 profile uses a known Panda joint configuration as planning input only; it does
 not command or execute robot motion.
 
+## Known-reachable assembly sequence profile
+
+The deterministic reachable profile fixes both the Panda start state and task
+target so local validation can cover successful `pre_grasp -> assembly`
+planning:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_panda_sequence_planning_reachable.launch.py
+```
+
+Validate the installed profile and successful two-stage status:
+
+```bash
+bash scripts/check_reachable_sequence_profile_available.sh
+python3 scripts/check_assembly_sequence_success_path.py
+```
+
+This is reproducible plan-only coverage. Neither trajectory is executed. See
+[docs/assembly_sequence_planner.md](docs/assembly_sequence_planner.md).
+The profile retains static scene collision checking and disables the optional
+dynamic target box because that box occupies the assembly goal itself.
+
 ## Panda-adapted pre-grasp planning
 
 `/pre_grasp_pose` is task-level. `/panda_pre_grasp_pose` is robot-specific and
@@ -482,4 +505,5 @@ See
 - PR25: simple RViz marker visualization
 - PR26: plan-only Panda pre-grasp and assembly sequence planning
 - PR27: deterministic fixed-start assembly sequence planning fallback
+- PR28: deterministic known-reachable assembly sequence profile
 - Future PR: assembly sequence diagnostics and planning refinements

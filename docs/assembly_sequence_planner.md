@@ -107,3 +107,37 @@ ros2 topic echo /assembly_sequence_planning_status
 
 This feature is plan-only. It adds no Gazebo, `ros2_control`, real hardware,
 or trajectory execution support.
+
+## Known-reachable sequence profile
+
+The known-reachable profile combines the PR27 fixed Panda start state with a
+fixed task target and known working planning settings. It exists to provide
+repeatable successful coverage of both planning stages without depending on a
+controller/current-state plugin:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_panda_sequence_planning_reachable.launch.py
+```
+
+The profile uses target `(x=0.442, y=0.148, z=0.15, yaw=0.0)`, random seed `42`,
+one planning attempt, a 5-second per-stage planning limit, `0.01` position
+tolerance, and `0.10` orientation tolerance. The target is fixed by setting
+equal minimum and maximum x/y/yaw values.
+
+The profile disables the optional dynamic target collision object because that
+box occupies the fixed assembly goal itself. Static table/support collision
+checking remains active. The normal sequence demo still enables the dynamic
+target scene by default.
+
+Validate installation and the successful second-stage path:
+
+```bash
+bash scripts/check_reachable_sequence_profile_available.sh
+python3 scripts/check_assembly_sequence_success_path.py
+```
+
+Success requires `event=success`, `failed_stage=none`,
+`planned_stage_count=2`, `start_state_mode=fixed`, and `execution=false`.
+This profile improves plan-only reproducibility and coverage; it does not
+command or execute either planned trajectory.
