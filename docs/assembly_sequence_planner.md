@@ -44,6 +44,7 @@ Sequence status contains:
 - `failed_stage`: `none`, `pre_grasp`, or `assembly`
 - `planned_stage_count`: number of successful stages
 - `total_duration_ms`: wall-clock planning time across attempted stages
+- `start_state_mode`: `current` or `fixed`
 - `execution=false`
 
 ## Build and run
@@ -70,6 +71,26 @@ ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_sequence_planning_
   publish_diagnostics:=true
 ```
 
+## Deterministic fixed-start fallback
+
+The default `start_state_mode` is `current`, preserving the normal behavior of
+requesting the current Panda state before planning `pre_grasp`. Some local
+Panda demo installations do not provide a stable current joint state because
+their controller/current-state plugin is unavailable.
+
+For reproducible plan-only validation, use the fixed-start profile:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_panda_sequence_planning_fixed_start.launch.py
+```
+
+This sets `panda_joint1` through `panda_joint7` to the deterministic planning
+configuration `[0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785]` before the
+pre-grasp planning request. The assembly stage still starts from the final
+joint state of the successful pre-grasp plan. The fixed state is planning input
+only and is never commanded or executed.
+
 ## Validate
 
 With the sequence demo running:
@@ -78,6 +99,8 @@ With the sequence demo running:
 bash scripts/check_assembly_sequence_available.sh
 bash scripts/check_assembly_sequence_topics.sh
 python3 scripts/check_assembly_sequence_status.py
+bash scripts/check_assembly_sequence_fixed_start_launch.sh
+bash scripts/check_assembly_sequence_start_state_status.sh
 ros2 topic echo /panda_assembly_pose
 ros2 topic echo /assembly_sequence_planning_status
 ```

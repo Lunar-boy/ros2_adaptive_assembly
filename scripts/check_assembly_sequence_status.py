@@ -16,6 +16,7 @@ REQUIRED_KEYS = {
     'failed_stage',
     'planned_stage_count',
     'total_duration_ms',
+    'start_state_mode',
     'execution',
 }
 
@@ -62,6 +63,10 @@ def _validate(status: str) -> int:
         )
     if fields.get('execution') != 'false':
         failures.append('execution must be false')
+    if fields.get('start_state_mode') not in {'current', 'fixed'}:
+        failures.append(
+            f"unexpected start_state_mode: {fields.get('start_state_mode')}"
+        )
 
     try:
         stage_count = int(fields.get('planned_stage_count', ''))

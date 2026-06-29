@@ -117,6 +117,18 @@ The existing Panda planning demo keeps its single pre-grasp behavior by
 default. See
 [docs/assembly_sequence_planner.md](docs/assembly_sequence_planner.md).
 
+For local environments without a stable Panda current-state source, the
+fixed-start profile provides deterministic plan-only sequence validation:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_panda_sequence_planning_fixed_start.launch.py
+```
+
+The default sequence launch still uses `start_state_mode=current`. The fixed
+profile uses a known Panda joint configuration as planning input only; it does
+not command or execute robot motion.
+
 ## Panda-adapted pre-grasp planning
 
 `/pre_grasp_pose` is task-level. `/panda_pre_grasp_pose` is robot-specific and
@@ -469,4 +481,5 @@ See
 - PR24: PlanningScene object audit tool
 - PR25: simple RViz marker visualization
 - PR26: plan-only Panda pre-grasp and assembly sequence planning
+- PR27: deterministic fixed-start assembly sequence planning fallback
 - Future PR: assembly sequence diagnostics and planning refinements
