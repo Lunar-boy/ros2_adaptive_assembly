@@ -1,0 +1,86 @@
+# Plan-only Panda assembly sequence planner
+
+The assembly sequence path extends the single pre-grasp planning pipeline with
+a second robot-aware target and a two-stage plan-only workflow. It does not
+execute either trajectory.
+
+## Data flow
+
+```text
+/pre_grasp_pose                         /assembly_pose
+      |                                      |
+      v                                      v
+panda_pre_grasp_pose_adapter_node      panda_assembly_pose_adapter_node
+      |                                      |
+      v                                      v
+/panda_pre_grasp_pose                  /panda_assembly_pose
+      |                                      |
+      +------------------+-------------------+
+                         v
+            assembly_sequence_planning_node
+                         |
+                         +-- plan pre_grasp from current state
+                         +-- plan assembly from pre_grasp plan end state
+                         |
+                         +-- /assembly_sequence_plan_success
+                         +-- /assembly_sequence_planning_status
+                         +-- /assembly_sequence_planning_duration_ms
+```
+
+The Panda assembly adapter mirrors the pre-grasp adapter defaults: it copies
+the numeric task pose into frame `panda_link0`, applies the fixed quaternion
+`(1, 0, 0, 0)`, and can optionally use TF2 instead of frame override. Adapter
+events are published on `/panda_assembly_pose_adapter_status`.
+
+The sequence planner waits until both adapted inputs have been refreshed. It
+plans `pre_grasp` first. If that succeeds, the final joint positions from that
+plan become the start state for the `assembly` plan. The generated plans are
+discarded after diagnostics are published; `execute()` and `move()` are never
+called.
+
+Sequence status contains:
+
+- `event`: `success` or `failure`
+- `failed_stage`: `none`, `pre_grasp`, or `assembly`
+- `planned_stage_count`: number of successful stages
+- `total_duration_ms`: wall-clock planning time across attempted stages
+- `execution=false`
+
+## Build and run
+
+```bash
+cd ~/ros2_adaptive_assembly_ws
+source /opt/ros/jazzy/setup.bash
+colcon build --symlink-install
+source install/setup.bash
+ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_sequence_planning_demo.launch.py
+```
+
+The dedicated launch disables the existing single-pose pre-grasp planner and
+starts the assembly adapter and sequence planner instead. The regular
+`adaptive_assembly_panda_planning_demo.launch.py` still starts the original
+pre-grasp planner by default.
+
+Planner settings can be overridden at launch:
+
+```bash
+ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_sequence_planning_demo.launch.py \
+  planner_id:="" num_planning_attempts:=1 planning_time_sec:=5.0 \
+  position_tolerance:=0.01 orientation_tolerance:=0.10 \
+  publish_diagnostics:=true
+```
+
+## Validate
+
+With the sequence demo running:
+
+```bash
+bash scripts/check_assembly_sequence_available.sh
+bash scripts/check_assembly_sequence_topics.sh
+python3 scripts/check_assembly_sequence_status.py
+ros2 topic echo /panda_assembly_pose
+ros2 topic echo /assembly_sequence_planning_status
+```
+
+This feature is plan-only. It adds no Gazebo, `ros2_control`, real hardware,
+or trajectory execution support.
