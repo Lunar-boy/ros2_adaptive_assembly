@@ -15,6 +15,7 @@ def generate_launch_description() -> LaunchDescription:
     position_tolerance = LaunchConfiguration('position_tolerance')
     orientation_tolerance = LaunchConfiguration('orientation_tolerance')
     publish_diagnostics = LaunchConfiguration('publish_diagnostics')
+    start_state_mode = LaunchConfiguration('start_state_mode')
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -46,6 +47,13 @@ def generate_launch_description() -> LaunchDescription:
             'publish_diagnostics',
             default_value='true',
             description='Publish sequence status and duration diagnostics.',
+        ),
+        DeclareLaunchArgument(
+            'start_state_mode',
+            default_value='current',
+            description=(
+                "Pre-grasp start state source: 'current' or deterministic 'fixed'."
+            ),
         ),
         Node(
             package='adaptive_assembly_planning',
@@ -80,6 +88,7 @@ def generate_launch_description() -> LaunchDescription:
                     orientation_tolerance,
                     value_type=float,
                 ),
+                'start_state_mode': start_state_mode,
             }],
         ),
     ])

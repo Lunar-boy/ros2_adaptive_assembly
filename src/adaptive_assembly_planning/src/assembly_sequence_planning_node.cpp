@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <iomanip>
 #include <memory>
@@ -36,6 +37,7 @@ public:
     planning_time_sec_(declare_parameter<double>("planning_time_sec", 5.0)),
     position_tolerance_(declare_parameter<double>("position_tolerance", 0.01)),
     orientation_tolerance_(declare_parameter<double>("orientation_tolerance", 0.10)),
+    start_state_mode_(declare_parameter<std::string>("start_state_mode", "current")),
     move_group_(node_, planning_group_)
   {
     validate_parameters();
@@ -74,11 +76,11 @@ public:
       "Assembly sequence planner ready: pre_grasp_topic='%s', assembly_topic='%s', "
       "planning_group='%s', planner_id='%s', num_planning_attempts=%d, "
       "planning_time_sec=%.3f, position_tolerance=%.3f, "
-      "orientation_tolerance=%.3f, publish_diagnostics=%s. "
+      "orientation_tolerance=%.3f, start_state_mode='%s', publish_diagnostics=%s. "
       "The pre-grasp and assembly stages are planned only; execution is disabled.",
       pre_grasp_topic_.c_str(), assembly_topic_.c_str(), planning_group_.c_str(),
       planner_id_.c_str(), num_planning_attempts_, planning_time_sec_,
-      position_tolerance_, orientation_tolerance_,
+      position_tolerance_, orientation_tolerance_, start_state_mode_.c_str(),
       publish_diagnostics_ ? "true" : "false");
   }
 
@@ -112,6 +114,13 @@ private:
       RCLCPP_WARN(node_->get_logger(), "orientation_tolerance must be positive; using 0.10.");
       orientation_tolerance_ = 0.10;
     }
+    if (start_state_mode_ != "current" && start_state_mode_ != "fixed") {
+      RCLCPP_WARN(
+        node_->get_logger(),
+        "start_state_mode='%s' is invalid; using 'current'.",
+        start_state_mode_.c_str());
+      start_state_mode_ = "current";
+    }
   }
 
   void try_plan_sequence()
@@ -140,7 +149,7 @@ private:
     double total_duration_ms = 0.0;
     std::size_t planned_stage_count = 0;
 
-    move_group_.setStartStateToCurrentState();
+    set_pre_grasp_start_state();
     set_pose_target(pre_grasp_pose);
     moveit::planning_interface::MoveGroupInterface::Plan pre_grasp_plan;
     const bool pre_grasp_succeeded = plan_stage(pre_grasp_plan, total_duration_ms);
@@ -195,6 +204,34 @@ private:
       move_group_.setPoseReferenceFrame(pose.header.frame_id);
     }
     move_group_.setPoseTarget(pose);
+  }
+
+  void set_pre_grasp_start_state()
+  {
+    if (start_state_mode_ == "current") {
+      move_group_.setStartStateToCurrentState();
+      return;
+    }
+
+    constexpr std::array<const char *, 7> joint_names = {
+      "panda_joint1", "panda_joint2", "panda_joint3", "panda_joint4",
+      "panda_joint5", "panda_joint6", "panda_joint7"
+    };
+    constexpr std::array<double, 7> joint_positions = {
+      0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785
+    };
+
+    moveit_msgs::msg::RobotState fixed_state;
+    fixed_state.joint_state.name.assign(joint_names.begin(), joint_names.end());
+    fixed_state.joint_state.position.assign(
+      joint_positions.begin(), joint_positions.end());
+    fixed_state.is_diff = false;
+    move_group_.setStartState(fixed_state);
+
+    RCLCPP_INFO(
+      node_->get_logger(),
+      "Using deterministic fixed Panda start state for pre-grasp planning. "
+      "Execution remains disabled.");
   }
 
   bool plan_stage(
@@ -263,6 +300,7 @@ private:
            << ";failed_stage=" << failed_stage
            << ";planned_stage_count=" << planned_stage_count
            << ";total_duration_ms=" << total_duration_ms
+           << ";start_state_mode=" << start_state_mode_
            << ";execution=false";
     status_message.data = status.str();
     status_publisher_->publish(status_message);
@@ -285,6 +323,7 @@ private:
   double planning_time_sec_;
   double position_tolerance_;
   double orientation_tolerance_;
+  std::string start_state_mode_;
   moveit::planning_interface::MoveGroupInterface move_group_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr success_publisher_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_publisher_;

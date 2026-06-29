@@ -18,6 +18,7 @@ def generate_launch_description() -> LaunchDescription:
     position_tolerance = LaunchConfiguration('position_tolerance')
     orientation_tolerance = LaunchConfiguration('orientation_tolerance')
     publish_diagnostics = LaunchConfiguration('publish_diagnostics')
+    start_state_mode = LaunchConfiguration('start_state_mode')
 
     panda_planning_demo = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_bringup'),
@@ -66,6 +67,13 @@ def generate_launch_description() -> LaunchDescription:
             default_value='true',
             description='Publish sequence status and duration diagnostics.',
         ),
+        DeclareLaunchArgument(
+            'start_state_mode',
+            default_value='current',
+            description=(
+                "Pre-grasp start state source: 'current' or deterministic 'fixed'."
+            ),
+        ),
         LogInfo(
             msg='Launching the existing Panda plan-only demo plus the Panda '
             'assembly pose adapter and two-stage pre-grasp/assembly sequence '
@@ -91,6 +99,7 @@ def generate_launch_description() -> LaunchDescription:
                 'position_tolerance': position_tolerance,
                 'orientation_tolerance': orientation_tolerance,
                 'publish_diagnostics': publish_diagnostics,
+                'start_state_mode': start_state_mode,
             }.items(),
         ),
     ])
