@@ -12,6 +12,13 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description() -> LaunchDescription:
     """Compose the existing demo with assembly adaptation and sequencing."""
+    default_params_file = PathJoinSubstitution([
+        FindPackageShare('adaptive_assembly_bringup'),
+        'config',
+        'adaptive_assembly_params.yaml',
+    ])
+    params_file = LaunchConfiguration('params_file')
+    use_dynamic_target_scene = LaunchConfiguration('use_dynamic_target_scene')
     planner_id = LaunchConfiguration('planner_id')
     num_planning_attempts = LaunchConfiguration('num_planning_attempts')
     planning_time_sec = LaunchConfiguration('planning_time_sec')
@@ -37,6 +44,16 @@ def generate_launch_description() -> LaunchDescription:
     ])
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'params_file',
+            default_value=default_params_file,
+            description='Parameter YAML for adaptive assembly pipeline nodes.',
+        ),
+        DeclareLaunchArgument(
+            'use_dynamic_target_scene',
+            default_value='true',
+            description='Whether to include the dynamic target collision object.',
+        ),
         DeclareLaunchArgument(
             'planner_id',
             default_value='',
@@ -82,6 +99,8 @@ def generate_launch_description() -> LaunchDescription:
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(panda_planning_demo),
             launch_arguments={
+                'params_file': params_file,
+                'use_dynamic_target_scene': use_dynamic_target_scene,
                 'planner_id': planner_id,
                 'num_planning_attempts': num_planning_attempts,
                 'use_pre_grasp_planning': 'false',
