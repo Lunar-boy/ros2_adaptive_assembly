@@ -49,6 +49,33 @@ ament_target_dependencies(
   tf2_geometry_msgs
 )
 
+add_executable(
+  panda_assembly_pose_adapter_node
+  src/panda_assembly_pose_adapter_node.cpp
+)
+ament_target_dependencies(
+  panda_assembly_pose_adapter_node
+  rclcpp
+  geometry_msgs
+  std_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+)
+
+add_executable(
+  assembly_sequence_planning_node
+  src/assembly_sequence_planning_node.cpp
+)
+ament_target_dependencies(
+  assembly_sequence_planning_node
+  rclcpp
+  geometry_msgs
+  std_msgs
+  moveit_ros_planning_interface
+  moveit_msgs
+)
+
 add_executable(static_planning_scene_node src/static_planning_scene_node.cpp)
 ament_target_dependencies(
   static_planning_scene_node
@@ -94,6 +121,8 @@ install(
   TARGETS
     pre_grasp_planning_node
     panda_pre_grasp_pose_adapter_node
+    panda_assembly_pose_adapter_node
+    assembly_sequence_planning_node
     static_planning_scene_node
     dynamic_target_scene_node
     planning_scene_audit_node

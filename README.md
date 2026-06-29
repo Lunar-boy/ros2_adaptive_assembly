@@ -95,6 +95,28 @@ This launch plans only. It does not execute robot motion, use Gazebo, or require
 real hardware. See
 [docs/pre_grasp_planning_bridge.md](docs/pre_grasp_planning_bridge.md).
 
+## Plan-only Panda assembly sequence
+
+The sequence demo adds a Panda-aware `/panda_assembly_pose` path and plans two
+stages: `pre_grasp`, then `assembly`. The assembly-stage plan starts from the
+final joint state of the pre-grasp plan. Neither trajectory is executed.
+
+```bash
+ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_sequence_planning_demo.launch.py
+```
+
+Validation helpers:
+
+```bash
+bash scripts/check_assembly_sequence_available.sh
+bash scripts/check_assembly_sequence_topics.sh
+python3 scripts/check_assembly_sequence_status.py
+```
+
+The existing Panda planning demo keeps its single pre-grasp behavior by
+default. See
+[docs/assembly_sequence_planner.md](docs/assembly_sequence_planner.md).
+
 ## Panda-adapted pre-grasp planning
 
 `/pre_grasp_pose` is task-level. `/panda_pre_grasp_pose` is robot-specific and
@@ -446,4 +468,5 @@ See
 - PR23: planning request guard and safety filter
 - PR24: PlanningScene object audit tool
 - PR25: simple RViz marker visualization
-- Future PR: dynamic PlanningScene updates and planning refinements
+- PR26: plan-only Panda pre-grasp and assembly sequence planning
+- Future PR: assembly sequence diagnostics and planning refinements

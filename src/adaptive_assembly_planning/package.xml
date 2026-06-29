@@ -3,7 +3,7 @@
 <package format="3">
   <name>adaptive_assembly_planning</name>
   <version>0.0.0</version>
-  <description>Plan-only MoveIt2 bridge for adaptive assembly pre-grasp poses.</description>
+  <description>Plan-only MoveIt2 pose adaptation and sequence planning for adaptive assembly.</description>
   <maintainer email="chunzhi.wu@mailbox.tu-dresden.de">nate</maintainer>
   <license>TODO: License declaration</license>
 
