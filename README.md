@@ -166,6 +166,36 @@ python3 scripts/check_dry_run_execution_status.py
 `real_execution=false` means no MoveIt, simulator, controller, or hardware
 execution occurred. See [docs/dry_run_execution.md](docs/dry_run_execution.md).
 
+## Closed-loop recovery supervisor
+
+The recovery supervisor observes sequence planning, dry-run execution, dynamic
+scene, and PlanningScene audit statuses. It publishes deterministic decisions
+on:
+
+- `/assembly_recovery_status`
+- `/assembly_recovery_action`
+- `/assembly_recovery_success`
+
+Run the known-reachable dry-run sequence with supervision:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_recovery_supervisor_demo.launch.py
+```
+
+Validate the supervisor in another sourced shell:
+
+```bash
+bash scripts/check_recovery_supervisor_topics.sh
+python3 scripts/check_recovery_supervisor_success_path.py
+python3 scripts/check_recovery_supervisor_failure_injection.py
+```
+
+This is supervisor-only. Service calls are disabled by default, no trajectory
+is executed, and publishing a recovery action does not retry planning by itself.
+Future orchestration must consume that action to initiate a new plan. See
+[docs/recovery_supervisor.md](docs/recovery_supervisor.md).
+
 The existing Panda planning demo keeps its single pre-grasp behavior by
 default. See
 [docs/assembly_sequence_planner.md](docs/assembly_sequence_planner.md).
@@ -560,4 +590,7 @@ See
 - PR27: deterministic fixed-start assembly sequence planning fallback
 - PR28: deterministic known-reachable assembly sequence profile
 - PR29: assembly sequence stage-level diagnostics
-- Future PR: assembly sequence recovery and planning refinements
+- PR30: successful assembly sequence trajectory export
+- PR31: message-only dry-run sequence execution
+- PR32: closed-loop recovery state machine and deterministic actions
+- Future PR: recovery action orchestration and planning refinements
