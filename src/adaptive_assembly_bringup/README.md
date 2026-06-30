@@ -12,6 +12,14 @@ This package connects:
 This is intentionally the non-MoveIt pipeline launch. It does not start Gazebo,
 RViz, a robot model, ros2_control, or MoveIt2.
 
+The optional
+`adaptive_assembly_panda_ros2_control_execution.launch.py` profile is separate
+from the non-MoveIt pipeline. It composes known-reachable sequence planning with
+a simulator-only execution bridge. It can connect to an already running Panda
+`FollowJointTrajectory` controller. It adds no Gazebo launch or controller
+configuration; the included existing MoveIt demo may provide its own mock
+ros2_control stack.
+
 ## Build
 
 ```bash

@@ -1,4 +1,4 @@
-"""Set up the adaptive assembly dry-run execution package."""
+"""Set up adaptive assembly trajectory execution interfaces."""
 
 from setuptools import find_packages, setup
 
@@ -20,9 +20,7 @@ setup(
     zip_safe=True,
     maintainer='nate',
     maintainer_email='chunzhi.wu@mailbox.tu-dresden.de',
-    description=(
-        'Dry-run trajectory execution interfaces for adaptive assembly.'
-    ),
+    description='Optional trajectory execution interfaces for assembly.',
     license='TODO: License declaration',
     extras_require={
         'test': [
@@ -33,6 +31,9 @@ setup(
         'console_scripts': [
             'dry_run_sequence_executor_node = '
             'adaptive_assembly_execution.dry_run_sequence_executor_node:main',
+            'ros2_control_sequence_executor_node = '
+            'adaptive_assembly_execution.'
+            'ros2_control_sequence_executor_node:main',
         ],
     },
 )
