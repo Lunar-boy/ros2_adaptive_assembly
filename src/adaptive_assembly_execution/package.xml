@@ -1,20 +1,15 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>adaptive_assembly_bringup</name>
+  <name>adaptive_assembly_execution</name>
   <version>0.0.0</version>
-  <description>Launch entry points for the adaptive assembly pipeline.</description>
+  <description>Dry-run trajectory execution interfaces for adaptive assembly.</description>
   <maintainer email="chunzhi.wu@mailbox.tu-dresden.de">nate</maintainer>
   <license>TODO: License declaration</license>
 
   <depend>rclpy</depend>
-  <depend>launch</depend>
-  <depend>launch_ros</depend>
-  <depend>adaptive_assembly_perception</depend>
-  <depend>adaptive_assembly_task</depend>
-  <depend>adaptive_assembly_planning</depend>
-  <depend>adaptive_assembly_execution</depend>
-  <depend>moveit_resources_panda_moveit_config</depend>
+  <depend>moveit_msgs</depend>
+  <depend>std_msgs</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

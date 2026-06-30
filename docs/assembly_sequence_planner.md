@@ -132,6 +132,20 @@ python3 scripts/check_sequence_trajectory_status.py
 
 Exporting a trajectory does not command or execute it.
 
+## Dry-run execution consumer
+
+The exported trajectories can be validated and processed by the message-only
+dry-run executor:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_panda_sequence_dry_run_execution.launch.py
+```
+
+This abstraction simulates the two stage transitions but sends no commands and
+performs no real execution. See
+[dry_run_execution.md](dry_run_execution.md) for its interfaces and validation.
+
 ## Known-reachable sequence profile
 
 The known-reachable profile combines the PR27 fixed Panda start state with a
