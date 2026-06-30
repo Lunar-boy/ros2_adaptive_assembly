@@ -30,6 +30,12 @@ public:
         "status_topic", "/assembly_sequence_planning_status")),
     duration_topic_(declare_parameter<std::string>(
         "duration_topic", "/assembly_sequence_planning_duration_ms")),
+    stage_status_topic_(declare_parameter<std::string>(
+        "stage_status_topic", "/assembly_sequence_stage_status")),
+    stage_success_topic_(declare_parameter<std::string>(
+        "stage_success_topic", "/assembly_sequence_stage_success")),
+    stage_duration_topic_(declare_parameter<std::string>(
+        "stage_duration_topic", "/assembly_sequence_stage_duration_ms")),
     publish_diagnostics_(declare_parameter<bool>("publish_diagnostics", true)),
     planning_group_(declare_parameter<std::string>("planning_group", "panda_arm")),
     planner_id_(declare_parameter<std::string>("planner_id", "")),
@@ -53,6 +59,12 @@ public:
     status_publisher_ = node_->create_publisher<std_msgs::msg::String>(status_topic_, 10);
     duration_publisher_ =
       node_->create_publisher<std_msgs::msg::Float64>(duration_topic_, 10);
+    stage_status_publisher_ =
+      node_->create_publisher<std_msgs::msg::String>(stage_status_topic_, 10);
+    stage_success_publisher_ =
+      node_->create_publisher<std_msgs::msg::Bool>(stage_success_topic_, 10);
+    stage_duration_publisher_ =
+      node_->create_publisher<std_msgs::msg::Float64>(stage_duration_topic_, 10);
 
     pre_grasp_subscription_ =
       node_->create_subscription<geometry_msgs::msg::PoseStamped>(
@@ -77,11 +89,13 @@ public:
       "planning_group='%s', planner_id='%s', num_planning_attempts=%d, "
       "planning_time_sec=%.3f, position_tolerance=%.3f, "
       "orientation_tolerance=%.3f, start_state_mode='%s', publish_diagnostics=%s. "
+      "Stage diagnostics: status='%s', success='%s', duration='%s'. "
       "The pre-grasp and assembly stages are planned only; execution is disabled.",
       pre_grasp_topic_.c_str(), assembly_topic_.c_str(), planning_group_.c_str(),
       planner_id_.c_str(), num_planning_attempts_, planning_time_sec_,
       position_tolerance_, orientation_tolerance_, start_state_mode_.c_str(),
-      publish_diagnostics_ ? "true" : "false");
+      publish_diagnostics_ ? "true" : "false", stage_status_topic_.c_str(),
+      stage_success_topic_.c_str(), stage_duration_topic_.c_str());
   }
 
 private:
@@ -152,10 +166,13 @@ private:
     set_pre_grasp_start_state();
     set_pose_target(pre_grasp_pose);
     moveit::planning_interface::MoveGroupInterface::Plan pre_grasp_plan;
-    const bool pre_grasp_succeeded = plan_stage(pre_grasp_plan, total_duration_ms);
+    const auto pre_grasp_result = plan_stage(pre_grasp_plan);
+    total_duration_ms += pre_grasp_result.duration_ms;
     move_group_.clearPoseTargets();
+    publish_stage_result(
+      "pre_grasp", pre_grasp_result.succeeded, pre_grasp_result.duration_ms);
 
-    if (!pre_grasp_succeeded) {
+    if (!pre_grasp_result.succeeded) {
       publish_result(false, "failure", "pre_grasp", planned_stage_count, total_duration_ms);
       RCLCPP_WARN(
         node_->get_logger(),
@@ -178,10 +195,13 @@ private:
     move_group_.setStartState(assembly_start_state.value());
     set_pose_target(assembly_pose);
     moveit::planning_interface::MoveGroupInterface::Plan assembly_plan;
-    const bool assembly_succeeded = plan_stage(assembly_plan, total_duration_ms);
+    const auto assembly_result = plan_stage(assembly_plan);
+    total_duration_ms += assembly_result.duration_ms;
     move_group_.clearPoseTargets();
+    publish_stage_result(
+      "assembly", assembly_result.succeeded, assembly_result.duration_ms);
 
-    if (!assembly_succeeded) {
+    if (!assembly_result.succeeded) {
       publish_result(false, "failure", "assembly", planned_stage_count, total_duration_ms);
       RCLCPP_WARN(
         node_->get_logger(),
@@ -234,16 +254,21 @@ private:
       "Execution remains disabled.");
   }
 
-  bool plan_stage(
-    moveit::planning_interface::MoveGroupInterface::Plan & plan,
-    double & total_duration_ms)
+  struct StagePlanResult
+  {
+    bool succeeded;
+    double duration_ms;
+  };
+
+  StagePlanResult plan_stage(
+    moveit::planning_interface::MoveGroupInterface::Plan & plan)
   {
     const auto start = std::chrono::steady_clock::now();
     const bool succeeded = static_cast<bool>(move_group_.plan(plan));
     const auto end = std::chrono::steady_clock::now();
-    total_duration_ms +=
+    const double duration_ms =
       std::chrono::duration<double, std::milli>(end - start).count();
-    return succeeded;
+    return {succeeded, duration_ms};
   }
 
   static std::optional<moveit_msgs::msg::RobotState> final_state_from_plan(
@@ -310,12 +335,50 @@ private:
     duration_publisher_->publish(duration_message);
   }
 
+  void publish_stage_result(
+    const std::string & stage,
+    const bool success,
+    const double duration_ms)
+  {
+    std_msgs::msg::Bool success_message;
+    success_message.data = success;
+    stage_success_publisher_->publish(success_message);
+
+    if (!publish_diagnostics_) {
+      return;
+    }
+
+    std_msgs::msg::String status_message;
+    std::ostringstream status;
+    status << std::fixed << std::setprecision(6)
+           << "event=" << (success ? "success" : "failure")
+           << ";stage=" << stage
+           << ";duration_ms=" << duration_ms
+           << ";planning_group=" << planning_group_
+           << ";planner_id=" << (planner_id_.empty() ? "<default>" : planner_id_)
+           << ";num_planning_attempts=" << num_planning_attempts_
+           << ";planning_time_sec=" << planning_time_sec_
+           << ";position_tolerance=" << position_tolerance_
+           << ";orientation_tolerance=" << orientation_tolerance_
+           << ";start_state_mode=" << start_state_mode_
+           << ";execution=false";
+    status_message.data = status.str();
+    stage_status_publisher_->publish(status_message);
+
+    std_msgs::msg::Float64 duration_message;
+    duration_message.data = duration_ms;
+    stage_duration_publisher_->publish(duration_message);
+  }
+
   rclcpp::Node::SharedPtr node_;
   std::string pre_grasp_topic_;
   std::string assembly_topic_;
   std::string success_topic_;
   std::string status_topic_;
   std::string duration_topic_;
+  std::string stage_status_topic_;
+  std::string stage_success_topic_;
+  std::string stage_duration_topic_;
   bool publish_diagnostics_;
   std::string planning_group_;
   std::string planner_id_;
@@ -328,6 +391,9 @@ private:
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr success_publisher_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_publisher_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr duration_publisher_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr stage_status_publisher_;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr stage_success_publisher_;
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr stage_duration_publisher_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pre_grasp_subscription_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr assembly_subscription_;
   std::optional<geometry_msgs::msg::PoseStamped> pre_grasp_pose_;

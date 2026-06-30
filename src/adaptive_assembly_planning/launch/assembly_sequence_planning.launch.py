@@ -66,6 +66,9 @@ def generate_launch_description() -> LaunchDescription:
                 'success_topic': '/assembly_sequence_plan_success',
                 'status_topic': '/assembly_sequence_planning_status',
                 'duration_topic': '/assembly_sequence_planning_duration_ms',
+                'stage_status_topic': '/assembly_sequence_stage_status',
+                'stage_success_topic': '/assembly_sequence_stage_success',
+                'stage_duration_topic': '/assembly_sequence_stage_duration_ms',
                 'publish_diagnostics': ParameterValue(
                     publish_diagnostics,
                     value_type=bool,
