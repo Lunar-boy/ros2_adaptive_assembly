@@ -166,6 +166,39 @@ python3 scripts/check_dry_run_execution_status.py
 `real_execution=false` means no MoveIt, simulator, controller, or hardware
 execution occurred. See [docs/dry_run_execution.md](docs/dry_run_execution.md).
 
+## Optional Gazebo/ros2_control execution bridge
+
+The simulator-only execution profile forwards the existing exported
+`pre_grasp` and `assembly` trajectories, in order, to an externally running
+Panda `FollowJointTrajectory` action server:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_panda_ros2_control_execution.launch.py
+```
+
+It publishes:
+
+- `/assembly_ros2_control_execution_status`
+- `/assembly_ros2_control_execution_success`
+- `/assembly_ros2_control_execution_duration_ms`
+- `/assembly_ros2_control_execution_stage_status`
+
+Validate the interface, terminal result, and controller-unavailable path with:
+
+```bash
+bash scripts/check_ros2_control_execution_topics.sh
+python3 scripts/check_ros2_control_execution_status.py
+python3 scripts/check_ros2_control_execution_unavailable_path.py
+```
+
+The launch does not start a full Gazebo world or ros2_control hardware stack.
+When the controller is unavailable, the bridge publishes a skipped result and
+does not crash. This profile adds only a simulator/controller bridge; it does
+not add real hardware execution, gripper control, contact-rich insertion, or a
+full Gazebo workcell simulation. See
+[docs/gazebo_ros2_control_execution.md](docs/gazebo_ros2_control_execution.md).
+
 ## Closed-loop recovery supervisor
 
 The recovery supervisor observes sequence planning, dry-run execution, dynamic
@@ -593,4 +626,5 @@ See
 - PR30: successful assembly sequence trajectory export
 - PR31: message-only dry-run sequence execution
 - PR32: closed-loop recovery state machine and deterministic actions
+- PR33: optional simulator-only Gazebo/ros2_control execution bridge
 - Future PR: recovery action orchestration and planning refinements
