@@ -34,9 +34,8 @@ events are published on `/panda_assembly_pose_adapter_status`.
 
 The sequence planner waits until both adapted inputs have been refreshed. It
 plans `pre_grasp` first. If that succeeds, the final joint positions from that
-plan become the start state for the `assembly` plan. The generated plans are
-discarded after diagnostics are published; `execute()` and `move()` are never
-called.
+plan become the start state for the `assembly` plan. `execute()` and `move()`
+are never called.
 
 Sequence status contains:
 
@@ -107,6 +106,31 @@ ros2 topic echo /assembly_sequence_planning_status
 
 This feature is plan-only. It adds no Gazebo, `ros2_control`, real hardware,
 or trajectory execution support.
+
+## Trajectory export
+
+By default, each successful stage exports its complete
+`moveit_msgs/msg/RobotTrajectory` for future consumers:
+
+- `/pre_grasp_trajectory`
+- `/assembly_trajectory`
+- `/assembly_sequence_trajectory_status` (`std_msgs/msg/String`)
+
+The assembly trajectory is published only when assembly planning succeeds. Set
+`publish_trajectories:=false` to disable both trajectory publishers. Topic names
+are configurable with `pre_grasp_trajectory_topic`,
+`assembly_trajectory_topic`, and `trajectory_status_topic`. Status events report
+the stage, topic, available point and joint counts, and always include
+`execution=false`.
+
+With the deterministic known-reachable profile running, validate the export:
+
+```bash
+bash scripts/check_sequence_trajectory_topics.sh
+python3 scripts/check_sequence_trajectory_status.py
+```
+
+Exporting a trajectory does not command or execute it.
 
 ## Known-reachable sequence profile
 
