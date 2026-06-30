@@ -156,6 +156,18 @@ source /opt/ros/jazzy/setup.bash
 colcon build --symlink-install
 source install/setup.bash
 ```
+## Docker headless workflow
+
+A headless Docker environment is provided for reproducible ROS2 Jazzy + MoveIt2 builds, plan-only demos, validation scripts, and benchmark workflows.
+
+This container does not provide RViz2 GUI, Gazebo GUI, NVIDIA GPU acceleration, real robot access, camera devices, gripper hardware, or contact-rich insertion simulation.
+
+Build and start the development container:
+
+```bash
+docker compose -f docker/compose.yaml up -d --build dev
+```
+See [docker/README.md](docker/README.md) for the full container workflow.
 
 ---
 
