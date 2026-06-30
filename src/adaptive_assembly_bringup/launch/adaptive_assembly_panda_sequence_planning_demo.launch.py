@@ -19,6 +19,7 @@ def generate_launch_description() -> LaunchDescription:
     ])
     params_file = LaunchConfiguration('params_file')
     use_dynamic_target_scene = LaunchConfiguration('use_dynamic_target_scene')
+    use_planning_scene_audit = LaunchConfiguration('use_planning_scene_audit')
     planner_id = LaunchConfiguration('planner_id')
     num_planning_attempts = LaunchConfiguration('num_planning_attempts')
     planning_time_sec = LaunchConfiguration('planning_time_sec')
@@ -59,6 +60,11 @@ def generate_launch_description() -> LaunchDescription:
             'use_dynamic_target_scene',
             default_value='true',
             description='Whether to include the dynamic target collision object.',
+        ),
+        DeclareLaunchArgument(
+            'use_planning_scene_audit',
+            default_value='true',
+            description='Whether to include the read-only PlanningScene audit.',
         ),
         DeclareLaunchArgument(
             'planner_id',
@@ -127,6 +133,7 @@ def generate_launch_description() -> LaunchDescription:
             launch_arguments={
                 'params_file': params_file,
                 'use_dynamic_target_scene': use_dynamic_target_scene,
+                'use_planning_scene_audit': use_planning_scene_audit,
                 'planner_id': planner_id,
                 'num_planning_attempts': num_planning_attempts,
                 'use_pre_grasp_planning': 'false',

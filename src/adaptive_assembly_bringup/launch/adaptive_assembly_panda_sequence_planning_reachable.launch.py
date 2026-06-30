@@ -30,6 +30,9 @@ def generate_launch_description() -> LaunchDescription:
     assembly_trajectory_topic = LaunchConfiguration(
         'assembly_trajectory_topic'
     )
+    use_planning_scene_audit = LaunchConfiguration(
+        'use_planning_scene_audit'
+    )
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -41,6 +44,11 @@ def generate_launch_description() -> LaunchDescription:
             'assembly_trajectory_topic',
             default_value='/assembly_trajectory',
             description='Topic for successful assembly trajectories.',
+        ),
+        DeclareLaunchArgument(
+            'use_planning_scene_audit',
+            default_value='true',
+            description='Whether to include the read-only scene audit.',
         ),
         LogInfo(
             msg='Launching the deterministic known-reachable Panda assembly '
@@ -59,6 +67,7 @@ def generate_launch_description() -> LaunchDescription:
                 'orientation_tolerance': '0.10',
                 'pre_grasp_trajectory_topic': pre_grasp_trajectory_topic,
                 'assembly_trajectory_topic': assembly_trajectory_topic,
+                'use_planning_scene_audit': use_planning_scene_audit,
             }.items(),
         ),
     ])

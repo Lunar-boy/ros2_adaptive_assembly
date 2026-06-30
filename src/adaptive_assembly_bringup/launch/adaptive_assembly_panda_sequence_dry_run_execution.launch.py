@@ -39,6 +39,9 @@ def generate_launch_description() -> LaunchDescription:
         'simulated_stage_duration_ms'
     )
     publish_stage_status = LaunchConfiguration('publish_stage_status')
+    use_planning_scene_audit = LaunchConfiguration(
+        'use_planning_scene_audit'
+    )
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -100,6 +103,11 @@ def generate_launch_description() -> LaunchDescription:
             default_value='true',
             description='Publish per-stage dry-run status messages.',
         ),
+        DeclareLaunchArgument(
+            'use_planning_scene_audit',
+            default_value='true',
+            description='Whether to include the read-only PlanningScene audit.',
+        ),
         LogInfo(
             msg='Launching the deterministic known-reachable sequence with a '
             'message-only dry-run executor. Real execution is disabled.'
@@ -140,6 +148,7 @@ def generate_launch_description() -> LaunchDescription:
             launch_arguments={
                 'pre_grasp_trajectory_topic': pre_grasp_trajectory_topic,
                 'assembly_trajectory_topic': assembly_trajectory_topic,
+                'use_planning_scene_audit': use_planning_scene_audit,
             }.items(),
         ),
     ])
