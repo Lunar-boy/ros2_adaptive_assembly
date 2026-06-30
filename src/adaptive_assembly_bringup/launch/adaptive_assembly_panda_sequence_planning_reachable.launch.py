@@ -1,10 +1,14 @@
 """Launch a deterministic known-reachable plan-only assembly sequence."""
 
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
-from launch.actions import LogInfo
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    LogInfo,
+)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -20,11 +24,28 @@ def generate_launch_description() -> LaunchDescription:
         'config',
         'adaptive_assembly_sequence_reachable_params.yaml',
     ])
+    pre_grasp_trajectory_topic = LaunchConfiguration(
+        'pre_grasp_trajectory_topic'
+    )
+    assembly_trajectory_topic = LaunchConfiguration(
+        'assembly_trajectory_topic'
+    )
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'pre_grasp_trajectory_topic',
+            default_value='/pre_grasp_trajectory',
+            description='Topic for successful pre-grasp trajectories.',
+        ),
+        DeclareLaunchArgument(
+            'assembly_trajectory_topic',
+            default_value='/assembly_trajectory',
+            description='Topic for successful assembly trajectories.',
+        ),
         LogInfo(
             msg='Launching the deterministic known-reachable Panda assembly '
-            'sequence profile. Both stages are planned only; execution is disabled.'
+            'sequence profile. Both stages are planned only; execution is '
+            'disabled.'
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(sequence_demo),
@@ -36,6 +57,8 @@ def generate_launch_description() -> LaunchDescription:
                 'num_planning_attempts': '1',
                 'position_tolerance': '0.01',
                 'orientation_tolerance': '0.10',
+                'pre_grasp_trajectory_topic': pre_grasp_trajectory_topic,
+                'assembly_trajectory_topic': assembly_trajectory_topic,
             }.items(),
         ),
     ])

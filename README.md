@@ -140,6 +140,32 @@ python3 scripts/check_sequence_trajectory_status.py
 
 These trajectories are exported for future consumers but are not executed.
 
+The dry-run execution launch composes the deterministic known-reachable profile
+with a message-only consumer of both exported trajectories:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_panda_sequence_dry_run_execution.launch.py
+```
+
+Dry-run aggregate topics are:
+
+- `/assembly_execution_status`
+- `/assembly_execution_success`
+- `/assembly_execution_duration_ms`
+- `/assembly_execution_stage_status` (optional per-stage status)
+
+Validation commands:
+
+```bash
+bash scripts/check_dry_run_execution_topics.sh
+python3 scripts/check_dry_run_execution_status.py
+```
+
+`execution=true` means the dry-run abstraction processed both stages;
+`real_execution=false` means no MoveIt, simulator, controller, or hardware
+execution occurred. See [docs/dry_run_execution.md](docs/dry_run_execution.md).
+
 The existing Panda planning demo keeps its single pre-grasp behavior by
 default. See
 [docs/assembly_sequence_planner.md](docs/assembly_sequence_planner.md).
