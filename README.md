@@ -125,6 +125,21 @@ They report each attempted `pre_grasp` and `assembly` planning stage
 independently. Aggregate sequence topics remain unchanged, and execution stays
 disabled.
 
+Successful stage plans are also exported on:
+
+- `/pre_grasp_trajectory` (`moveit_msgs/msg/RobotTrajectory`)
+- `/assembly_trajectory` (`moveit_msgs/msg/RobotTrajectory`)
+- `/assembly_sequence_trajectory_status` (`std_msgs/msg/String`)
+
+Validate trajectory topics and content against the known-reachable profile:
+
+```bash
+bash scripts/check_sequence_trajectory_topics.sh
+python3 scripts/check_sequence_trajectory_status.py
+```
+
+These trajectories are exported for future consumers but are not executed.
+
 The existing Panda planning demo keeps its single pre-grasp behavior by
 default. See
 [docs/assembly_sequence_planner.md](docs/assembly_sequence_planner.md).

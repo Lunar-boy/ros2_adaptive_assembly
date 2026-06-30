@@ -15,6 +15,12 @@ def generate_launch_description() -> LaunchDescription:
     position_tolerance = LaunchConfiguration('position_tolerance')
     orientation_tolerance = LaunchConfiguration('orientation_tolerance')
     publish_diagnostics = LaunchConfiguration('publish_diagnostics')
+    publish_trajectories = LaunchConfiguration('publish_trajectories')
+    pre_grasp_trajectory_topic = LaunchConfiguration(
+        'pre_grasp_trajectory_topic'
+    )
+    assembly_trajectory_topic = LaunchConfiguration('assembly_trajectory_topic')
+    trajectory_status_topic = LaunchConfiguration('trajectory_status_topic')
     start_state_mode = LaunchConfiguration('start_state_mode')
 
     return LaunchDescription([
@@ -49,6 +55,26 @@ def generate_launch_description() -> LaunchDescription:
             description='Publish sequence status and duration diagnostics.',
         ),
         DeclareLaunchArgument(
+            'publish_trajectories',
+            default_value='true',
+            description='Publish successful plans as RobotTrajectory messages.',
+        ),
+        DeclareLaunchArgument(
+            'pre_grasp_trajectory_topic',
+            default_value='/pre_grasp_trajectory',
+            description='Topic for successful pre-grasp trajectories.',
+        ),
+        DeclareLaunchArgument(
+            'assembly_trajectory_topic',
+            default_value='/assembly_trajectory',
+            description='Topic for successful assembly trajectories.',
+        ),
+        DeclareLaunchArgument(
+            'trajectory_status_topic',
+            default_value='/assembly_sequence_trajectory_status',
+            description='Topic for trajectory publication status.',
+        ),
+        DeclareLaunchArgument(
             'start_state_mode',
             default_value='current',
             description=(
@@ -69,8 +95,15 @@ def generate_launch_description() -> LaunchDescription:
                 'stage_status_topic': '/assembly_sequence_stage_status',
                 'stage_success_topic': '/assembly_sequence_stage_success',
                 'stage_duration_topic': '/assembly_sequence_stage_duration_ms',
+                'pre_grasp_trajectory_topic': pre_grasp_trajectory_topic,
+                'assembly_trajectory_topic': assembly_trajectory_topic,
+                'trajectory_status_topic': trajectory_status_topic,
                 'publish_diagnostics': ParameterValue(
                     publish_diagnostics,
+                    value_type=bool,
+                ),
+                'publish_trajectories': ParameterValue(
+                    publish_trajectories,
                     value_type=bool,
                 ),
                 'planning_group': 'panda_arm',
