@@ -12,12 +12,26 @@ This package connects:
 This is intentionally the non-MoveIt pipeline launch. It does not start Gazebo,
 RViz, a robot model, ros2_control, or MoveIt2.
 
+The optional Gazebo workcell wrapper is separate:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_gazebo_workcell_demo.launch.py
+```
+
+It starts the primitive-geometry workcell from `adaptive_assembly_sim` and, by
+default, the same non-MoveIt pipeline. Use `launch_pipeline:=false` for the
+workcell alone. The Gazebo target is static and is not synchronized with
+`/target_pose`. This wrapper does not spawn a robot, start ros2_control, include
+the sequence executor, or execute trajectories.
+
 The optional
 `adaptive_assembly_panda_ros2_control_execution.launch.py` profile is separate
 from the non-MoveIt pipeline. It composes known-reachable sequence planning with
 a simulator-only execution bridge. It can connect to an already running Panda
 `FollowJointTrajectory` controller. It adds no Gazebo launch or controller
-configuration; the included existing MoveIt demo may provide its own mock
+configuration; the separate PR34 workcell wrapper also does not provide a
+controller. The included existing MoveIt demo may provide its own mock
 ros2_control stack.
 
 ## Build
