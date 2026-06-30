@@ -141,3 +141,28 @@ Success requires `event=success`, `failed_stage=none`,
 `planned_stage_count=2`, `start_state_mode=fixed`, and `execution=false`.
 This profile improves plan-only reproducibility and coverage; it does not
 command or execute either planned trajectory.
+
+## Stage-level diagnostics
+
+Each attempted sequence stage publishes an independent result:
+
+- `/assembly_sequence_stage_status` (`std_msgs/msg/String`)
+- `/assembly_sequence_stage_success` (`std_msgs/msg/Bool`)
+- `/assembly_sequence_stage_duration_ms` (`std_msgs/msg/Float64`)
+
+Stage status identifies `pre_grasp` or `assembly` and includes the individual
+duration, planner settings, tolerances, start-state mode, and
+`execution=false`. A pre-grasp failure emits only the pre-grasp result. An
+assembly failure follows a successful pre-grasp result with an assembly failure
+result. Existing aggregate sequence topics and status fields are unchanged.
+
+With the known-reachable profile running:
+
+```bash
+bash scripts/check_assembly_sequence_stage_diagnostics.sh
+python3 scripts/check_assembly_sequence_stage_status.py
+```
+
+When `publish_diagnostics=false`, stage String/Float64 messages are suppressed,
+but per-stage Bool results remain available. These diagnostics are plan-only;
+they do not execute either trajectory.

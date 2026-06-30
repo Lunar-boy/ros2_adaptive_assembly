@@ -111,7 +111,19 @@ Validation helpers:
 bash scripts/check_assembly_sequence_available.sh
 bash scripts/check_assembly_sequence_topics.sh
 python3 scripts/check_assembly_sequence_status.py
+bash scripts/check_assembly_sequence_stage_diagnostics.sh
+python3 scripts/check_assembly_sequence_stage_status.py
 ```
+
+Stage-level diagnostics are published on:
+
+- `/assembly_sequence_stage_status`
+- `/assembly_sequence_stage_success`
+- `/assembly_sequence_stage_duration_ms`
+
+They report each attempted `pre_grasp` and `assembly` planning stage
+independently. Aggregate sequence topics remain unchanged, and execution stays
+disabled.
 
 The existing Panda planning demo keeps its single pre-grasp behavior by
 default. See
@@ -506,4 +518,5 @@ See
 - PR26: plan-only Panda pre-grasp and assembly sequence planning
 - PR27: deterministic fixed-start assembly sequence planning fallback
 - PR28: deterministic known-reachable assembly sequence profile
-- Future PR: assembly sequence diagnostics and planning refinements
+- PR29: assembly sequence stage-level diagnostics
+- Future PR: assembly sequence recovery and planning refinements
