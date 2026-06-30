@@ -199,6 +199,24 @@ not add real hardware execution, gripper control, contact-rich insertion, or a
 full Gazebo workcell simulation. See
 [docs/gazebo_ros2_control_execution.md](docs/gazebo_ros2_control_execution.md).
 
+## Gazebo workcell bringup
+
+The optional Gazebo Harmonic demo provides a primitive-geometry assembly cell
+with a floor, work table, target support, static cylindrical target object, and
+assembly socket fixture:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_gazebo_workcell_demo.launch.py
+```
+
+By default, the wrapper also launches the existing fake-perception and task
+pose pipeline. The Gazebo object remains static and is not synchronized with
+`/target_pose`. This bringup does not spawn a robot, configure ros2_control,
+execute trajectories, control a gripper, attach objects, or simulate
+contact-rich insertion. See
+[docs/gazebo_workcell_bringup.md](docs/gazebo_workcell_bringup.md).
+
 ## Closed-loop recovery supervisor
 
 The recovery supervisor observes sequence planning, dry-run execution, dynamic
@@ -627,4 +645,5 @@ See
 - PR31: message-only dry-run sequence execution
 - PR32: closed-loop recovery state machine and deterministic actions
 - PR33: optional simulator-only Gazebo/ros2_control execution bridge
-- Future PR: recovery action orchestration and planning refinements
+- PR34: full Gazebo workcell bringup
+- PR35: ros2_control success-path execution in Gazebo
