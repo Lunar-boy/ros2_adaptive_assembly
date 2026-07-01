@@ -1,0 +1,39 @@
+"""Set up the logical manipulation interfaces."""
+
+import os
+from glob import glob
+
+from setuptools import find_packages, setup
+
+
+package_name = 'adaptive_assembly_manipulation'
+
+setup(
+    name=package_name,
+    version='0.0.0',
+    packages=find_packages(exclude=['test']),
+    data_files=[
+        (
+            'share/ament_index/resource_index/packages',
+            ['resource/' + package_name],
+        ),
+        ('share/' + package_name, ['package.xml', 'README.md']),
+        (
+            os.path.join('share', package_name, 'launch'),
+            glob('launch/*.launch.py'),
+        ),
+    ],
+    install_requires=['setuptools'],
+    zip_safe=True,
+    maintainer='nate',
+    maintainer_email='chunzhi.wu@mailbox.tu-dresden.de',
+    description='Simulator-only logical gripper and grasp lifecycle.',
+    license='TODO: License declaration',
+    entry_points={
+        'console_scripts': [
+            'logical_grasp_lifecycle_node = '
+            'adaptive_assembly_manipulation.'
+            'logical_grasp_lifecycle_node:main',
+        ],
+    },
+)

@@ -378,6 +378,24 @@ Panda in Gazebo and adds no gripper, attach/detach, contact-rich insertion,
 force control, real robot, or real hardware support. See
 [`docs/ros2_control_success_path.md`](docs/ros2_control_success_path.md).
 
+### 8. PR36 logical gripper and grasp lifecycle
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_logical_grasp_demo.launch.py
+```
+
+The demo adds retained `/gripper_command`, `/gripper_command_status`,
+`/object_grasp_state`, `/object_grasp_attached`, and
+`/logical_grasp_lifecycle_status` topics to the PR35 success fixture. The
+logical sequence is open/detached, close/attached after pre-grasp success, then
+open/detached after aggregate execution success.
+
+This is state-level grasping only. It does not physically control a gripper,
+send gripper action goals, attach Gazebo objects, alter contact physics, or
+support real hardware. See
+[`docs/gripper_abstraction_logical_grasp.md`](docs/gripper_abstraction_logical_grasp.md).
+
 ---
 
 ## PlanningScene tools

@@ -48,6 +48,17 @@ visual-only workcell; it does not physically move a Panda in Gazebo. Neither
 launch supports real hardware, grippers, attach/detach, force control, or
 contact-rich insertion.
 
+The optional PR36 logical grasp demo composes that unchanged PR35 fixture with
+the independent lifecycle observer:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_logical_grasp_demo.launch.py
+```
+
+It publishes logical open/close and attach/detach state only. It does not
+physically control a gripper or attach an object in Gazebo.
+
 ## Build
 
 ```bash
