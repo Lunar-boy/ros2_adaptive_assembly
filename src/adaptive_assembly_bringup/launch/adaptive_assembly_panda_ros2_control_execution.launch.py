@@ -6,6 +6,7 @@ from launch.actions import (
     IncludeLaunchDescription,
     LogInfo,
 )
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
@@ -39,6 +40,9 @@ def generate_launch_description() -> LaunchDescription:
     simulated_only = LaunchConfiguration('simulated_execution_only')
     use_planning_scene_audit = LaunchConfiguration(
         'use_planning_scene_audit'
+    )
+    launch_reachable_sequence = LaunchConfiguration(
+        'launch_reachable_sequence'
     )
 
     return LaunchDescription([
@@ -124,6 +128,14 @@ def generate_launch_description() -> LaunchDescription:
             default_value='true',
             description='Include the read-only PlanningScene audit.',
         ),
+        DeclareLaunchArgument(
+            'launch_reachable_sequence',
+            default_value='true',
+            description=(
+                'Launch the existing MoveIt demo-backed reachable planner. '
+                'Set false when another planning stack is already running.'
+            ),
+        ),
         LogInfo(
             msg='Launching the simulator-only ros2_control execution bridge. '
             'It connects to an existing controller when available and does '
@@ -166,6 +178,7 @@ def generate_launch_description() -> LaunchDescription:
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(reachable_sequence),
+            condition=IfCondition(launch_reachable_sequence),
             launch_arguments={
                 'pre_grasp_trajectory_topic': pre_grasp_topic,
                 'assembly_trajectory_topic': assembly_topic,

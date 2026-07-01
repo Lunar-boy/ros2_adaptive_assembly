@@ -1,0 +1,203 @@
+"""Launch Gazebo Harmonic with a Panda-like ros2_control arm."""
+
+import os
+import shutil
+
+from ament_index_python.packages import (
+    PackageNotFoundError,
+    get_package_share_directory,
+)
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import LogInfo, OpaqueFunction, TimerAction
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
+from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
+from launch_ros.substitutions import FindPackageShare
+
+
+def _required_package_share(package_name: str, install_hint: str) -> str:
+    try:
+        return get_package_share_directory(package_name)
+    except PackageNotFoundError as error:
+        raise RuntimeError(
+            f"Required package '{package_name}' is unavailable. {install_hint}"
+        ) from error
+
+
+def _launch_setup(context, *args, **kwargs):
+    """Create runtime actions after dependency checks pass."""
+    ros_gz_sim_share = _required_package_share(
+        'ros_gz_sim',
+        'Install Gazebo integration with: sudo apt install ros-jazzy-ros-gz-sim',
+    )
+    _required_package_share(
+        'gz_ros2_control',
+        'Install ros2_control Gazebo support with: '
+        'sudo apt install ros-jazzy-gz-ros2-control',
+    )
+    _required_package_share(
+        'controller_manager',
+        'Install ros2_control controller manager with: '
+        'sudo apt install ros-jazzy-controller-manager',
+    )
+    _required_package_share(
+        'joint_state_broadcaster',
+        'Install ros-jazzy-joint-state-broadcaster.',
+    )
+    _required_package_share(
+        'joint_trajectory_controller',
+        'Install ros-jazzy-joint-trajectory-controller.',
+    )
+    _required_package_share(
+        'xacro',
+        'Install ros-jazzy-xacro.',
+    )
+    if shutil.which('gz') is None:
+        raise RuntimeError(
+            "Gazebo's 'gz' executable is unavailable. Install Gazebo "
+            'Harmonic before launching full simulated execution.'
+        )
+
+    gazebo_launch = os.path.join(
+        ros_gz_sim_share, 'launch', 'gz_sim.launch.py'
+    )
+
+    world = LaunchConfiguration('world')
+    gz_args = LaunchConfiguration('gz_args')
+    model = LaunchConfiguration('model')
+    robot_name = LaunchConfiguration('robot_name')
+    spawn_x = LaunchConfiguration('spawn_x')
+    spawn_y = LaunchConfiguration('spawn_y')
+    spawn_z = LaunchConfiguration('spawn_z')
+    spawn_yaw = LaunchConfiguration('spawn_yaw')
+    controller_manager_name = LaunchConfiguration('controller_manager_name')
+
+    robot_description = ParameterValue(
+        Command(['xacro ', model]),
+        value_type=str,
+    )
+
+    return [
+        LogInfo(msg=(
+            'Launching Gazebo Harmonic with a simulator-only Panda '
+            'ros2_control arm. Real hardware support remains disabled.'
+        )),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(gazebo_launch),
+            launch_arguments={
+                'gz_args': gz_args,
+                'gz_version': '8',
+                'on_exit_shutdown': 'true',
+            }.items(),
+        ),
+        Node(
+            package='robot_state_publisher',
+            executable='robot_state_publisher',
+            name='panda_robot_state_publisher',
+            output='screen',
+            parameters=[{
+                'robot_description': robot_description,
+                'use_sim_time': True,
+            }],
+        ),
+        TimerAction(
+            period=2.0,
+            actions=[
+                Node(
+                    package='ros_gz_sim',
+                    executable='create',
+                    name='spawn_panda',
+                    output='screen',
+                    arguments=[
+                        '-name', robot_name,
+                        '-topic', 'robot_description',
+                        '-x', spawn_x,
+                        '-y', spawn_y,
+                        '-z', spawn_z,
+                        '-Y', spawn_yaw,
+                    ],
+                ),
+            ],
+        ),
+        TimerAction(
+            period=5.0,
+            actions=[
+                Node(
+                    package='controller_manager',
+                    executable='spawner',
+                    name='spawn_joint_state_broadcaster',
+                    output='screen',
+                    arguments=[
+                        'joint_state_broadcaster',
+                        '--controller-manager',
+                        controller_manager_name,
+                        '--controller-manager-timeout',
+                        '20',
+                    ],
+                ),
+                Node(
+                    package='controller_manager',
+                    executable='spawner',
+                    name='spawn_panda_arm_controller',
+                    output='screen',
+                    arguments=[
+                        'panda_arm_controller',
+                        '--controller-manager',
+                        controller_manager_name,
+                        '--controller-manager-timeout',
+                        '20',
+                    ],
+                ),
+            ],
+        ),
+    ]
+
+
+def generate_launch_description() -> LaunchDescription:
+    """Start the workcell, spawn the Panda, and activate controllers."""
+    default_world = PathJoinSubstitution([
+        FindPackageShare('adaptive_assembly_sim'),
+        'worlds',
+        'adaptive_assembly_workcell.sdf',
+    ])
+    default_model = PathJoinSubstitution([
+        FindPackageShare('adaptive_assembly_sim'),
+        'urdf',
+        'panda_gazebo_ros2_control.urdf.xacro',
+    ])
+    world = LaunchConfiguration('world')
+
+    return LaunchDescription([
+        DeclareLaunchArgument(
+            'world',
+            default_value=default_world,
+            description='Absolute path to the Gazebo SDF workcell world.',
+        ),
+        DeclareLaunchArgument(
+            'gz_args',
+            default_value=['-r ', world],
+            description='Arguments passed to Gazebo Sim.',
+        ),
+        DeclareLaunchArgument(
+            'model',
+            default_value=default_model,
+            description='Panda-like URDF/xacro model to spawn.',
+        ),
+        DeclareLaunchArgument(
+            'robot_name',
+            default_value='panda',
+            description='Gazebo entity name for the spawned Panda arm.',
+        ),
+        DeclareLaunchArgument('spawn_x', default_value='0.0'),
+        DeclareLaunchArgument('spawn_y', default_value='0.0'),
+        DeclareLaunchArgument('spawn_z', default_value='0.0'),
+        DeclareLaunchArgument('spawn_yaw', default_value='0.0'),
+        DeclareLaunchArgument(
+            'controller_manager_name',
+            default_value='/controller_manager',
+            description='Controller manager provided by gz_ros2_control.',
+        ),
+        OpaqueFunction(function=_launch_setup),
+    ])
