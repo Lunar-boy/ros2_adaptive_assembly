@@ -4,8 +4,8 @@ A ROS2 Jazzy + MoveIt2 project for perception-driven adaptive robotic assembly i
 
 This repository builds a lightweight adaptive manipulation pipeline that converts randomized object poses into robot-aware Panda planning targets, maintains TF and PlanningScene state, performs plan-only two-stage assembly planning, exports trajectories, records planning diagnostics, and provides deterministic benchmark profiles for evaluating robustness under target-pose variation.
 
-> **Current scope:** reproducible plan-only adaptive assembly.  
-> **Not yet included:** full Gazebo trajectory execution, gripper control, contact-rich insertion, force control, or real robot hardware execution.
+> **Current scope:** reproducible adaptive assembly planning plus simulator-only Gazebo Panda arm execution.
+> **Not yet included:** physical gripper control, object attach/detach, contact-rich insertion, force control, perception-driven Gazebo object sync, or real robot hardware execution.
 
 ---
 
@@ -37,6 +37,7 @@ The project is intentionally designed as a lightweight software stack rather tha
 - Deterministic benchmark profiles and CSV/Markdown report export
 - Contact-lite geometric insertion benchmark and report export
 - Lightweight Gazebo Harmonic workcell visualization
+- Simulator-only Gazebo Panda arm execution through ros2_control
 
 ---
 
@@ -65,7 +66,7 @@ MoveIt2 sequence planner
     └── diagnostics / benchmark CSV
               │
               ▼
-dry-run execution / future ros2_control execution
+dry-run execution / simulator-only ros2_control execution
               │
               ▼
 contact-lite insertion evaluator
@@ -98,10 +99,11 @@ The current pipeline separates perception, task-level pose generation, robot-spe
 | Message-only dry-run execution | Implemented |
 | Recovery supervisor | Implemented |
 | Gazebo Harmonic workcell visualization | Implemented |
-| ros2_control trajectory bridge | Interface-level / simulator-only bridge |
-| Full Gazebo robot execution | Planned / in progress |
+| ros2_control trajectory bridge | Implemented / simulator-only |
+| Full Gazebo Panda arm execution | Implemented / simulator-only |
 | Gripper control and object attachment | Not implemented |
 | Contact-rich insertion | Not implemented |
+| Force control and perception-driven Gazebo object sync | Not implemented |
 | Real robot execution | Not implemented |
 
 ---
@@ -143,7 +145,13 @@ Recommended optional packages:
 sudo apt update
 sudo apt install \
   ros-jazzy-moveit \
-  ros-jazzy-ros-gz-sim
+  ros-jazzy-ros-gz-sim \
+  ros-jazzy-gz-ros2-control \
+  ros-jazzy-controller-manager \
+  ros-jazzy-joint-state-broadcaster \
+  ros-jazzy-joint-trajectory-controller \
+  ros-jazzy-robot-state-publisher \
+  ros-jazzy-xacro
 ```
 
 Depending on your local MoveIt2 installation, the standard Panda demo resources may also be required for Panda planning profiles.
@@ -385,7 +393,10 @@ This starts a lightweight Gazebo Harmonic workcell with primitive geometry:
 - static cylindrical target object;
 - four-sided assembly socket fixture.
 
-The current workcell is visualization-only. It does not spawn the Panda robot, execute trajectories, attach objects, simulate contact-rich insertion, or run a full `ros2_control` hardware stack.
+This workcell launch is visualization-only. It does not spawn the Panda robot,
+execute trajectories, attach objects, simulate contact-rich insertion, or run a
+`ros2_control` hardware stack. Use the full Gazebo execution demo below for
+simulated Panda arm motion.
 
 Validate installed Gazebo assets and launch files:
 
@@ -412,7 +423,34 @@ Panda in Gazebo and adds no gripper, attach/detach, contact-rich insertion,
 force control, real robot, or real hardware support. See
 [`docs/ros2_control_success_path.md`](docs/ros2_control_success_path.md).
 
-### 8. PR36 logical gripper and grasp lifecycle
+### 8. Full Gazebo Panda arm execution
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_full_gazebo_execution_demo.launch.py
+```
+
+This simulator-only demo starts the Gazebo workcell, spawns a lightweight
+Panda-like arm, activates `joint_state_broadcaster` and
+`panda_arm_controller`, plans the known-reachable two-stage sequence, and sends
+the exported `/pre_grasp_trajectory` then `/assembly_trajectory` to
+`/panda_arm_controller/follow_joint_trajectory`.
+
+Validate with the launch running:
+
+```bash
+bash scripts/check_gazebo_panda_spawned.sh
+bash scripts/check_ros2_control_controllers_active.sh
+bash scripts/check_full_gazebo_execution_topics.sh
+python3 scripts/check_full_gazebo_execution_status.py
+```
+
+This does not add gripper control, object attachment, contact-rich insertion,
+force control, camera perception, target-pose-to-Gazebo synchronization, real
+robot drivers, or hardware execution. See
+[`docs/full_gazebo_panda_execution.md`](docs/full_gazebo_panda_execution.md).
+
+### 9. PR36 logical gripper and grasp lifecycle
 
 ```bash
 ros2 launch adaptive_assembly_bringup \
@@ -636,12 +674,13 @@ Implemented:
 - dry-run execution abstraction
 - recovery supervisor
 - lightweight Gazebo workcell visualization
+- simulator-only Gazebo Panda arm execution through ros2_control
 
 Not yet implemented:
 
-- full trajectory execution in Gazebo;
 - gripper control;
 - object attach/detach behavior;
+- target-pose-to-Gazebo synchronization;
 - contact-rich insertion physics;
 - force-controlled or tactile insertion behavior;
 - force/torque feedback control;

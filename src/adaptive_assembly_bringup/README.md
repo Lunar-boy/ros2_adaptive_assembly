@@ -29,10 +29,21 @@ The optional
 `adaptive_assembly_panda_ros2_control_execution.launch.py` profile is separate
 from the non-MoveIt pipeline. It composes known-reachable sequence planning with
 a simulator-only execution bridge. It can connect to an already running Panda
-`FollowJointTrajectory` controller. It adds no Gazebo launch or controller
-configuration; the separate PR34 workcell wrapper also does not provide a
-controller. The included existing MoveIt demo may provide its own mock
-ros2_control stack.
+`FollowJointTrajectory` controller.
+
+The full Gazebo execution entry point is:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_full_gazebo_execution_demo.launch.py
+```
+
+It starts the Gazebo workcell, spawns a lightweight Panda-like ros2_control
+arm, activates `joint_state_broadcaster` and `panda_arm_controller`, and sends
+the existing exported two-stage sequence to the simulated controller. It does
+not add gripper control, object attachment, contact-rich insertion, force
+control, perception-driven Gazebo object sync, real robot drivers, or hardware
+execution.
 
 The PR35 local success fixture is:
 
