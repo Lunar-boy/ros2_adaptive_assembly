@@ -2,14 +2,13 @@
 
 ## Near-term engineering priorities:
 
-1. Complete full Gazebo + `ros2_control` success-path execution.
-2. Add gripper abstraction and object attach/detach state.
-3. Synchronize Gazebo target object pose with the adaptive perception pipeline.
-4. Add richer benchmark reports with real recorded tables and plots.
-5. Add screenshots or GIFs for RViz, PlanningScene, and Gazebo workcell demos.
-6. Extend fake perception toward AprilTag/ArUco or RGB-D based target pose estimation.
-7. Introduce task-level retry orchestration that consumes recovery supervisor actions.
-8. Add contact-aware insertion approximation or force-control extension points.
+1. Add gripper abstraction and logical grasp lifecycle.
+2. Synchronize Gazebo target object pose with the adaptive perception pipeline.
+3. Add richer benchmark reports with real recorded tables and plots.
+4. Add screenshots or GIFs for RViz, PlanningScene, and Gazebo workcell demos.
+5. Extend fake perception toward AprilTag/ArUco or RGB-D based target pose estimation.
+6. Introduce task-level retry orchestration that consumes recovery supervisor actions.
+7. Add contact-aware insertion approximation or force-control extension points.
 
 ## Longer-term extensions:
 
@@ -55,7 +54,6 @@
 - PR32: closed-loop recovery state machine and deterministic actions
 - PR33: optional simulator-only Gazebo/ros2_control execution bridge
 - PR34: full Gazebo workcell bringup
-- PR35: ros2_control success-path execution in Gazebo
-
-
+- PR35: ros2_control success-path execution
+- PR36: gripper abstraction and logical grasp lifecycle
 

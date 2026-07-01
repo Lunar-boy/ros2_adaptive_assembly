@@ -30,6 +30,8 @@ def generate_launch_description() -> LaunchDescription:
     duration_topic = LaunchConfiguration('duration_topic')
     stage_status_topic = LaunchConfiguration('stage_status_topic')
     wait_for_controller = LaunchConfiguration('wait_for_controller_sec')
+    result_timeout = LaunchConfiguration('result_timeout_sec')
+    cancel_on_timeout = LaunchConfiguration('cancel_on_timeout')
     send_goals = LaunchConfiguration('send_goals')
     require_non_empty = LaunchConfiguration('require_non_empty_trajectory')
     require_panda_joints = LaunchConfiguration('require_panda_joints')
@@ -83,6 +85,16 @@ def generate_launch_description() -> LaunchDescription:
             description='Maximum controller action discovery wait.',
         ),
         DeclareLaunchArgument(
+            'result_timeout_sec',
+            default_value='10.0',
+            description='Maximum wait for each accepted controller result.',
+        ),
+        DeclareLaunchArgument(
+            'cancel_on_timeout',
+            default_value='true',
+            description='Request action cancellation after result timeout.',
+        ),
+        DeclareLaunchArgument(
             'send_goals',
             default_value='true',
             description='Send validated trajectories to the action server.',
@@ -132,6 +144,12 @@ def generate_launch_description() -> LaunchDescription:
                 'stage_status_topic': stage_status_topic,
                 'wait_for_controller_sec': ParameterValue(
                     wait_for_controller, value_type=float
+                ),
+                'result_timeout_sec': ParameterValue(
+                    result_timeout, value_type=float
+                ),
+                'cancel_on_timeout': ParameterValue(
+                    cancel_on_timeout, value_type=bool
                 ),
                 'send_goals': ParameterValue(send_goals, value_type=bool),
                 'require_non_empty_trajectory': ParameterValue(
