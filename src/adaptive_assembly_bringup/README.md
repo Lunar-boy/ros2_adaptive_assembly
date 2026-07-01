@@ -59,6 +59,16 @@ ros2 launch adaptive_assembly_bringup \
 It publishes logical open/close and attach/detach state only. It does not
 physically control a gripper or attach an object in Gazebo.
 
+The PR37 recovery orchestration demo composes the existing supervisor with a
+bounded simulator-only reset and fake-perception republish loop:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_recovery_orchestration_demo.launch.py
+```
+
+It does not execute trajectories or command real hardware.
+
 ## Build
 
 ```bash

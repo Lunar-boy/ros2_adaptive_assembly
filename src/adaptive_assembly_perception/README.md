@@ -21,6 +21,7 @@ as the `world` to `target_object` TF transform.
 | `yaw_min` | `-pi` | Minimum sampled target yaw in radians |
 | `yaw_max` | `pi` | Maximum sampled target yaw in radians |
 | `publish_immediately` | `true` | Publish one pose immediately on startup before the timer |
+| `publish_target_pose_service` | `/publish_target_pose_once` | Trigger service that publishes one fresh pose through the same path |
 
 The published pose uses `frame_id`. Its orientation is a sampled yaw represented
 by a unit quaternion.
@@ -76,6 +77,12 @@ ros2 topic echo /target_pose
 
 ```bash
 ros2 run tf2_ros tf2_echo world target_object
+```
+
+Publish one fresh simulated target pose on demand:
+
+```bash
+ros2 service call /publish_target_pose_once std_srvs/srv/Trigger '{}'
 ```
 
 Run the package tests with:
