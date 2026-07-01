@@ -15,6 +15,10 @@ setup(
             ['resource/' + package_name],
         ),
         ('share/' + package_name, ['package.xml', 'README.md']),
+        (
+            'share/' + package_name + '/launch',
+            ['launch/recovery_orchestrator.launch.py'],
+        ),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -27,6 +31,8 @@ setup(
         'console_scripts': [
             'recovery_supervisor_node = '
             'adaptive_assembly_recovery.recovery_supervisor_node:main',
+            'recovery_orchestrator_node = '
+            'adaptive_assembly_recovery.recovery_orchestrator_node:main',
         ],
     },
 )

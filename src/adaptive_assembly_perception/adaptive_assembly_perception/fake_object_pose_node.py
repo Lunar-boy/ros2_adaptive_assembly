@@ -7,6 +7,7 @@ from geometry_msgs.msg import PoseStamped
 from geometry_msgs.msg import TransformStamped
 import rclpy
 from rclpy.node import Node
+from std_srvs.srv import Trigger
 from tf2_ros import TransformBroadcaster
 
 
@@ -29,6 +30,9 @@ class FakeObjectPoseNode(Node):
         self.declare_parameter('yaw_min', -math.pi)
         self.declare_parameter('yaw_max', math.pi)
         self.declare_parameter('publish_immediately', True)
+        self.declare_parameter(
+            'publish_target_pose_service', '/publish_target_pose_once'
+        )
 
         self._publish_period_sec = (
             self.get_parameter('publish_period_sec').get_parameter_value()
@@ -45,6 +49,9 @@ class FakeObjectPoseNode(Node):
         self._yaw_min = self.get_parameter('yaw_min').value
         self._yaw_max = self.get_parameter('yaw_max').value
         self._publish_immediately = self.get_parameter('publish_immediately').value
+        self._publish_target_pose_service = self.get_parameter(
+            'publish_target_pose_service'
+        ).value
         self._validate_parameters()
         self._random_generator = (
             random.Random(self._random_seed)
@@ -56,6 +63,11 @@ class FakeObjectPoseNode(Node):
             PoseStamped, '/target_pose', 10
         )
         self._tf_broadcaster = TransformBroadcaster(self)
+        self._trigger_service = self.create_service(
+            Trigger,
+            self._publish_target_pose_service,
+            self._publish_target_pose_once,
+        )
         self._timer = self.create_timer(
             self._publish_period_sec, self._publish_target_pose
         )
@@ -93,8 +105,19 @@ class FakeObjectPoseNode(Node):
             f'x_range=[{self._x_min:.3f}, {self._x_max:.3f}], '
             f'y_range=[{self._y_min:.3f}, {self._y_max:.3f}], '
             f'yaw_range=[{self._yaw_min:.3f}, {self._yaw_max:.3f}], '
-            f'publish_immediately={str(self._publish_immediately).lower()}'
+            f'publish_immediately={str(self._publish_immediately).lower()}, '
+            f'publish_target_pose_service={self._publish_target_pose_service}'
         )
+
+    def _publish_target_pose_once(
+        self, request: Trigger.Request, response: Trigger.Response
+    ) -> Trigger.Response:
+        """Publish one fresh pose through the normal publishing path."""
+        del request
+        self._publish_target_pose()
+        response.success = True
+        response.message = 'Published one fresh simulated target pose'
+        return response
 
     def _publish_target_pose(self) -> None:
         """Publish a randomized pose and the equivalent TF transform."""
@@ -143,7 +166,8 @@ def main(args=None) -> None:
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

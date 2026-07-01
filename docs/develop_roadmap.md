@@ -56,4 +56,4 @@
 - PR34: full Gazebo workcell bringup
 - PR35: ros2_control success-path execution
 - PR36: gripper abstraction and logical grasp lifecycle
-- PR37: recovery action orchestration and real retry loop
+- PR37: recovery action orchestration and bounded simulated retry loop (complete)

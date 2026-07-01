@@ -336,6 +336,34 @@ python3 scripts/check_recovery_supervisor_failure_injection.py
 
 ---
 
+### 5a. Recovery orchestration and bounded retry (PR37)
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_recovery_orchestration_demo.launch.py
+```
+
+The simulator-only orchestrator consumes `/assembly_recovery_action`, runs the
+selected logical PlanningScene reset sequence, and calls
+`/publish_target_pose_once` to restart the existing pose-to-planning data flow.
+It publishes retained results on `/recovery_orchestration_status` and
+`/recovery_retry_requested`. Retry means scene reset plus a fresh fake target
+pose; it does not execute trajectories or command hardware.
+
+Validate without MoveIt2 or Gazebo:
+
+```bash
+bash scripts/check_recovery_orchestrator_available.sh
+python3 scripts/check_fake_pose_trigger_service.py
+python3 scripts/check_recovery_orchestrator_retry_path.py
+python3 scripts/check_recovery_orchestrator_exhausted_path.py
+```
+
+See `docs/recovery_orchestration_retry_loop.md` for action mappings,
+parameters, and limitations.
+
+---
+
 ### 6. Gazebo workcell visualization
 
 ```bash
