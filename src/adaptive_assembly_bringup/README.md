@@ -34,6 +34,20 @@ configuration; the separate PR34 workcell wrapper also does not provide a
 controller. The included existing MoveIt demo may provide its own mock
 ros2_control stack.
 
+The PR35 local success fixture is:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_ros2_control_success_demo.launch.py
+```
+
+It starts a deterministic simulated action server and verifies both planned
+stages. The optional
+`adaptive_assembly_gazebo_ros2_control_success_demo.launch.py` wrapper adds the
+visual-only workcell; it does not physically move a Panda in Gazebo. Neither
+launch supports real hardware, grippers, attach/detach, force control, or
+contact-rich insertion.
+
 ## Build
 
 ```bash

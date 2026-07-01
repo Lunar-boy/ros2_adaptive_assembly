@@ -360,6 +360,24 @@ bash scripts/check_gazebo_workcell_assets.sh
 bash scripts/check_gazebo_workcell_launch_available.sh
 ```
 
+### 7. PR35 ros2_control success-path execution
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_ros2_control_success_demo.launch.py
+```
+
+The simulator-only action fixture drives both trajectory stages to retained
+terminal outputs on `/assembly_ros2_control_execution_status`,
+`/assembly_ros2_control_execution_success`,
+`/assembly_ros2_control_execution_duration_ms`, and stage events on
+`/assembly_ros2_control_execution_stage_status`.
+
+This validates the action-level ros2_control execution path. It does not move a
+Panda in Gazebo and adds no gripper, attach/detach, contact-rich insertion,
+force control, real robot, or real hardware support. See
+[`docs/ros2_control_success_path.md`](docs/ros2_control_success_path.md).
+
 ---
 
 ## PlanningScene tools

@@ -62,8 +62,9 @@ existing ros2_control sequence executor.
 
 Consequently, this bringup demonstrates the assembly-cell environment only. It
 does not execute trajectories, model grasping, perform contact-rich insertion,
-apply force control, or support real hardware. Gazebo controller success-path
-execution is deferred to PR35.
+apply force control, or support real hardware. PR35 adds an action-level
+success fixture, but physical Panda motion in Gazebo remains outside this
+workcell's scope.
 
 ## Validation
 

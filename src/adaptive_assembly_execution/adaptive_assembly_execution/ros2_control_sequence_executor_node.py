@@ -49,6 +49,8 @@ class Ros2ControlSequenceExecutorNode(Node):
             '/assembly_ros2_control_execution_stage_status',
         )
         self.declare_parameter('wait_for_controller_sec', 5.0)
+        self.declare_parameter('result_timeout_sec', 10.0)
+        self.declare_parameter('cancel_on_timeout', True)
         self.declare_parameter('send_goals', True)
         self.declare_parameter('require_non_empty_trajectory', True)
         self.declare_parameter('require_panda_joints', True)
@@ -74,6 +76,12 @@ class Ros2ControlSequenceExecutorNode(Node):
             'wait_for_controller_sec'
         ).value
         self._send_goals = self.get_parameter('send_goals').value
+        self._result_timeout_sec = self.get_parameter(
+            'result_timeout_sec'
+        ).value
+        self._cancel_on_timeout = self.get_parameter(
+            'cancel_on_timeout'
+        ).value
         self._require_non_empty_trajectory = self.get_parameter(
             'require_non_empty_trajectory'
         ).value
@@ -130,6 +138,7 @@ class Ros2ControlSequenceExecutorNode(Node):
         self._stage_start = 0.0
         self._started = False
         self._completed = False
+        self._result_timer = None
 
         self.get_logger().info(
             'Simulator-only ros2_control sequence executor ready: '
@@ -137,6 +146,8 @@ class Ros2ControlSequenceExecutorNode(Node):
             f"assembly_topic='{self._assembly_topic}', "
             f"controller='{self._controller_action_name}', "
             f'wait_for_controller_sec={self._wait_for_controller_sec}, '
+            f'result_timeout_sec={self._result_timeout_sec}, '
+            f'cancel_on_timeout={self._cancel_on_timeout}, '
             f'send_goals={self._send_goals}, '
             'simulated_execution_only=true, real_hardware=false.'
         )
@@ -147,6 +158,8 @@ class Ros2ControlSequenceExecutorNode(Node):
             raise ValueError(
                 'wait_for_controller_sec must be greater than or equal to zero'
             )
+        if self._result_timeout_sec <= 0.0:
+            raise ValueError('result_timeout_sec must be greater than zero')
         if self._require_panda_joints and not self._expected_joint_prefix:
             raise ValueError(
                 'expected_joint_prefix must not be empty when '
@@ -270,16 +283,30 @@ class Ros2ControlSequenceExecutorNode(Node):
             f'controller={self._controller_action_name};real_hardware=false'
         )
         result_future = goal_handle.get_result_async()
+        self._result_timer = self.create_timer(
+            self._result_timeout_sec,
+            lambda: self._result_timeout_callback(stage, goal_handle),
+        )
         result_future.add_done_callback(
             lambda completed_future: self._result_callback(
                 stage, completed_future
             )
         )
 
+    def _result_timeout_callback(self, stage: str, goal_handle) -> None:
+        """Terminate deterministically when a controller result is late."""
+        if self._completed:
+            return
+        self._cancel_result_timer()
+        if self._cancel_on_timeout:
+            goal_handle.cancel_goal_async()
+        self._publish_failure(stage, 'result_timeout')
+
     def _result_callback(self, stage: str, future) -> None:
         """Advance after a successful result or terminate on failure."""
         if self._completed:
             return
+        self._cancel_result_timer()
         try:
             wrapped_result = future.result()
         except Exception as error:  # pragma: no cover - middleware failure
@@ -364,6 +391,7 @@ class Ros2ControlSequenceExecutorNode(Node):
         """Publish the retained terminal result exactly once."""
         if self._completed:
             return
+        self._cancel_result_timer()
         self._completed = True
 
         status_message = String()
@@ -377,6 +405,14 @@ class Ros2ControlSequenceExecutorNode(Node):
         duration_message = Float64()
         duration_message.data = duration_ms
         self._duration_publisher.publish(duration_message)
+
+    def _cancel_result_timer(self) -> None:
+        """Cancel and release the active result watchdog, if any."""
+        if self._result_timer is None:
+            return
+        self._result_timer.cancel()
+        self.destroy_timer(self._result_timer)
+        self._result_timer = None
 
 
 def main(args=None) -> None:
