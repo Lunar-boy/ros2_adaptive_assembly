@@ -59,3 +59,5 @@ wait_for_topic_type \
 wait_for_action
 
 echo "PASS: full Gazebo execution topics and controller action are available"
+echo "NOTE: interface existence does not prove ros2_control controllers are active."
+echo "      Run scripts/check_ros2_control_controllers_active.sh for that proof."

@@ -68,11 +68,10 @@ def generate_launch_description() -> LaunchDescription:
         ),
         DeclareLaunchArgument(
             'gz_args',
-            default_value=['-r ', world],
+            default_value=[world],
             description=(
-                'Arguments passed to Gazebo Sim. Override with '
-                '"-r -s /absolute/path/to/world.sdf" for server-only '
-                'validation.'
+                'Arguments passed to Gazebo Sim. Gazebo is paused by default; '
+                'do not add -r until controllers are ready.'
             ),
         ),
         LogInfo(msg=(

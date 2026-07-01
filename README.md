@@ -436,6 +436,10 @@ Panda-like arm, activates `joint_state_broadcaster` and
 the exported `/pre_grasp_trajectory` then `/assembly_trajectory` to
 `/panda_arm_controller/follow_joint_trajectory`.
 
+Gazebo starts paused and the Panda base is simulator-only anchored. Launch
+unpauses only after controller configuration, then activates both controllers;
+topic or action visibility alone is insufficient proof of activation.
+
 Validate with the launch running:
 
 ```bash

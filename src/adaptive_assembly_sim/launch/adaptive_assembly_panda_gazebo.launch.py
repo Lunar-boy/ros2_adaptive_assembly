@@ -8,8 +8,10 @@ from ament_index_python.packages import (
     get_package_share_directory,
 )
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-from launch.actions import LogInfo, OpaqueFunction, TimerAction
+from launch.actions import DeclareLaunchArgument, ExecuteProcess
+from launch.actions import IncludeLaunchDescription
+from launch.actions import LogInfo, OpaqueFunction, RegisterEventHandler
+from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
@@ -43,6 +45,10 @@ def _launch_setup(context, *args, **kwargs):
         'sudo apt install ros-jazzy-controller-manager',
     )
     _required_package_share(
+        'ros_gz_bridge',
+        'Install Gazebo ROS bridges with: sudo apt install ros-jazzy-ros-gz-bridge',
+    )
+    _required_package_share(
         'joint_state_broadcaster',
         'Install ros-jazzy-joint-state-broadcaster.',
     )
@@ -73,10 +79,75 @@ def _launch_setup(context, *args, **kwargs):
     spawn_z = LaunchConfiguration('spawn_z')
     spawn_yaw = LaunchConfiguration('spawn_yaw')
     controller_manager_name = LaunchConfiguration('controller_manager_name')
+    world_name = LaunchConfiguration('world_name')
+    controllers_file = os.path.join(
+        get_package_share_directory('adaptive_assembly_sim'),
+        'config',
+        'panda_ros2_control.yaml',
+    )
 
     robot_description = ParameterValue(
-        Command(['xacro ', model]),
+        Command([
+            'xacro ', model,
+            ' controllers_file:=', controllers_file,
+        ]),
         value_type=str,
+    )
+
+    spawn_panda = Node(
+        package='ros_gz_sim',
+        executable='create',
+        name='spawn_panda',
+        output='screen',
+        arguments=[
+            '-name', robot_name,
+            '-topic', 'robot_description',
+            '-x', spawn_x,
+            '-y', spawn_y,
+            '-z', spawn_z,
+            '-Y', spawn_yaw,
+        ],
+    )
+    spawn_controllers = Node(
+        package='controller_manager',
+        executable='spawner',
+        name='spawn_panda_controllers',
+        output='screen',
+        arguments=[
+            'joint_state_broadcaster',
+            'panda_arm_controller',
+            '--controller-manager',
+            controller_manager_name,
+            '--controller-manager-timeout',
+            '30',
+            '--service-call-timeout',
+            '10',
+            '--switch-timeout',
+            '60',
+            '--inactive',
+        ],
+    )
+    unpause_gazebo = ExecuteProcess(
+        cmd=[
+            'gz', 'service', '-s',
+            ['/world/', world_name, '/control'],
+            '--reqtype', 'gz.msgs.WorldControl',
+            '--reptype', 'gz.msgs.Boolean',
+            '--timeout', '5000',
+            '--req', 'pause: false',
+        ],
+        name='unpause_gazebo_after_controller_configuration',
+        output='screen',
+    )
+    activate_controllers = ExecuteProcess(
+        cmd=[
+            'ros2', 'control', 'switch_controllers',
+            '--activate', 'joint_state_broadcaster', 'panda_arm_controller',
+            '--strict',
+            '--controller-manager', controller_manager_name,
+        ],
+        name='activate_panda_controllers',
+        output='screen',
     )
 
     return [
@@ -93,6 +164,13 @@ def _launch_setup(context, *args, **kwargs):
             }.items(),
         ),
         Node(
+            package='ros_gz_bridge',
+            executable='parameter_bridge',
+            name='gazebo_clock_bridge',
+            output='screen',
+            arguments=['/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock'],
+        ),
+        Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
             name='panda_robot_state_publisher',
@@ -102,55 +180,24 @@ def _launch_setup(context, *args, **kwargs):
                 'use_sim_time': True,
             }],
         ),
-        TimerAction(
-            period=2.0,
-            actions=[
-                Node(
-                    package='ros_gz_sim',
-                    executable='create',
-                    name='spawn_panda',
-                    output='screen',
-                    arguments=[
-                        '-name', robot_name,
-                        '-topic', 'robot_description',
-                        '-x', spawn_x,
-                        '-y', spawn_y,
-                        '-z', spawn_z,
-                        '-Y', spawn_yaw,
-                    ],
-                ),
-            ],
+        spawn_panda,
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=spawn_panda,
+                on_exit=[spawn_controllers],
+            ),
         ),
-        TimerAction(
-            period=5.0,
-            actions=[
-                Node(
-                    package='controller_manager',
-                    executable='spawner',
-                    name='spawn_joint_state_broadcaster',
-                    output='screen',
-                    arguments=[
-                        'joint_state_broadcaster',
-                        '--controller-manager',
-                        controller_manager_name,
-                        '--controller-manager-timeout',
-                        '20',
-                    ],
-                ),
-                Node(
-                    package='controller_manager',
-                    executable='spawner',
-                    name='spawn_panda_arm_controller',
-                    output='screen',
-                    arguments=[
-                        'panda_arm_controller',
-                        '--controller-manager',
-                        controller_manager_name,
-                        '--controller-manager-timeout',
-                        '20',
-                    ],
-                ),
-            ],
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=spawn_controllers,
+                on_exit=[unpause_gazebo],
+            ),
+        ),
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=unpause_gazebo,
+                on_exit=[activate_controllers],
+            ),
         ),
     ]
 
@@ -177,8 +224,8 @@ def generate_launch_description() -> LaunchDescription:
         ),
         DeclareLaunchArgument(
             'gz_args',
-            default_value=['-r ', world],
-            description='Arguments passed to Gazebo Sim.',
+            default_value=[world],
+            description='Arguments passed to Gazebo Sim; paused by default.',
         ),
         DeclareLaunchArgument(
             'model',
@@ -194,6 +241,11 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument('spawn_y', default_value='0.0'),
         DeclareLaunchArgument('spawn_z', default_value='0.0'),
         DeclareLaunchArgument('spawn_yaw', default_value='0.0'),
+        DeclareLaunchArgument(
+            'world_name',
+            default_value='adaptive_assembly_workcell',
+            description='Gazebo world name used by the unpause service.',
+        ),
         DeclareLaunchArgument(
             'controller_manager_name',
             default_value='/controller_manager',

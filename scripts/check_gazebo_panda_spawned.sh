@@ -15,7 +15,8 @@ command -v gz >/dev/null 2>&1 ||
 deadline=$((SECONDS + TIMEOUT_SEC))
 while (( SECONDS < deadline )); do
   if model_output="$(gz model --list 2>/dev/null)" &&
-    grep -qx "${ENTITY_NAME}" <<< "${model_output}"; then
+    sed -E 's/^[[:space:]]*-[[:space:]]*//' <<< "${model_output}" |
+      grep -Fxq "${ENTITY_NAME}"; then
     echo "PASS: Gazebo model '${ENTITY_NAME}' is spawned"
     exit 0
   fi

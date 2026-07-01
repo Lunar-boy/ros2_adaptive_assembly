@@ -35,6 +35,9 @@ The Panda launch spawns a lightweight Panda-compatible arm model and starts
 `joint_state_broadcaster` plus `panda_arm_controller`. Full two-stage execution
 is composed from `adaptive_assembly_bringup`.
 
+Gazebo starts paused. Panda creation completes before both controllers are
+configured; launch then unpauses and activates them. Only the base is anchored.
+
 This package does not add gripper control, object attach/detach, contact-rich
 insertion, force control, camera perception, target-pose-to-Gazebo sync, real
 robot drivers, or hardware execution. The target object is static and is not

@@ -30,6 +30,7 @@ sudo apt install \
   ros-jazzy-joint-state-broadcaster \
   ros-jazzy-joint-trajectory-controller \
   ros-jazzy-robot-state-publisher \
+  ros-jazzy-ros-gz-bridge \
   ros-jazzy-xacro
 ```
 
@@ -54,13 +55,20 @@ ros2 launch adaptive_assembly_bringup \
   adaptive_assembly_full_gazebo_execution_demo.launch.py
 ```
 
+Gazebo starts paused. The Panda is spawned first, and the controller spawner is
+started only after entity creation completes. Both controllers are loaded and
+configured while paused; launch then deterministically unpauses Gazebo and
+activates them. Do not manually unpause before controller configuration. The
+Panda base is simulator-only kinematic, so it remains anchored while the seven
+arm joints remain controllable.
+
 For server-only validation, pass a full Gazebo argument string with the world
-path:
+path. Omit `-r` during startup; unpause only after controller readiness:
 
 ```bash
 ros2 launch adaptive_assembly_bringup \
   adaptive_assembly_full_gazebo_execution_demo.launch.py \
-  gz_args:="-r -s $(ros2 pkg prefix adaptive_assembly_sim)/share/adaptive_assembly_sim/worlds/adaptive_assembly_workcell.sdf"
+  gz_args:="-s $(ros2 pkg prefix adaptive_assembly_sim)/share/adaptive_assembly_sim/worlds/adaptive_assembly_workcell.sdf"
 ```
 
 ## Interfaces
@@ -116,6 +124,65 @@ bash scripts/check_ros2_control_controllers_active.sh
 bash scripts/check_full_gazebo_execution_topics.sh
 python3 scripts/check_full_gazebo_execution_status.py
 ```
+
+The topic/action check verifies ROS graph interfaces only. A visible
+`/joint_states` topic or `follow_joint_trajectory` action is not proof that the
+Gazebo ros2_control controllers are active. Valid PR37 success requires both
+controllers to be reported `active` by
+`ros2 control list_controllers -c /controller_manager`.
+
+## Troubleshooting
+
+### Missing `/controller_manager/list_controllers`
+
+The controller manager is created by the `gz_ros2_control` model plugin, not a
+standalone launch node. Confirm the service and relevant graph entries:
+
+```bash
+ros2 service list | grep controller_manager
+ros2 node list | grep -E "controller|panda|gz"
+ros2 action list | grep follow_joint_trajectory
+```
+
+If the service is absent, inspect Gazebo output for plugin load errors. The
+bounded controller check prints these diagnostics and exits.
+
+### `gz_ros2_control` plugin not loading
+
+Confirm `ros-jazzy-gz-ros2-control` is installed and Gazebo logs show
+`gz_ros2_control::GazeboSimROS2ControlPlugin` loading from the spawned Panda.
+The plugin must exist in the expanded `robot_description`; seeing the entity
+alone does not prove the plugin loaded.
+
+### Controller YAML path not expanded
+
+Launch passes the installed absolute `panda_ros2_control.yaml` path into xacro
+as `controllers_file`. If logs show a literal `$(find ...)` or a missing file,
+rebuild and source `install/setup.bash` before relaunching.
+
+### Controller manager namespace mismatch
+
+PR37 uses `/controller_manager`. If the service list shows a namespaced
+manager, pass the matching `controller_manager_name` to the simulator launch
+and configure the check consistently:
+
+```bash
+CONTROLLER_MANAGER=/panda/controller_manager \
+  bash scripts/check_ros2_control_controllers_active.sh
+```
+
+### Panda falls before controllers are active
+
+Do not add `-r` to the Gazebo arguments. Launch unpauses only after both
+controllers are configured, then activates them. If running these steps
+manually, do not unpause before controller readiness. Only `panda_link0` is
+kinematic; the complete model is not static, so arm motion remains available.
+
+### Panda spawned but the spawn check fails
+
+Gazebo may format its model list as `- panda`. The check accepts that exact
+entry after removing only the list marker. Set `ENTITY_NAME` when using a
+different `robot_name`.
 
 To validate only terminal-result formatting when dependencies are unavailable
 or a controller skip/failure path is expected:
