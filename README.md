@@ -446,6 +446,7 @@ Validate with the launch running:
 bash scripts/check_gazebo_panda_spawned.sh
 bash scripts/check_ros2_control_controllers_active.sh
 bash scripts/check_full_gazebo_execution_topics.sh
+python3 scripts/check_gazebo_trajectory_compatibility.py
 python3 scripts/check_full_gazebo_execution_status.py
 ```
 

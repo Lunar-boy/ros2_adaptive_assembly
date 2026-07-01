@@ -122,6 +122,7 @@ With the full demo running:
 bash scripts/check_gazebo_panda_spawned.sh
 bash scripts/check_ros2_control_controllers_active.sh
 bash scripts/check_full_gazebo_execution_topics.sh
+python3 scripts/check_gazebo_trajectory_compatibility.py
 python3 scripts/check_full_gazebo_execution_status.py
 ```
 
@@ -154,6 +155,11 @@ Confirm `ros-jazzy-gz-ros2-control` is installed and Gazebo logs show
 The plugin must exist in the expanded `robot_description`; seeing the entity
 alone does not prove the plugin loaded.
 
+The simulator description is isolated on
+`/gazebo_panda/robot_description`. This prevents the Gazebo plugin from
+consuming MoveIt's separate Panda planning URDF (which uses mock hardware) and
+prevents the sequence planner from consuming the lightweight simulator URDF.
+
 ### Controller YAML path not expanded
 
 Launch passes the installed absolute `panda_ros2_control.yaml` path into xacro
@@ -183,6 +189,31 @@ kinematic; the complete model is not static, so arm motion remains available.
 Gazebo may format its model list as `- panda`. The check accepts that exact
 entry after removing only the list marker. Set `ENTITY_NAME` when using a
 different `robot_name`.
+
+### Pre-grasp goal rejected
+
+Run the compatibility checker while the full demo is publishing trajectories:
+
+```bash
+python3 scripts/check_gazebo_trajectory_compatibility.py
+```
+
+It prints the active controller joints, current Panda state, each trajectory's
+joint names and first point, and its timing range. Both trajectories must use
+exactly `panda_joint1` through `panda_joint7`; every point must contain seven
+finite positions and strictly increasing `time_from_start` values.
+
+The execution bridge waits for a complete `/joint_states` sample and compares
+it with the first pre-grasp point before sending. The fixed Gazebo initial
+positions intentionally match the known-reachable planning start state. It
+also clears the exported trajectory header stamp so the controller interprets
+the goal as starting now rather than rejecting a stale MoveIt timestamp. A
+rejected goal logs the complete joint, first-point, timing, and current-state
+summary before publishing `reason=goal_rejected`.
+
+The default `spawn_yaw` remains `0.0`: MoveIt plans with an unrotated Panda base
+in `world`. Rotating only the Gazebo entity would make the simulated robot pose
+inconsistent with planning, even if its visual orientation looked preferable.
 
 To validate only terminal-result formatting when dependencies are unavailable
 or a controller skip/failure path is expected:

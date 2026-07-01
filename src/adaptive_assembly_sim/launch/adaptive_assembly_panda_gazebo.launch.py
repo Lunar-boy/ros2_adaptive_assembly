@@ -101,7 +101,7 @@ def _launch_setup(context, *args, **kwargs):
         output='screen',
         arguments=[
             '-name', robot_name,
-            '-topic', 'robot_description',
+            '-topic', '/gazebo_panda/robot_description',
             '-x', spawn_x,
             '-y', spawn_y,
             '-z', spawn_z,
@@ -179,6 +179,9 @@ def _launch_setup(context, *args, **kwargs):
                 'robot_description': robot_description,
                 'use_sim_time': True,
             }],
+            remappings=[
+                ('/robot_description', '/gazebo_panda/robot_description'),
+            ],
         ),
         spawn_panda,
         RegisterEventHandler(

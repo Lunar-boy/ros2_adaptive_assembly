@@ -231,6 +231,9 @@
   <gazebo>
     <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
       <parameters>$(arg controllers_file)</parameters>
+      <ros>
+        <remapping>/robot_description:=/gazebo_panda/robot_description</remapping>
+      </ros>
     </plugin>
   </gazebo>
 </robot>

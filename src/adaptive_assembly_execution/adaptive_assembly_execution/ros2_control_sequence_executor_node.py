@@ -1,5 +1,6 @@
 """Forward assembly trajectories to a simulated ros2_control action."""
 
+import math
 import time
 from typing import Optional, Tuple
 
@@ -13,6 +14,8 @@ import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+
+from sensor_msgs.msg import JointState
 
 from std_msgs.msg import Bool, Float64, String
 
@@ -55,6 +58,9 @@ class Ros2ControlSequenceExecutorNode(Node):
         self.declare_parameter('require_non_empty_trajectory', True)
         self.declare_parameter('require_panda_joints', True)
         self.declare_parameter('expected_joint_prefix', 'panda_joint')
+        self.declare_parameter('joint_state_topic', '/joint_states')
+        self.declare_parameter('require_joint_state', True)
+        self.declare_parameter('start_state_tolerance', 0.05)
         self.declare_parameter('simulated_execution_only', True)
 
         self._pre_grasp_topic = self.get_parameter(
@@ -91,6 +97,18 @@ class Ros2ControlSequenceExecutorNode(Node):
         self._expected_joint_prefix = self.get_parameter(
             'expected_joint_prefix'
         ).value
+        self._joint_state_topic = self.get_parameter(
+            'joint_state_topic'
+        ).value
+        self._require_joint_state = self.get_parameter(
+            'require_joint_state'
+        ).value
+        self._start_state_tolerance = self.get_parameter(
+            'start_state_tolerance'
+        ).value
+        self._expected_joints = [
+            f'{self._expected_joint_prefix}{index}' for index in range(1, 8)
+        ]
         self._simulated_execution_only = self.get_parameter(
             'simulated_execution_only'
         ).value
@@ -131,6 +149,12 @@ class Ros2ControlSequenceExecutorNode(Node):
             self._assembly_callback,
             10,
         )
+        self._joint_state_subscription = self.create_subscription(
+            JointState,
+            self._joint_state_topic,
+            self._joint_state_callback,
+            10,
+        )
 
         self._pre_grasp_trajectory: Optional[RobotTrajectory] = None
         self._assembly_trajectory: Optional[RobotTrajectory] = None
@@ -139,6 +163,8 @@ class Ros2ControlSequenceExecutorNode(Node):
         self._started = False
         self._completed = False
         self._result_timer = None
+        self._current_joint_positions = {}
+        self._joint_state_received = False
 
         self.get_logger().info(
             'Simulator-only ros2_control sequence executor ready: '
@@ -149,6 +175,8 @@ class Ros2ControlSequenceExecutorNode(Node):
             f'result_timeout_sec={self._result_timeout_sec}, '
             f'cancel_on_timeout={self._cancel_on_timeout}, '
             f'send_goals={self._send_goals}, '
+            f"joint_state_topic='{self._joint_state_topic}', "
+            f'require_joint_state={self._require_joint_state}, '
             'simulated_execution_only=true, real_hardware=false.'
         )
 
@@ -164,6 +192,10 @@ class Ros2ControlSequenceExecutorNode(Node):
             raise ValueError(
                 'expected_joint_prefix must not be empty when '
                 'require_panda_joints is true'
+            )
+        if self._start_state_tolerance < 0.0:
+            raise ValueError(
+                'start_state_tolerance must be greater than or equal to zero'
             )
         if not self._simulated_execution_only:
             raise ValueError(
@@ -185,6 +217,22 @@ class Ros2ControlSequenceExecutorNode(Node):
         self._assembly_trajectory = trajectory
         self._try_start_sequence()
 
+    def _joint_state_callback(self, joint_state: JointState) -> None:
+        """Retain the latest complete finite Panda joint-state sample."""
+        if len(joint_state.name) != len(joint_state.position):
+            return
+        positions = dict(zip(joint_state.name, joint_state.position))
+        if not all(
+            name in positions and math.isfinite(positions[name])
+            for name in self._expected_joints
+        ):
+            return
+        self._current_joint_positions = {
+            name: positions[name] for name in self._expected_joints
+        }
+        self._joint_state_received = True
+        self._try_start_sequence()
+
     def _try_start_sequence(self) -> None:
         """Validate both trajectories and connect to the controller once."""
         if self._started:
@@ -193,13 +241,13 @@ class Ros2ControlSequenceExecutorNode(Node):
             return
         if self._assembly_trajectory is None:
             return
+        if self._require_joint_state and not self._joint_state_received:
+            return
 
         self._started = True
         self._sequence_start = time.monotonic()
 
-        valid, reason = self._validate_trajectory(
-            self._pre_grasp_trajectory
-        )
+        valid, reason = self._validate_trajectory(self._pre_grasp_trajectory)
         if not valid:
             self._publish_failure('pre_grasp', reason)
             return
@@ -218,6 +266,7 @@ class Ros2ControlSequenceExecutorNode(Node):
             self._publish_skipped('controller_unavailable')
             return
 
+        self._log_start_state_difference(self._pre_grasp_trajectory)
         self._send_stage('pre_grasp', self._pre_grasp_trajectory)
 
     def _validate_trajectory(
@@ -235,12 +284,77 @@ class Ros2ControlSequenceExecutorNode(Node):
             and not joint_trajectory.points
         ):
             return False, 'empty_trajectory'
-        if self._require_panda_joints and not any(
-            name.startswith(self._expected_joint_prefix)
-            for name in joint_trajectory.joint_names
+        if (
+            self._require_panda_joints
+            and list(joint_trajectory.joint_names) != self._expected_joints
         ):
-            return False, 'missing_expected_joints'
+            return False, 'controller_joint_mismatch'
+        joint_count = len(joint_trajectory.joint_names)
+        previous_time = -1.0
+        for index, point in enumerate(joint_trajectory.points):
+            if len(point.positions) != joint_count:
+                return False, f'invalid_position_count_point_{index}'
+            for field_name in ('velocities', 'accelerations', 'effort'):
+                values = getattr(point, field_name)
+                if values and len(values) != joint_count:
+                    return False, f'invalid_{field_name}_count_point_{index}'
+            values = (
+                list(point.positions) + list(point.velocities)
+                + list(point.accelerations) + list(point.effort)
+            )
+            if not all(math.isfinite(value) for value in values):
+                return False, f'non_finite_value_point_{index}'
+            point_time = (
+                float(point.time_from_start.sec)
+                + float(point.time_from_start.nanosec) * 1.0e-9
+            )
+            if point_time < 0.0:
+                return False, f'negative_time_point_{index}'
+            if index > 0 and point_time <= previous_time:
+                return False, f'non_increasing_time_point_{index}'
+            previous_time = point_time
         return True, ''
+
+    def _trajectory_summary(self, trajectory: RobotTrajectory) -> str:
+        """Return validation-relevant trajectory fields for diagnostics."""
+        joint_trajectory = trajectory.joint_trajectory
+        times = [
+            point.time_from_start.sec
+            + point.time_from_start.nanosec * 1.0e-9
+            for point in joint_trajectory.points
+        ]
+        first_positions = (
+            list(joint_trajectory.points[0].positions)
+            if joint_trajectory.points else []
+        )
+        return (
+            f'joints={list(joint_trajectory.joint_names)}, '
+            f'point_count={len(joint_trajectory.points)}, '
+            f'first_positions={first_positions}, times={times}'
+        )
+
+    def _log_start_state_difference(self, trajectory: RobotTrajectory) -> None:
+        """Report whether execution starts from the state used by planning."""
+        if (
+            not self._joint_state_received
+            or not trajectory.joint_trajectory.points
+        ):
+            return
+        first = trajectory.joint_trajectory.points[0].positions
+        current = [
+            self._current_joint_positions[name]
+            for name in self._expected_joints
+        ]
+        max_delta = max(abs(a - b) for a, b in zip(current, first))
+        log = self.get_logger().warning if (
+            max_delta > self._start_state_tolerance
+        ) else self.get_logger().info
+        log(
+            'Pre-grasp execution start-state comparison: '
+            f'current={current}, planned_first={list(first)}, '
+            f'max_delta={max_delta:.6f}, '
+            f'tolerance={self._start_state_tolerance:.6f}.'
+        )
 
     def _send_stage(
         self, stage: str, trajectory: RobotTrajectory
@@ -249,6 +363,14 @@ class Ros2ControlSequenceExecutorNode(Node):
         self._stage_start = time.monotonic()
         goal = FollowJointTrajectory.Goal()
         goal.trajectory = trajectory.joint_trajectory
+        # A zero stamp means "start now" and avoids MoveIt export timestamps
+        # becoming stale while the two-stage sequence waits for the controller.
+        goal.trajectory.header.stamp.sec = 0
+        goal.trajectory.header.stamp.nanosec = 0
+        self.get_logger().info(
+            f'Sending {stage} trajectory: '
+            f'{self._trajectory_summary(trajectory)}'
+        )
         future = self._action_client.send_goal_async(goal)
         future.add_done_callback(
             lambda completed_future: self._goal_response_callback(
@@ -272,6 +394,23 @@ class Ros2ControlSequenceExecutorNode(Node):
             return
 
         if not goal_handle.accepted:
+            summary = self._trajectory_summary(trajectory)
+            current = [
+                self._current_joint_positions.get(name, float('nan'))
+                for name in self._expected_joints
+            ]
+            self.get_logger().error(
+                f'Controller rejected {stage} goal: {summary}, '
+                f'expected_joints={self._expected_joints}, '
+                f'current_positions={current}, '
+                'header_stamp_normalized=true.'
+            )
+            self._publish_stage_status(
+                f'event=rejected;mode=ros2_control;stage={stage};'
+                f'point_count={len(trajectory.joint_trajectory.points)};'
+                f'joint_count={len(trajectory.joint_trajectory.joint_names)};'
+                'header_stamp_normalized=true;real_hardware=false'
+            )
             self._publish_failure(stage, 'goal_rejected')
             return
 
