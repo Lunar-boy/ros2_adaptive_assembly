@@ -35,6 +35,7 @@ The project is intentionally designed as a lightweight software stack rather tha
 - Message-only dry-run execution abstraction
 - Closed-loop recovery supervisor with deterministic recovery actions
 - Deterministic benchmark profiles and CSV/Markdown report export
+- Contact-lite geometric insertion benchmark and report export
 - Lightweight Gazebo Harmonic workcell visualization
 
 ---
@@ -65,6 +66,9 @@ MoveIt2 sequence planner
               │
               ▼
 dry-run execution / future ros2_control execution
+              │
+              ▼
+contact-lite insertion evaluator
 ```
 
 The current pipeline separates perception, task-level pose generation, robot-specific pose adaptation, planning, diagnostics, and execution abstraction. This makes the system easy to test incrementally and extend toward simulator or hardware execution.
@@ -89,6 +93,7 @@ The current pipeline separates perception, task-level pose generation, robot-spe
 | Planning diagnostics | Implemented |
 | CSV benchmark recording | Implemented |
 | Markdown benchmark reports | Implemented |
+| Contact-lite insertion benchmark | Implemented |
 | Trajectory export | Implemented |
 | Message-only dry-run execution | Implemented |
 | Recovery supervisor | Implemented |
@@ -110,6 +115,7 @@ ros2_adaptive_assembly/
 ├── benchmark_results/            # Optional benchmark CSV/Markdown outputs
 └── src/
     ├── adaptive_assembly_bringup/     # Launch files and integration entry points
+    ├── adaptive_assembly_benchmark/   # Contact-lite geometric benchmark nodes
     ├── adaptive_assembly_execution/   # Dry-run and execution-bridge abstractions
     ├── adaptive_assembly_perception/  # Fake perception and target-pose generation
     ├── adaptive_assembly_recovery/    # Recovery supervisor and deterministic actions
@@ -552,6 +558,49 @@ python3 scripts/compare_planning_benchmark_csvs.py \
   --output-markdown benchmark_results/benchmark_report.md
 ```
 
+### Contact-lite insertion benchmark
+
+Run the deterministic known-reachable plan-only sequence with geometric
+insertion evaluation:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_contact_lite_insertion_benchmark.launch.py
+```
+
+The evaluator publishes:
+
+- `/assembly_insertion_status`
+- `/assembly_insertion_success`
+- `/assembly_insertion_error_mm`
+- `/assembly_insertion_error_deg`
+
+By default, the achieved pose is the planned `/panda_assembly_pose`; status
+therefore reports `achieved_pose_source=planned_pose`. This benchmark checks
+only final-pose geometry. It adds no force control, tactile sensing,
+contact-rich peg-in-hole behavior, real hardware execution, or Gazebo contact
+physics requirement.
+
+Record CSV data and export a Markdown summary:
+
+```bash
+MAX_TRIALS=20 TIMEOUT_SEC=120 \
+  bash scripts/run_contact_lite_insertion_benchmark.sh
+```
+
+Validate with synthetic poses and report export:
+
+```bash
+bash scripts/check_contact_lite_insertion_topics.sh
+python3 scripts/check_contact_lite_insertion_success_path.py
+python3 scripts/check_contact_lite_insertion_failure_path.py
+bash scripts/check_contact_lite_insertion_report_export.sh
+```
+
+See
+[`docs/contact_lite_insertion_benchmark.md`](docs/contact_lite_insertion_benchmark.md)
+for parameters, status fields, and limitations.
+
 ### Suggested result table
 
 After recording benchmark data, add a small result table here:
@@ -582,6 +631,7 @@ Implemented:
 - static and dynamic PlanningScene objects
 - PlanningScene audit/reset workflows
 - planning diagnostics and benchmarks
+- contact-lite geometric insertion benchmark
 - trajectory export
 - dry-run execution abstraction
 - recovery supervisor
@@ -593,6 +643,7 @@ Not yet implemented:
 - gripper control;
 - object attach/detach behavior;
 - contact-rich insertion physics;
+- force-controlled or tactile insertion behavior;
 - force/torque feedback control;
 - real robot hardware execution.
 
