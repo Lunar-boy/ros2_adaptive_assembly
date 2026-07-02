@@ -18,6 +18,8 @@ def generate_launch_description() -> LaunchDescription:
         'marker_id': '0',
         'target_entity_name': 'target_object',
         'publish_period_sec': '1.0',
+        'camera_x': '0.0', 'camera_y': '0.0', 'camera_z': '1.0',
+        'camera_yaw': '0.0',
         'x': '0.45', 'y': '0.0', 'z': '0.15', 'yaw': '0.0',
         'position_noise_std': '0.0', 'yaw_noise_std': '0.0',
         'publish_immediately': 'true',

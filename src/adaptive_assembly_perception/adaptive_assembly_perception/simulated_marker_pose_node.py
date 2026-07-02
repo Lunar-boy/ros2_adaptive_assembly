@@ -27,6 +27,10 @@ class SimulatedMarkerPoseNode(Node):
             'marker_id': 0,
             'target_entity_name': 'target_object',
             'publish_period_sec': 1.0,
+            'camera_x': 0.0,
+            'camera_y': 0.0,
+            'camera_z': 1.0,
+            'camera_yaw': 0.0,
             'x': 0.45,
             'y': 0.0,
             'z': 0.15,
@@ -123,8 +127,47 @@ class SimulatedMarkerPoseNode(Node):
         pose.pose.orientation.z = math.sin(yaw / 2.0)
         pose.pose.orientation.w = math.cos(yaw / 2.0)
         self._target_publisher.publish(pose)
+
         if self._perceived_publisher is not None:
-            self._perceived_publisher.publish(pose)
+            perceived = PoseStamped()
+            perceived.header.stamp = pose.header.stamp
+            perceived.header.frame_id = self._values['camera_frame']
+            camera_yaw = float(self._values['camera_yaw'])
+            delta_x = pose.pose.position.x - float(self._values['camera_x'])
+            delta_y = pose.pose.position.y - float(self._values['camera_y'])
+            perceived.pose.position.x = (
+                math.cos(camera_yaw) * delta_x
+                + math.sin(camera_yaw) * delta_y
+            )
+            perceived.pose.position.y = (
+                -math.sin(camera_yaw) * delta_x
+                + math.cos(camera_yaw) * delta_y
+            )
+            perceived.pose.position.z = (
+                pose.pose.position.z - float(self._values['camera_z'])
+            )
+            relative_yaw = yaw - camera_yaw
+            perceived.pose.orientation.z = math.sin(relative_yaw / 2.0)
+            perceived.pose.orientation.w = math.cos(relative_yaw / 2.0)
+            self._perceived_publisher.publish(perceived)
+
+        camera_transform = TransformStamped()
+        camera_transform.header.stamp = pose.header.stamp
+        camera_transform.header.frame_id = self._values['world_frame']
+        camera_transform.child_frame_id = self._values['camera_frame']
+        camera_transform.transform.translation.x = float(
+            self._values['camera_x']
+        )
+        camera_transform.transform.translation.y = float(
+            self._values['camera_y']
+        )
+        camera_transform.transform.translation.z = float(
+            self._values['camera_z']
+        )
+        camera_yaw = float(self._values['camera_yaw'])
+        camera_transform.transform.rotation.z = math.sin(camera_yaw / 2.0)
+        camera_transform.transform.rotation.w = math.cos(camera_yaw / 2.0)
+        self._tf_broadcaster.sendTransform(camera_transform)
 
         transform = TransformStamped()
         transform.header = pose.header
@@ -137,6 +180,7 @@ class SimulatedMarkerPoseNode(Node):
         self._publish_status(
             'event=success;mode=simulated_vision_perception;'
             'source=marker_pose_emulator;'
+            f"perceived_frame={self._values['camera_frame']};"
             f"target_frame={self._values['target_frame_id']};"
             'simulated_only=true;real_hardware=false'
         )

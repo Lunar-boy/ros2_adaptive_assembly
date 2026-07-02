@@ -2,8 +2,9 @@
 
 Launch entry points for the current adaptive assembly pipeline.
 
-The simulator-only vision demo composes deterministic marker-pose perception,
-task pose generation, the headless Gazebo workcell, and target synchronization:
+The simulator-only vision demo composes a deterministic camera-frame
+marker-pose perception emulator, task pose generation, the headless Gazebo
+workcell, and target synchronization. It is not pixel-based vision:
 
 ```bash
 ros2 launch adaptive_assembly_bringup \

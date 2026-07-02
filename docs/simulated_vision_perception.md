@@ -2,11 +2,12 @@
 
 ## Purpose
 
-`simulated_marker_pose_node` is a simulator-only perception boundary for the
-adaptive assembly pipeline. It emulates a marker observation from configured
-object coordinates, publishes the resulting pose on `/target_pose`, and
-broadcasts the identical `world -> target_object` transform. It requires no
-Gazebo GUI, image transport, OpenCV, camera device, or robot hardware.
+`simulated_marker_pose_node` is a simulator-only, camera-frame marker-pose
+perception emulator for the adaptive assembly pipeline. It expresses the
+configured target observation in `simulated_camera`, publishes the converted
+world pose on `/target_pose`, and broadcasts `world -> simulated_camera` and
+`world -> target_object`. This is not pixel-based vision. It requires no Gazebo
+GUI, image transport, OpenCV, camera device, or robot hardware.
 
 The emulator is deterministic when its noise standard deviations are zero.
 With noise enabled, its pseudo-random sequence is seeded by `marker_id`, so
@@ -34,9 +35,9 @@ ros2 launch adaptive_assembly_bringup \
 | Topic | Type | Behavior |
 | --- | --- | --- |
 | `/target_pose` | `geometry_msgs/msg/PoseStamped` | Existing pipeline input |
-| `/perceived_target_pose` | `geometry_msgs/msg/PoseStamped` | Optional raw emulated observation; set its parameter to an empty string to disable |
+| `/perceived_target_pose` | `geometry_msgs/msg/PoseStamped` | Optional raw observation in `simulated_camera`; set its parameter to an empty string to disable |
 | `/simulated_vision_perception_status` | `std_msgs/msg/String` | Reliable, transient-local status |
-| `/tf` | `tf2_msgs/msg/TFMessage` | `world -> target_object` transform |
+| `/tf` | `tf2_msgs/msg/TFMessage` | `world -> simulated_camera` and `world -> target_object` transforms |
 
 ## Parameters
 
@@ -51,6 +52,8 @@ ros2 launch adaptive_assembly_bringup \
 | `marker_id` | `0` | Emulated marker ID and deterministic noise seed |
 | `target_entity_name` | `target_object` | Logical simulator entity name |
 | `publish_period_sec` | `1.0` | Observation period |
+| `camera_x`, `camera_y`, `camera_z` | `0.0`, `0.0`, `1.0` | Simulated camera position in `world` |
+| `camera_yaw` | `0.0` | Simulated camera yaw in `world`, in radians |
 | `x`, `y`, `z` | `0.45`, `0.0`, `0.15` | Base world position in metres |
 | `yaw` | `0.0` | Base world yaw in radians |
 | `position_noise_std` | `0.0` | Gaussian position noise standard deviation |
@@ -64,7 +67,7 @@ ros2 launch adaptive_assembly_bringup \
 Status is semicolon-delimited `key=value` data. A successful observation is:
 
 ```text
-event=success;mode=simulated_vision_perception;source=marker_pose_emulator;target_frame=target_object;simulated_only=true;real_hardware=false
+event=success;mode=simulated_vision_perception;source=marker_pose_emulator;perceived_frame=simulated_camera;target_frame=target_object;simulated_only=true;real_hardware=false
 ```
 
 When camera topics are disabled, startup also emits a skipped event before the
@@ -87,8 +90,8 @@ These checks need neither Gazebo nor a camera.
 
 ## Limitations and fake perception comparison
 
-This first version emulates marker-pose output; it does not process pixels,
-detect ArUco markers, model occlusion, or perform visual servoing. The existing
+This first version emulates camera-frame marker-pose output; it does not process
+pixels, detect ArUco markers, model occlusion, or perform visual servoing. The existing
 fake perception node remains unchanged and is useful for randomized workspace
 and benchmark inputs. Simulated vision instead exposes camera/marker semantics,
 raw perceived output, retained diagnostics, deterministic measurement noise,

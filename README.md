@@ -22,7 +22,7 @@ The project is intentionally designed as a lightweight software stack rather tha
 
 - ROS2 Jazzy workspace with modular Python packages
 - Fake perception node publishing randomized target object poses
-- Simulated marker/camera perception emulator (simulator-only)
+- Simulated marker-pose perception emulator (simulator-only)
 - TF2 target frame broadcasting
 - Task-level pre-grasp and assembly pose generation
 - Panda-specific pose adapters for MoveIt2 planning
@@ -84,7 +84,7 @@ The current pipeline separates perception, task-level pose generation, robot-spe
 | Area | Status |
 |---|---|
 | Fake perception | Implemented |
-| Simulated camera/vision perception | Implemented / simulator-only |
+| Simulated marker-pose perception emulator | Implemented / simulator-only |
 | TF2 target broadcasting | Implemented |
 | Task-level pose generation | Implemented |
 | Panda-specific pose adaptation | Implemented |
@@ -258,8 +258,10 @@ ros2 launch adaptive_assembly_bringup \
   adaptive_assembly_simulated_vision_demo.launch.py
 ```
 
-The node feeds the existing `/target_pose` and `world -> target_object` TF
-interfaces. It does not use a real camera or hardware. See
+The camera-frame marker pose emulator publishes `/perceived_target_pose` in
+`simulated_camera`, then feeds the existing world-frame `/target_pose` and
+`world -> target_object` TF interfaces. It is not pixel-based vision and does
+not use a real camera or hardware. See
 [`docs/simulated_vision_perception.md`](docs/simulated_vision_perception.md).
 
 ---

@@ -47,6 +47,8 @@ def main() -> int:
         'event': 'success',
         'mode': 'simulated_vision_perception',
         'source': 'marker_pose_emulator',
+        'perceived_frame': 'simulated_camera',
+        'target_frame': 'target_object',
         'simulated_only': 'true',
         'real_hardware': 'false',
     }
