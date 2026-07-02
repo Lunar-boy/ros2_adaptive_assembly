@@ -102,6 +102,7 @@ The current pipeline separates perception, task-level pose generation, robot-spe
 | Markdown benchmark reports | Implemented |
 | Contact-lite insertion benchmark | Implemented |
 | Assembly episode status schema | Implemented / schema-only |
+| Assembly episode supervisor | Implemented / passive aggregate status only |
 | Trajectory export | Implemented |
 | Message-only dry-run execution | Implemented |
 | Recovery supervisor | Implemented |
@@ -220,7 +221,7 @@ Validate the successful planning path:
 python3 scripts/check_assembly_sequence_success_path.py
 ```
 
-See [docs/assembly_episode_status_schema.md](docs/assembly_episode_status_schema.md) for the stable topic and status-field contract planned for the complete assembly episode supervisor.
+See [docs/assembly_episode_status_schema.md](docs/assembly_episode_status_schema.md) for the stable topic and status-field contract used by the passive assembly episode supervisor.
 
 ---
 
@@ -739,6 +740,22 @@ bash scripts/check_contact_lite_insertion_report_export.sh
 See
 [`docs/contact_lite_insertion_benchmark.md`](docs/contact_lite_insertion_benchmark.md)
 for parameters, status fields, and limitations.
+
+### Passive assembly episode supervisor
+
+Launch the status-only episode aggregator and run its isolated synthetic checks:
+
+```bash
+ros2 launch adaptive_assembly_episode assembly_episode_supervisor.launch.py
+bash scripts/check_assembly_episode_supervisor_available.sh
+python3 scripts/check_assembly_episode_supervisor_success_path.py
+python3 scripts/check_assembly_episode_supervisor_failure_path.py
+python3 scripts/check_assembly_episode_supervisor_timeout_path.py
+```
+
+See
+[`docs/assembly_episode_supervisor.md`](docs/assembly_episode_supervisor.md)
+for subscribed topics, terminal rules, and passive-only limitations.
 
 ### Suggested result table
 
