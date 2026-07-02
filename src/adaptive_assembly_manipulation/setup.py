@@ -34,6 +34,9 @@ setup(
             'logical_grasp_lifecycle_node = '
             'adaptive_assembly_manipulation.'
             'logical_grasp_lifecycle_node:main',
+            'gazebo_attach_detach_node = '
+            'adaptive_assembly_manipulation.'
+            'gazebo_attach_detach_node:main',
         ],
     },
 )

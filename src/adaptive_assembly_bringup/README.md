@@ -70,6 +70,17 @@ ros2 launch adaptive_assembly_bringup \
 It publishes logical open/close and attach/detach state only. It does not
 physically control a gripper or attach an object in Gazebo.
 
+The PR39 Gazebo grasp attachment demo composes full Gazebo Panda execution, the
+logical lifecycle, and kinematic target-object following:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_gazebo_grasp_attach_demo.launch.py
+```
+
+It is simulator-only and does not model contact-rich or force-controlled
+grasping.
+
 The PR37 recovery orchestration demo composes the existing supervisor with a
 bounded simulator-only reset and fake-perception republish loop:
 

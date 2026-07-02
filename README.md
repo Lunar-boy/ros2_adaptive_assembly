@@ -5,7 +5,8 @@ A ROS2 Jazzy + MoveIt2 project for perception-driven adaptive robotic assembly i
 This repository builds a lightweight adaptive manipulation pipeline that converts randomized object poses into robot-aware Panda planning targets, maintains TF and PlanningScene state, performs plan-only two-stage assembly planning, exports trajectories, records planning diagnostics, and provides deterministic benchmark profiles for evaluating robustness under target-pose variation.
 
 > **Current scope:** reproducible adaptive assembly planning plus simulator-only Gazebo Panda arm execution.
-> **Not yet included:** physical gripper control, object attach/detach, camera perception, contact-rich insertion, force control, or real robot hardware execution.
+> **Not yet included:** physical gripper hardware control, camera perception,
+> contact-rich insertion, force control, or real robot hardware execution.
 
 ---
 
@@ -103,7 +104,7 @@ The current pipeline separates perception, task-level pose generation, robot-spe
 | ros2_control trajectory bridge | Implemented / simulator-only |
 | Full Gazebo Panda arm execution | Implemented / simulator-only |
 | Gazebo target object synchronization | Implemented / simulator-only |
-| Gripper control and object attachment | Not implemented |
+| Gripper control and object attachment | Implemented / simulator-only |
 | Contact-rich insertion | Not implemented |
 | Camera perception and force control | Not implemented |
 | Real robot execution | Not implemented |
@@ -478,7 +479,33 @@ python3 scripts/check_target_pose_to_gazebo_entity_consistency.py
 
 See [`docs/gazebo_target_pose_sync.md`](docs/gazebo_target_pose_sync.md).
 
-### 10. PR36 logical gripper and grasp lifecycle
+### 10. PR39 Gazebo grasp attach/detach
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_gazebo_grasp_attach_demo.launch.py
+```
+
+The demo composes full simulator execution, the logical grasp lifecycle, and a
+simulator-only kinematic attachment layer. While logically attached, Gazebo's
+`target_object` follows `panda_hand`; detach leaves it at its last world pose.
+Retained state and diagnostics are published on `/gazebo_object_attached`,
+`/gazebo_attach_detach_status`, and `/gazebo_attach_pose_error_mm`.
+
+```bash
+bash scripts/check_gazebo_attach_detach_available.sh
+python3 scripts/check_gazebo_attach_detach_success_path.py
+python3 scripts/check_gazebo_attach_detach_failure_path.py
+python3 scripts/check_live_gazebo_attach_detach.py
+```
+
+The last command is an optional bounded, headless live Gazebo validation; the
+fixture checks remain available without a running simulator. Live attachment
+is kinematic set-pose mirroring only.
+
+See [`docs/gazebo_grasp_attach_detach.md`](docs/gazebo_grasp_attach_detach.md).
+
+### 11. PR36 logical gripper and grasp lifecycle
 
 ```bash
 ros2 launch adaptive_assembly_bringup \
@@ -704,11 +731,10 @@ Implemented:
 - lightweight Gazebo workcell visualization
 - simulator-only Gazebo Panda arm execution through ros2_control
 - simulator-only Gazebo target object synchronization from `/target_pose`
+- gripper control and object attachment (simulator-only kinematic layer)
 
 Not yet implemented:
 
-- gripper control;
-- object attach/detach behavior;
 - camera-based perception;
 - contact-rich insertion physics;
 - force-controlled or tactile insertion behavior;
