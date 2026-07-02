@@ -23,6 +23,7 @@ The project is intentionally designed as a lightweight software stack rather tha
 - ROS2 Jazzy workspace with modular Python packages
 - Fake perception node publishing randomized target object poses
 - Simulated marker-pose perception emulator (simulator-only)
+- Optional OpenCV ArUco simulated image detection (simulator-only)
 - TF2 target frame broadcasting
 - Task-level pre-grasp and assembly pose generation
 - Panda-specific pose adapters for MoveIt2 planning
@@ -85,6 +86,7 @@ The current pipeline separates perception, task-level pose generation, robot-spe
 |---|---|
 | Fake perception | Implemented |
 | Simulated marker-pose perception emulator | Implemented / simulator-only |
+| Optional OpenCV ArUco image detection | Implemented / optional / simulator-only |
 | TF2 target broadcasting | Implemented |
 | Task-level pose generation | Implemented |
 | Panda-specific pose adaptation | Implemented |
@@ -108,7 +110,8 @@ The current pipeline separates perception, task-level pose generation, robot-spe
 | Gazebo target object synchronization | Implemented / simulator-only |
 | Gripper control and object attachment | Implemented / simulator-only |
 | Contact-rich insertion | Not implemented |
-| Real camera hardware and force control | Not implemented |
+| Real camera hardware | Not implemented |
+| Visual servoing and force control | Not implemented |
 | Real robot execution | Not implemented |
 
 ---
@@ -263,6 +266,18 @@ The camera-frame marker pose emulator publishes `/perceived_target_pose` in
 `world -> target_object` TF interfaces. It is not pixel-based vision and does
 not use a real camera or hardware. See
 [`docs/simulated_vision_perception.md`](docs/simulated_vision_perception.md).
+
+An optional pixel-based path consumes simulated camera images when OpenCV ArUco
+support is installed:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_opencv_aruco_demo.launch.py
+```
+
+It does not make OpenCV mandatory and does not support real camera hardware.
+The marker-pose emulator above remains the recommended default fallback. See
+[`docs/opencv_aruco_perception.md`](docs/opencv_aruco_perception.md).
 
 ---
 

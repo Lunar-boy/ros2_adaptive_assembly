@@ -6,7 +6,7 @@
 2. Synchronize Gazebo target object pose with the adaptive perception pipeline.
 3. Add richer benchmark reports with real recorded tables and plots.
 4. Add screenshots or GIFs for RViz, PlanningScene, and Gazebo workcell demos.
-5. Extend fake perception toward AprilTag/ArUco or RGB-D based target pose estimation.
+5. Extend optional ArUco perception toward RGB-D target pose estimation.
 6. Introduce task-level retry orchestration that consumes recovery supervisor actions.
 7. Add contact-aware insertion approximation or force-control extension points.
 
