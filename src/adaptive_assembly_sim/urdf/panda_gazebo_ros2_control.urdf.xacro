@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="adaptive_assembly_panda">
   <xacro:arg name="initial_positions_file" default=""/>
+  <xacro:arg name="controllers_file" default=""/>
 
   <material name="panda_white">
     <color rgba="0.86 0.88 0.90 1.0"/>
@@ -63,6 +64,11 @@
     <child link="panda_link0"/>
     <origin xyz="0 0 0" rpy="0 0 0"/>
   </joint>
+
+  <!-- Anchor only the base in Gazebo; the arm links remain dynamic. -->
+  <gazebo reference="panda_link0">
+    <kinematic>true</kinematic>
+  </gazebo>
 
   <xacro:box_link name="panda_link1" size="0.14 0.16 0.32" xyz="0 0 0.16" material="panda_white"/>
   <xacro:box_link name="panda_link2" size="0.12 0.12 0.28" xyz="0 0 0.14" material="panda_white"/>
@@ -224,7 +230,10 @@
 
   <gazebo>
     <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
-      <parameters>$(find adaptive_assembly_sim)/config/panda_ros2_control.yaml</parameters>
+      <parameters>$(arg controllers_file)</parameters>
+      <ros>
+        <remapping>/robot_description:=/gazebo_panda/robot_description</remapping>
+      </ros>
     </plugin>
   </gazebo>
 </robot>

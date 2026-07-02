@@ -11,6 +11,8 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 
+from sensor_msgs.msg import JointState
+
 from std_msgs.msg import Bool, Float64, String
 
 from trajectory_msgs.msg import JointTrajectoryPoint
@@ -48,6 +50,9 @@ class Checker(Node):
         )
         self.assembly = self.create_publisher(
             RobotTrajectory, f'{prefix}/assembly', 10
+        )
+        self.joint_states = self.create_publisher(
+            JointState, '/joint_states', 10
         )
         qos = QoSProfile(
             depth=1,
@@ -122,6 +127,12 @@ def run_check(mode: str) -> int:
             ):
                 node.pre.publish(_trajectory(0.0))
                 node.assembly.publish(_trajectory(0.1))
+                joint_state = JointState()
+                joint_state.name = [
+                    f'panda_joint{index}' for index in range(1, 8)
+                ]
+                joint_state.position = [0.0] * 7
+                node.joint_states.publish(joint_state)
                 last_publish = now
             if all(value is not None for value in (
                 node.status, node.success, node.duration
