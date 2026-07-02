@@ -5,8 +5,8 @@ A ROS2 Jazzy + MoveIt2 project for perception-driven adaptive robotic assembly i
 This repository builds a lightweight adaptive manipulation pipeline that converts randomized object poses into robot-aware Panda planning targets, maintains TF and PlanningScene state, performs plan-only two-stage assembly planning, exports trajectories, records planning diagnostics, and provides deterministic benchmark profiles for evaluating robustness under target-pose variation.
 
 > **Current scope:** reproducible adaptive assembly planning plus simulator-only Gazebo Panda arm execution.
-> **Not yet included:** physical gripper hardware control, camera perception,
-> contact-rich insertion, force control, or real robot hardware execution.
+> **Not yet included:** real camera hardware, contact-rich insertion, force
+> control, or real robot hardware execution.
 
 ---
 
@@ -22,6 +22,7 @@ The project is intentionally designed as a lightweight software stack rather tha
 
 - ROS2 Jazzy workspace with modular Python packages
 - Fake perception node publishing randomized target object poses
+- Simulated marker/camera perception emulator (simulator-only)
 - TF2 target frame broadcasting
 - Task-level pre-grasp and assembly pose generation
 - Panda-specific pose adapters for MoveIt2 planning
@@ -83,6 +84,7 @@ The current pipeline separates perception, task-level pose generation, robot-spe
 | Area | Status |
 |---|---|
 | Fake perception | Implemented |
+| Simulated camera/vision perception | Implemented / simulator-only |
 | TF2 target broadcasting | Implemented |
 | Task-level pose generation | Implemented |
 | Panda-specific pose adaptation | Implemented |
@@ -106,7 +108,7 @@ The current pipeline separates perception, task-level pose generation, robot-spe
 | Gazebo target object synchronization | Implemented / simulator-only |
 | Gripper control and object attachment | Implemented / simulator-only |
 | Contact-rich insertion | Not implemented |
-| Camera perception and force control | Not implemented |
+| Real camera hardware and force control | Not implemented |
 | Real robot execution | Not implemented |
 
 ---
@@ -239,6 +241,26 @@ python3 scripts/check_pipeline_offsets.py
 bash scripts/run_pipeline_validation.sh
 bash scripts/echo_pipeline_once.sh
 ```
+
+### Simulated vision perception
+
+Run the deterministic no-camera marker-pose emulator by itself:
+
+```bash
+ros2 launch adaptive_assembly_perception \
+  simulated_vision_perception.launch.py
+```
+
+For the headless Gazebo target synchronization demo:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_simulated_vision_demo.launch.py
+```
+
+The node feeds the existing `/target_pose` and `world -> target_object` TF
+interfaces. It does not use a real camera or hardware. See
+[`docs/simulated_vision_perception.md`](docs/simulated_vision_perception.md).
 
 ---
 

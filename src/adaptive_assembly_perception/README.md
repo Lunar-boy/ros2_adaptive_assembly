@@ -1,9 +1,14 @@
 # Adaptive Assembly Perception
 
-This ROS 2 Jazzy package provides simulated perception inputs for the adaptive
-assembly pipeline. The `fake_object_pose_node` publishes a randomized
+This ROS 2 Jazzy package provides fake and simulated-vision inputs for the
+adaptive assembly pipeline. The `fake_object_pose_node` publishes a randomized
 `geometry_msgs/msg/PoseStamped` on `/target_pose` and broadcasts the same pose
 as the `world` to `target_object` TF transform.
+
+The simulator-only `simulated_marker_pose_node` provides a deterministic marker
+pose emulator on the same pipeline interface, a matching TF, an optional raw
+pose, and retained status. See
+[`docs/simulated_vision_perception.md`](../../docs/simulated_vision_perception.md).
 
 ## Parameters
 
