@@ -14,6 +14,7 @@ def generate_launch_description() -> LaunchDescription:
         ('target_entity_name', 'target_object'),
         ('world_frame', 'world'),
         ('status_topic', '/gazebo_target_sync_status'),
+        ('control_owner_topic', '/target_object_control_owner'),
         ('pose_error_mm_topic', '/gazebo_target_pose_error_mm'),
         ('pose_error_deg_topic', '/gazebo_target_pose_error_deg'),
         ('service_timeout_sec', '2.0'),

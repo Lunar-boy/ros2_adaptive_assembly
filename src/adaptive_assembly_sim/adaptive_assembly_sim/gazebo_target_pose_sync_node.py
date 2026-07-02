@@ -38,6 +38,9 @@ class GazeboTargetPoseSyncNode(Node):
         self.declare_parameter('world_frame', 'world')
         self.declare_parameter('status_topic', '/gazebo_target_sync_status')
         self.declare_parameter(
+            'control_owner_topic', '/target_object_control_owner'
+        )
+        self.declare_parameter(
             'pose_error_mm_topic', '/gazebo_target_pose_error_mm'
         )
         self.declare_parameter(
@@ -51,6 +54,7 @@ class GazeboTargetPoseSyncNode(Node):
         self._entity_name = self.get_parameter('target_entity_name').value
         self._world_frame = self.get_parameter('world_frame').value
         self._status_topic = self.get_parameter('status_topic').value
+        self._owner_topic = self.get_parameter('control_owner_topic').value
         self._error_mm_topic = self.get_parameter('pose_error_mm_topic').value
         self._error_deg_topic = self.get_parameter(
             'pose_error_deg_topic'
@@ -76,6 +80,12 @@ class GazeboTargetPoseSyncNode(Node):
         self._client = self.create_client(SetEntityPose, self._service_name)
         self._pending_future = None
         self._deadline = None
+        # Preserve standalone target-sync behavior when no owner publisher is
+        # present. A retained lifecycle publisher overrides this value.
+        self._owner = 'target_sync'
+        self._owner_subscription = self.create_subscription(
+            String, self._owner_topic, self._on_owner, retained_qos
+        )
         self._subscription = self.create_subscription(
             PoseStamped, self._target_pose_topic, self._on_target_pose, 10
         )
@@ -84,6 +94,7 @@ class GazeboTargetPoseSyncNode(Node):
             'Gazebo target sync configured: '
             f'entity={self._entity_name}, source={self._target_pose_topic}, '
             f'world_frame={self._world_frame}, service={self._service_name}, '
+            f'control_owner_topic={self._owner_topic}, '
             f'enable_service_calls={str(self._enable_calls).lower()}, '
             'simulated_only=true, real_hardware=false'
         )
@@ -96,6 +107,7 @@ class GazeboTargetPoseSyncNode(Node):
             ('target_entity_name', self._entity_name),
             ('world_frame', self._world_frame),
             ('status_topic', self._status_topic),
+            ('control_owner_topic', self._owner_topic),
             ('pose_error_mm_topic', self._error_mm_topic),
             ('pose_error_deg_topic', self._error_deg_topic),
         ):
@@ -105,6 +117,9 @@ class GazeboTargetPoseSyncNode(Node):
             raise ValueError('service_timeout_sec must be greater than zero')
 
     def _on_target_pose(self, message: PoseStamped) -> None:
+        if self._owner != 'target_sync':
+            self._publish_terminal('skipped', 'not_owner')
+            return
         if message.header.frame_id != self._world_frame:
             self._publish_terminal('failure', 'invalid_frame')
             return
@@ -125,6 +140,22 @@ class GazeboTargetPoseSyncNode(Node):
         self._deadline = self.get_clock().now() + Duration(
             seconds=self._timeout
         )
+
+    def _on_owner(self, message: String) -> None:
+        owner = message.data.strip()
+        if not owner:
+            return
+        previous_owner = self._owner
+        self._owner = owner
+        if (
+            previous_owner == 'target_sync'
+            and owner != 'target_sync'
+            and self._pending_future is not None
+        ):
+            self._pending_future.cancel()
+            self._pending_future = None
+            self._deadline = None
+            self._publish_terminal('skipped', 'not_owner')
 
     @staticmethod
     def _valid_pose(message: PoseStamped) -> bool:
@@ -167,6 +198,7 @@ class GazeboTargetPoseSyncNode(Node):
         if reason:
             fields.append(f'reason={reason}')
         fields.extend([
+            f'owner={self._owner}',
             f'entity={self._entity_name}',
             f'source_topic={self._target_pose_topic}',
             'simulated_only=true',

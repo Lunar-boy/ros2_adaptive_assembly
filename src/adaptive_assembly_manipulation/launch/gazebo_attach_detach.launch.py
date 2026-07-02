@@ -12,6 +12,7 @@ def generate_launch_description() -> LaunchDescription:
         'object_grasp_state_topic': '/object_grasp_state',
         'object_grasp_attached_topic': '/object_grasp_attached',
         'status_topic': '/gazebo_attach_detach_status',
+        'control_owner_topic': '/target_object_control_owner',
         'gazebo_object_attached_topic': '/gazebo_object_attached',
         'pose_error_mm_topic': '/gazebo_attach_pose_error_mm',
         'target_entity_name': 'target_object',
