@@ -5,7 +5,7 @@ A ROS2 Jazzy + MoveIt2 project for perception-driven adaptive robotic assembly i
 This repository builds a lightweight adaptive manipulation pipeline that converts randomized object poses into robot-aware Panda planning targets, maintains TF and PlanningScene state, performs plan-only two-stage assembly planning, exports trajectories, records planning diagnostics, and provides deterministic benchmark profiles for evaluating robustness under target-pose variation.
 
 > **Current scope:** reproducible adaptive assembly planning plus simulator-only Gazebo Panda arm execution.
-> **Not yet included:** physical gripper control, object attach/detach, contact-rich insertion, force control, perception-driven Gazebo object sync, or real robot hardware execution.
+> **Not yet included:** physical gripper control, object attach/detach, camera perception, contact-rich insertion, force control, or real robot hardware execution.
 
 ---
 
@@ -38,6 +38,7 @@ The project is intentionally designed as a lightweight software stack rather tha
 - Contact-lite geometric insertion benchmark and report export
 - Lightweight Gazebo Harmonic workcell visualization
 - Simulator-only Gazebo Panda arm execution through ros2_control
+- Simulator-only Gazebo target object synchronization from `/target_pose`
 
 ---
 
@@ -101,9 +102,10 @@ The current pipeline separates perception, task-level pose generation, robot-spe
 | Gazebo Harmonic workcell visualization | Implemented |
 | ros2_control trajectory bridge | Implemented / simulator-only |
 | Full Gazebo Panda arm execution | Implemented / simulator-only |
+| Gazebo target object synchronization | Implemented / simulator-only |
 | Gripper control and object attachment | Not implemented |
 | Contact-rich insertion | Not implemented |
-| Force control and perception-driven Gazebo object sync | Not implemented |
+| Camera perception and force control | Not implemented |
 | Real robot execution | Not implemented |
 
 ---
@@ -451,11 +453,32 @@ python3 scripts/check_full_gazebo_execution_status.py
 ```
 
 This does not add gripper control, object attachment, contact-rich insertion,
-force control, camera perception, target-pose-to-Gazebo synchronization, real
-robot drivers, or hardware execution. See
+force control, camera perception, real robot drivers, or hardware execution. See
 [`docs/full_gazebo_panda_execution.md`](docs/full_gazebo_panda_execution.md).
 
-### 9. PR36 logical gripper and grasp lifecycle
+### 9. PR38 Gazebo target object synchronization
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_gazebo_target_sync_demo.launch.py
+```
+
+This headless-by-default simulator demo composes the fake target-pose pipeline,
+Gazebo workcell, and a simulator-only synchronizer. `/target_pose` drives the
+Gazebo `target_object` model through the Harmonic set-pose service. Status and
+pose-error diagnostics are retained on `/gazebo_target_sync_status`,
+`/gazebo_target_pose_error_mm`, and `/gazebo_target_pose_error_deg`.
+
+Validate without a Gazebo GUI:
+
+```bash
+bash scripts/check_gazebo_target_pose_sync_available.sh
+python3 scripts/check_target_pose_to_gazebo_entity_consistency.py
+```
+
+See [`docs/gazebo_target_pose_sync.md`](docs/gazebo_target_pose_sync.md).
+
+### 10. PR36 logical gripper and grasp lifecycle
 
 ```bash
 ros2 launch adaptive_assembly_bringup \
@@ -680,12 +703,13 @@ Implemented:
 - recovery supervisor
 - lightweight Gazebo workcell visualization
 - simulator-only Gazebo Panda arm execution through ros2_control
+- simulator-only Gazebo target object synchronization from `/target_pose`
 
 Not yet implemented:
 
 - gripper control;
 - object attach/detach behavior;
-- target-pose-to-Gazebo synchronization;
+- camera-based perception;
 - contact-rich insertion physics;
 - force-controlled or tactile insertion behavior;
 - force/torque feedback control;
