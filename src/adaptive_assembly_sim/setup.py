@@ -42,6 +42,8 @@ setup(
         'console_scripts': [
             'gazebo_target_pose_sync_node = '
             'adaptive_assembly_sim.gazebo_target_pose_sync_node:main',
+            'gazebo_entity_pose_observer_node = '
+            'adaptive_assembly_sim.gazebo_entity_pose_observer_node:main',
         ],
     },
 )

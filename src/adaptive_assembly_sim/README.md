@@ -23,6 +23,12 @@ Launch target synchronization independently:
 ros2 launch adaptive_assembly_sim gazebo_target_pose_sync.launch.py
 ```
 
+Launch the achieved object pose observer independently:
+
+```bash
+ros2 launch adaptive_assembly_sim gazebo_entity_pose_observer.launch.py
+```
+
 The launches require Gazebo and ros2_control integration packages. On ROS 2
 Jazzy they can be installed with:
 
@@ -61,4 +67,7 @@ bash scripts/check_gazebo_panda_spawned.sh
 bash scripts/check_ros2_control_controllers_active.sh
 bash scripts/check_gazebo_target_pose_sync_available.sh
 python3 scripts/check_target_pose_to_gazebo_entity_consistency.py
+bash scripts/check_gazebo_entity_pose_observer_available.sh
+python3 scripts/check_gazebo_entity_pose_observer_synthetic.py
+python3 scripts/check_gazebo_entity_pose_observer_stale.py
 ```

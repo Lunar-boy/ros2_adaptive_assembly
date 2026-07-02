@@ -110,6 +110,7 @@ The current pipeline separates perception, task-level pose generation, robot-spe
 | ros2_control trajectory bridge | Implemented / simulator-only |
 | Full Gazebo Panda arm execution | Implemented / simulator-only |
 | Gazebo target object synchronization | Implemented / simulator-only |
+| Gazebo achieved object pose observer | Implemented / simulator-only |
 | Gripper control and object attachment | Implemented / simulator-only |
 | Contact-rich insertion | Not implemented |
 | Real camera hardware | Not implemented |
@@ -524,6 +525,20 @@ python3 scripts/check_gazebo_target_sync_owner_gate.py
 ```
 
 See [`docs/gazebo_target_pose_sync.md`](docs/gazebo_target_pose_sync.md).
+
+The simulator-only achieved-pose observer makes
+`/gazebo_target_object_pose` available as the contact-lite evaluator's
+`achieved_pose_topic` without changing that evaluator's defaults:
+
+```bash
+ros2 launch adaptive_assembly_sim gazebo_entity_pose_observer.launch.py
+bash scripts/check_gazebo_entity_pose_observer_available.sh
+python3 scripts/check_gazebo_entity_pose_observer_synthetic.py
+python3 scripts/check_gazebo_entity_pose_observer_stale.py
+```
+
+See
+[`docs/gazebo_entity_pose_observer.md`](docs/gazebo_entity_pose_observer.md).
 
 ### 10. PR39 Gazebo grasp attach/detach
 
