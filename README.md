@@ -101,6 +101,7 @@ The current pipeline separates perception, task-level pose generation, robot-spe
 | CSV benchmark recording | Implemented |
 | Markdown benchmark reports | Implemented |
 | Contact-lite insertion benchmark | Implemented |
+| Assembly episode status schema | Implemented / schema-only |
 | Trajectory export | Implemented |
 | Message-only dry-run execution | Implemented |
 | Recovery supervisor | Implemented |
@@ -218,6 +219,8 @@ Validate the successful planning path:
 ```bash
 python3 scripts/check_assembly_sequence_success_path.py
 ```
+
+See [docs/assembly_episode_status_schema.md](docs/assembly_episode_status_schema.md) for the stable topic and status-field contract planned for the complete assembly episode supervisor.
 
 ---
 
