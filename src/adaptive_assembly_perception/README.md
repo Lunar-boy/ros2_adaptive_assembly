@@ -12,6 +12,11 @@ pipeline interface, broadcasts matching camera and target TF frames, and emits
 retained status. See
 [`docs/simulated_vision_perception.md`](../../docs/simulated_vision_perception.md).
 
+The optional `aruco_detector_node` detects configured ArUco markers in
+simulator-published images when `cv2.aruco` is available. OpenCV is loaded
+lazily and is not a package dependency. See
+[`docs/opencv_aruco_perception.md`](../../docs/opencv_aruco_perception.md).
+
 ## Parameters
 
 | Parameter | Default | Description |

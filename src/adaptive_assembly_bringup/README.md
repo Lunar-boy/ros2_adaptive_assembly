@@ -21,6 +21,17 @@ This package connects:
 This is intentionally the non-MoveIt pipeline launch. It does not start Gazebo,
 RViz, a robot model, ros2_control, or MoveIt2.
 
+The optional simulated-image ArUco path composes the OpenCV detector with the
+same task pipeline:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_opencv_aruco_demo.launch.py
+```
+
+It expects simulator camera topics and does not open real camera hardware. The
+existing marker-pose emulator remains the default headless fallback.
+
 The optional Gazebo workcell wrapper is separate:
 
 ```bash

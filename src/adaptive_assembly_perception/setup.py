@@ -35,6 +35,8 @@ setup(
             'adaptive_assembly_perception.fake_object_pose_node:main',
             'simulated_marker_pose_node = '
             'adaptive_assembly_perception.simulated_marker_pose_node:main',
+            'aruco_detector_node = '
+            'adaptive_assembly_perception.aruco_detector_node:main',
         ],
     },
 )
