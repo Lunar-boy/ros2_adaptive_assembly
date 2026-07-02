@@ -17,6 +17,7 @@
   <depend>adaptive_assembly_recovery</depend>
   <depend>adaptive_assembly_manipulation</depend>
   <depend>adaptive_assembly_benchmark</depend>
+  <exec_depend>adaptive_assembly_episode</exec_depend>
   <exec_depend>adaptive_assembly_sim</exec_depend>
   <depend>moveit_resources_panda_moveit_config</depend>
   <exec_depend>moveit_configs_utils</exec_depend>
