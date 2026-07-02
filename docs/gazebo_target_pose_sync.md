@@ -8,6 +8,12 @@ Gazebo `target_object` model. It converts each valid world-frame
 `ros_gz_interfaces/srv/SetEntityPose` request. This keeps fake perception, TF,
 PlanningScene consumers, and Gazebo driven by the same source pose.
 
+Writes are gated by the retained `/target_object_control_owner` state. The
+node writes only while the owner is `target_sync`. Its local default is
+`target_sync`, so standalone demos without an ownership publisher retain their
+previous behavior. While the owner is `gripper_attach` or `released`, target
+poses are skipped and cannot move the Gazebo object.
+
 The feature is simulator-only. It does not execute robot motion or implement
 gripper control, attachment, contacts, force control, cameras, or hardware.
 
@@ -32,6 +38,7 @@ ros2 launch adaptive_assembly_sim gazebo_target_pose_sync.launch.py \
 | Direction | Default topic | Type |
 |---|---|---|
 | Input | `/target_pose` | `geometry_msgs/msg/PoseStamped` |
+| Input | `/target_object_control_owner` | `std_msgs/msg/String` |
 | Output | `/gazebo_target_sync_status` | `std_msgs/msg/String` |
 | Output | `/gazebo_target_pose_error_mm` | `std_msgs/msg/Float64` |
 | Output | `/gazebo_target_pose_error_deg` | `std_msgs/msg/Float64` |
@@ -48,6 +55,7 @@ is skipped or fails because no simulator pose was confirmed.
 | `target_entity_name` | `target_object` | Gazebo model name |
 | `world_frame` | `world` | Required input frame |
 | `status_topic` | `/gazebo_target_sync_status` | Retained status topic |
+| `control_owner_topic` | `/target_object_control_owner` | Retained write-owner input |
 | `pose_error_mm_topic` | `/gazebo_target_pose_error_mm` | Translation diagnostic |
 | `pose_error_deg_topic` | `/gazebo_target_pose_error_deg` | Rotation diagnostic |
 | `service_timeout_sec` | `2.0` | Bounded response timeout |
@@ -60,13 +68,13 @@ the `ros_gz_bridge` service bridge for this endpoint.
 
 ## Status format
 
-Status is semicolon-delimited and always includes `mode`, `entity`,
+Status is semicolon-delimited and always includes `mode`, `owner`, `entity`,
 `source_topic`, `simulated_only=true`, and `real_hardware=false`. Examples:
 
 ```text
-event=success;mode=gazebo_target_sync;entity=target_object;source_topic=/target_pose;simulated_only=true;real_hardware=false
-event=skipped;mode=gazebo_target_sync;reason=gazebo_service_unavailable;entity=target_object;source_topic=/target_pose;simulated_only=true;real_hardware=false
-event=failure;mode=gazebo_target_sync;reason=invalid_frame;entity=target_object;source_topic=/target_pose;simulated_only=true;real_hardware=false
+event=success;mode=gazebo_target_sync;owner=target_sync;entity=target_object;source_topic=/target_pose;simulated_only=true;real_hardware=false
+event=skipped;mode=gazebo_target_sync;reason=not_owner;owner=gripper_attach;entity=target_object;source_topic=/target_pose;simulated_only=true;real_hardware=false
+event=failure;mode=gazebo_target_sync;reason=invalid_frame;owner=target_sync;entity=target_object;source_topic=/target_pose;simulated_only=true;real_hardware=false
 ```
 
 ## Validation
@@ -75,6 +83,7 @@ event=failure;mode=gazebo_target_sync;reason=invalid_frame;entity=target_object;
 bash scripts/check_gazebo_target_pose_sync_available.sh
 python3 scripts/check_target_pose_to_gazebo_entity_consistency.py
 python3 scripts/check_gazebo_target_pose_sync_status.py
+python3 scripts/check_gazebo_target_sync_owner_gate.py
 ```
 
 The consistency check starts the node with service calls disabled, verifies

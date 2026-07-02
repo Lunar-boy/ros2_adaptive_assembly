@@ -508,12 +508,15 @@ Gazebo workcell, and a simulator-only synchronizer. `/target_pose` drives the
 Gazebo `target_object` model through the Harmonic set-pose service. Status and
 pose-error diagnostics are retained on `/gazebo_target_sync_status`,
 `/gazebo_target_pose_error_mm`, and `/gazebo_target_pose_error_deg`.
+Retained ownership on `/target_object_control_owner` prevents these updates
+from competing with gripper attachment or moving an object after release.
 
 Validate without a Gazebo GUI:
 
 ```bash
 bash scripts/check_gazebo_target_pose_sync_available.sh
 python3 scripts/check_target_pose_to_gazebo_entity_consistency.py
+python3 scripts/check_gazebo_target_sync_owner_gate.py
 ```
 
 See [`docs/gazebo_target_pose_sync.md`](docs/gazebo_target_pose_sync.md).
@@ -535,6 +538,7 @@ Retained state and diagnostics are published on `/gazebo_object_attached`,
 bash scripts/check_gazebo_attach_detach_available.sh
 python3 scripts/check_gazebo_attach_detach_success_path.py
 python3 scripts/check_gazebo_attach_detach_failure_path.py
+python3 scripts/check_gazebo_attach_owner_transitions.py
 python3 scripts/check_live_gazebo_attach_detach.py
 ```
 

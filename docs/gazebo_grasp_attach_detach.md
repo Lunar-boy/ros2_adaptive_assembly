@@ -8,6 +8,18 @@ attached, it looks up `world -> panda_hand` and repeatedly sets the Gazebo
 the model at its last world pose. This is deterministic kinematic following,
 not physics-accurate grasping.
 
+The node arbitrates Gazebo pose ownership on the retained
+`/target_object_control_owner` topic:
+
+- startup/free: `target_sync`
+- attached: `gripper_attach`, published before the first attach pose update
+- final detached/released: `released`
+
+An explicit detached event with `trigger=startup` selects `target_sync`.
+Later detached events select `released`; a missing trigger also selects
+`released` as the safe deterministic default, preventing target sync from
+snapping the object back to a continuously published perception pose.
+
 ## Launch
 
 ```bash
@@ -35,6 +47,7 @@ Published with transient-local durability:
 - `/gazebo_attach_detach_status` (`std_msgs/msg/String`)
 - `/gazebo_object_attached` (`std_msgs/msg/Bool`)
 - `/gazebo_attach_pose_error_mm` (`std_msgs/msg/Float64`)
+- `/target_object_control_owner` (`std_msgs/msg/String`)
 
 ## Parameters
 
@@ -43,6 +56,7 @@ Published with transient-local durability:
 | `object_grasp_state_topic` | `/object_grasp_state` | Lifecycle event input |
 | `object_grasp_attached_topic` | `/object_grasp_attached` | Optional bool input; empty disables it |
 | `status_topic` | `/gazebo_attach_detach_status` | Retained status output |
+| `control_owner_topic` | `/target_object_control_owner` | Retained pose-write owner output |
 | `gazebo_object_attached_topic` | `/gazebo_object_attached` | Retained attachment bool |
 | `pose_error_mm_topic` | `/gazebo_attach_pose_error_mm` | Retained diagnostic |
 | `target_entity_name` | `target_object` | Gazebo model name |
@@ -58,10 +72,9 @@ Published with transient-local durability:
 Statuses are semicolon-delimited key/value fields. Examples:
 
 ```text
-event=attached;mode=gazebo_attach_detach;object=target_object;parent=panda_hand;simulated_only=true;real_hardware=false
-event=detached;mode=gazebo_attach_detach;object=target_object;parent=world;simulated_only=true;real_hardware=false
-event=skipped;mode=gazebo_attach_detach;reason=tf_unavailable;object=target_object;simulated_only=true;real_hardware=false
-event=skipped;mode=gazebo_attach_detach;reason=gazebo_service_unavailable;object=target_object;simulated_only=true;real_hardware=false
+event=attached;mode=gazebo_attach_detach;owner=gripper_attach;object=target_object;parent=panda_hand;simulated_only=true;real_hardware=false
+event=detached;mode=gazebo_attach_detach;owner=released;object=target_object;parent=world;simulated_only=true;real_hardware=false
+event=skipped;mode=gazebo_attach_detach;reason=tf_unavailable;owner=gripper_attach;object=target_object;simulated_only=true;real_hardware=false
 ```
 
 ## Validation
@@ -73,6 +86,7 @@ bash scripts/check_gazebo_attach_detach_available.sh
 python3 scripts/check_gazebo_attach_detach_success_path.py
 python3 scripts/check_gazebo_attach_detach_failure_path.py
 python3 scripts/check_gazebo_object_attached_status.py
+python3 scripts/check_gazebo_attach_owner_transitions.py
 ```
 
 The first two Python fixture checks do not require Gazebo. The retained-status

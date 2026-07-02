@@ -45,6 +45,7 @@ class GazeboAttachDetachNode(Node):
             'object_grasp_state_topic': '/object_grasp_state',
             'object_grasp_attached_topic': '/object_grasp_attached',
             'status_topic': '/gazebo_attach_detach_status',
+            'control_owner_topic': '/target_object_control_owner',
             'gazebo_object_attached_topic': '/gazebo_object_attached',
             'pose_error_mm_topic': '/gazebo_attach_pose_error_mm',
             'target_entity_name': 'target_object',
@@ -75,6 +76,13 @@ class GazeboAttachDetachNode(Node):
         self._error_pub = self.create_publisher(
             Float64, self._values['pose_error_mm_topic'], retained
         )
+        owner_qos = QoSProfile(
+            depth=1, reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self._owner_pub = self.create_publisher(
+            String, self._values['control_owner_topic'], owner_qos
+        )
         self.create_subscription(
             String, self._values['object_grasp_state_topic'],
             self._on_grasp_state, retained,
@@ -93,11 +101,13 @@ class GazeboAttachDetachNode(Node):
         self._pending = None
         self._deadline = None
         self._last_pose = None
+        self._owner = 'target_sync'
         self.create_timer(
             float(self._values['attach_update_period_sec']), self._update
         )
         self.create_timer(0.05, self._check_pending)
         self._publish_attached(False)
+        self._publish_owner('target_sync')
         self._publish_status('ready')
         self.get_logger().info(
             'Gazebo attach/detach ready: '
@@ -113,6 +123,7 @@ class GazeboAttachDetachNode(Node):
             raise ValueError('simulated_only:=false is not supported')
         required = (
             'object_grasp_state_topic', 'status_topic',
+            'control_owner_topic',
             'gazebo_object_attached_topic', 'pose_error_mm_topic',
             'target_entity_name', 'world_frame', 'gripper_frame',
         )
@@ -135,17 +146,24 @@ class GazeboAttachDetachNode(Node):
             return
         event = fields.get('event')
         if event == 'attached':
-            self._set_attached(True)
+            self._set_attached(True, fields.get('trigger'))
         elif event == 'detached':
-            self._set_attached(False)
+            self._set_attached(False, fields.get('trigger'))
 
     def _on_attached_bool(self, message: Bool) -> None:
         # The string event is authoritative; this optional input only repairs
         # state if a producer supplies the bool without its companion event.
         if bool(message.data) != self._attached:
-            self._set_attached(bool(message.data))
+            self._set_attached(bool(message.data), None)
 
-    def _set_attached(self, attached: bool) -> None:
+    def _set_attached(
+        self, attached: bool, trigger: Optional[str] = None
+    ) -> None:
+        owner = (
+            'gripper_attach' if attached else
+            ('target_sync' if trigger == 'startup' else 'released')
+        )
+        self._publish_owner(owner)
         if attached == self._attached:
             return
         self._attached = attached
@@ -156,6 +174,10 @@ class GazeboAttachDetachNode(Node):
             )
             self._update()
         else:
+            if self._pending is not None:
+                self._pending.cancel()
+                self._pending = None
+                self._deadline = None
             self._last_pose = None
             self._publish_status(
                 'detached', parent=self._values['world_frame']
@@ -224,6 +246,10 @@ class GazeboAttachDetachNode(Node):
     def _publish_attached(self, value: bool) -> None:
         self._attached_pub.publish(Bool(data=value))
 
+    def _publish_owner(self, owner: str) -> None:
+        self._owner = owner
+        self._owner_pub.publish(String(data=owner))
+
     def _publish_status(
         self, event: str, reason: Optional[str] = None,
         parent: Optional[str] = None,
@@ -231,6 +257,7 @@ class GazeboAttachDetachNode(Node):
         fields = [f'event={event}', 'mode=gazebo_attach_detach']
         if reason:
             fields.append(f'reason={reason}')
+        fields.append(f'owner={self._owner}')
         fields.append(f"object={self._values['target_entity_name']}")
         if parent:
             fields.append(f'parent={parent}')
