@@ -38,5 +38,10 @@ setup(
     maintainer_email='chunzhi.wu@mailbox.tu-dresden.de',
     description='Gazebo workcell assets and launch files for adaptive assembly.',
     license='TODO: License declaration',
-    entry_points={'console_scripts': []},
+    entry_points={
+        'console_scripts': [
+            'gazebo_target_pose_sync_node = '
+            'adaptive_assembly_sim.gazebo_target_pose_sync_node:main',
+        ],
+    },
 )
