@@ -78,9 +78,28 @@ python3 scripts/check_gazebo_object_attached_status.py
 The first two Python fixture checks do not require Gazebo. The retained-status
 check expects the launch to be running.
 
+### Live Gazebo validation
+
+The optional live check starts the minimal workcell headlessly, supplies a
+static `world -> panda_hand` transform, runs the attachment node with service
+calls enabled, and verifies successful attach and detach state transitions
+through Gazebo's real set-pose service path. Run it after building and sourcing
+the workspace:
+
+```bash
+python3 scripts/check_live_gazebo_attach_detach.py
+```
+
+The check uses explicit startup and event timeouts, terminates all processes it
+starts, and fails if the Gazebo service or a confirmed set-pose response is
+missing. It requires Gazebo Harmonic and `ros-jazzy-ros-gz-sim`, so it is kept
+optional for environments where a live simulator is too heavy.
+
 ## Limitations
 
 The object origin is mirrored directly to the gripper frame; no grasp offset,
 collision constraint, contact detection, force control, tactile feedback, or
 physics-accurate joint is modeled. Detach only stops kinematic updates. This
-feature has no real-robot or hardware path.
+feature has no real-robot or hardware path. Live Gazebo set-pose attachment is
+exercised by an optional bounded validation script; this remains kinematic pose
+mirroring only.

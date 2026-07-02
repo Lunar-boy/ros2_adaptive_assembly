@@ -496,7 +496,12 @@ Retained state and diagnostics are published on `/gazebo_object_attached`,
 bash scripts/check_gazebo_attach_detach_available.sh
 python3 scripts/check_gazebo_attach_detach_success_path.py
 python3 scripts/check_gazebo_attach_detach_failure_path.py
+python3 scripts/check_live_gazebo_attach_detach.py
 ```
+
+The last command is an optional bounded, headless live Gazebo validation; the
+fixture checks remain available without a running simulator. Live attachment
+is kinematic set-pose mirroring only.
 
 See [`docs/gazebo_grasp_attach_detach.md`](docs/gazebo_grasp_attach_detach.md).
 
