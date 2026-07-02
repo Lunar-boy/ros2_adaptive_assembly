@@ -103,6 +103,7 @@ The current pipeline separates perception, task-level pose generation, robot-spe
 | Contact-lite insertion benchmark | Implemented |
 | Assembly episode status schema | Implemented / schema-only |
 | Assembly episode supervisor | Implemented / passive aggregate status only |
+| Full assembly episode launch | Implemented / simulator-only composed launch |
 | Trajectory export | Implemented |
 | Message-only dry-run execution | Implemented |
 | Recovery supervisor | Implemented |
@@ -771,6 +772,25 @@ python3 scripts/check_assembly_episode_supervisor_timeout_path.py
 See
 [`docs/assembly_episode_supervisor.md`](docs/assembly_episode_supervisor.md)
 for subscribed topics, terminal rules, and passive-only limitations.
+
+### Full assembly episode demo
+
+Launch the complete simulator-only composed episode:
+
+```bash
+ros2 launch adaptive_assembly_bringup adaptive_assembly_full_episode_demo.launch.py
+```
+
+While it is active, validate launch discovery, topics, and terminal status:
+
+```bash
+bash scripts/check_full_episode_launch_available.sh
+bash scripts/check_full_episode_topics.sh
+python3 scripts/check_full_episode_terminal_status.py
+```
+
+See [`docs/full_assembly_episode_launch.md`](docs/full_assembly_episode_launch.md)
+for composition details, success criteria, and limitations.
 
 ### Suggested result table
 
