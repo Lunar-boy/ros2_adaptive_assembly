@@ -3,8 +3,10 @@
 This ROS 2 Jazzy package converts perceived target poses into simple
 task-level poses for adaptive assembly. The `assembly_task_node` subscribes to
 `/target_pose`, publishes vertically offset poses on `/pre_grasp_pose`,
-`/grasp_pose`, and `/assembly_pose`, and reports when target movement exceeds the replanning
-threshold. It does not perform motion planning or call MoveIt 2.
+`/grasp_pose`, `/assembly_pose`, and `/object_place_pose`, and reports when
+target movement exceeds the replanning threshold. `/assembly_pose` is the
+current robot hand target; `/object_place_pose` is the desired final object
+pose. It does not perform motion planning or call MoveIt 2.
 
 ## Parameters
 
@@ -15,6 +17,11 @@ threshold. It does not perform motion planning or call MoveIt 2.
 | `grasp_pose_topic` | `/grasp_pose` | Output topic for the explicit grasp pose |
 | `assembly_height_offset` | `0.05` | Assembly height above the target in meters |
 | `replan_distance_threshold` | `0.03` | Target movement requiring replanning in meters |
+| `object_place_pose_topic` | `/object_place_pose` | Desired final object pose output topic |
+| `assembly_pose_mode` | `target_offset` | Use `target_offset` or a configured `fixed_socket` pose |
+| `socket_x`, `socket_y`, `socket_z` | `0.62`, `-0.18`, `0.10` | Fixed object/socket target position in meters |
+| `socket_yaw` | `0.0` | Fixed object/socket target yaw in radians |
+| `socket_frame_id` | `world` | Fixed object/socket target frame |
 
 The output poses retain the target pose header and orientation.
 
@@ -68,6 +75,7 @@ Inspect the outputs:
 ros2 topic echo /pre_grasp_pose
 ros2 topic echo /grasp_pose
 ros2 topic echo /assembly_pose
+ros2 topic echo /object_place_pose
 ```
 
 Run package tests:

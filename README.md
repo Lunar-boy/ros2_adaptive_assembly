@@ -55,7 +55,8 @@ fake_object_pose_node
               ▼
 assembly_task_node
     ├── /pre_grasp_pose
-    └── /assembly_pose
+    ├── /assembly_pose (robot hand target)
+    └── /object_place_pose (desired final object pose)
               │
               ▼
 panda_pose_adapter_node
@@ -818,6 +819,11 @@ three-stage `pre_grasp -> grasp -> assembly` path. Attachment occurs only after
 the `grasp` execution stage succeeds. It does not model
 physical gripping or contact-rich insertion. See
 [`docs/full_assembly_episode_launch.md`](docs/full_assembly_episode_launch.md).
+
+The visual evaluator compares the desired final object pose on
+`/object_place_pose` with the observed Gazebo pose on
+`/gazebo_target_object_pose`. `/panda_assembly_pose` remains the Panda hand
+planning target and is not used as the evaluator target.
 
 ### Suggested result table
 

@@ -20,6 +20,7 @@ class AssemblyTaskNode(Node):
         self.declare_parameter('assembly_height_offset', 0.05)
         self.declare_parameter('replan_distance_threshold', 0.03)
         self.declare_parameter('assembly_pose_mode', 'target_offset')
+        self.declare_parameter('object_place_pose_topic', '/object_place_pose')
         self.declare_parameter('socket_x', 0.62)
         self.declare_parameter('socket_y', -0.18)
         self.declare_parameter('socket_z', 0.10)
@@ -44,6 +45,9 @@ class AssemblyTaskNode(Node):
         self._assembly_pose_mode = str(
             self.get_parameter('assembly_pose_mode').value
         )
+        self._object_place_pose_topic = str(
+            self.get_parameter('object_place_pose_topic').value
+        )
         self._socket_x = float(self.get_parameter('socket_x').value)
         self._socket_y = float(self.get_parameter('socket_y').value)
         self._socket_z = float(self.get_parameter('socket_z').value)
@@ -59,6 +63,9 @@ class AssemblyTaskNode(Node):
         self._assembly_publisher = self.create_publisher(
             PoseStamped, '/assembly_pose', 10
         )
+        self._object_place_publisher = self.create_publisher(
+            PoseStamped, self._object_place_pose_topic, 10
+        )
         self._grasp_publisher = self.create_publisher(
             PoseStamped, self._grasp_pose_topic, 10
         )
@@ -68,7 +75,8 @@ class AssemblyTaskNode(Node):
         self._previous_target_pose = None
         self.get_logger().info(
             f'Assembly task configured: assembly_pose_mode='
-            f'{self._assembly_pose_mode}'
+            f'{self._assembly_pose_mode}, object_place_pose_topic='
+            f'{self._object_place_pose_topic}'
         )
 
     def _validate_parameters(self) -> None:
@@ -88,6 +96,8 @@ class AssemblyTaskNode(Node):
             raise ValueError(
                 'assembly_pose_mode must be target_offset or fixed_socket'
             )
+        if not self._object_place_pose_topic:
+            raise ValueError('object_place_pose_topic must not be empty')
         if not self._socket_frame_id:
             raise ValueError('socket_frame_id must not be empty')
 
@@ -106,15 +116,22 @@ class AssemblyTaskNode(Node):
         )
         grasp_pose = self._offset_pose(target_pose, self._grasp_height_offset)
         if self._assembly_pose_mode == 'fixed_socket':
+            # Keep the hand target backward compatible while publishing the
+            # desired final object pose as a separate task-level concept.
             assembly_pose = self._fixed_socket_pose(target_pose)
+            object_place_pose = self._fixed_socket_pose(target_pose)
         else:
             assembly_pose = self._offset_pose(
+                target_pose, self._assembly_height_offset
+            )
+            object_place_pose = self._offset_pose(
                 target_pose, self._assembly_height_offset
             )
 
         self._pre_grasp_publisher.publish(pre_grasp_pose)
         self._grasp_publisher.publish(grasp_pose)
         self._assembly_publisher.publish(assembly_pose)
+        self._object_place_publisher.publish(object_place_pose)
 
         self.get_logger().info(
             'Computed grasp pose: '
@@ -133,6 +150,13 @@ class AssemblyTaskNode(Node):
             f'x={assembly_pose.pose.position.x:.3f}, '
             f'y={assembly_pose.pose.position.y:.3f}, '
             f'z={assembly_pose.pose.position.z:.3f}'
+        )
+        self.get_logger().info(
+            f'Computed object place pose: '
+            f'x={object_place_pose.pose.position.x:.3f}, '
+            f'y={object_place_pose.pose.position.y:.3f}, '
+            f'z={object_place_pose.pose.position.z:.3f}, '
+            f'frame={object_place_pose.header.frame_id}'
         )
 
         self._previous_target_pose = target_pose

@@ -71,8 +71,12 @@ This visual-correctness launch uses the deterministic source pose
 `(0.442, 0.148, 0.15)` and a distinct fixed socket/place pose
 `(0.62, -0.18, 0.10)`. It synchronizes the source pose into Gazebo before
 logical attachment, then evaluates `/gazebo_target_object_pose` against
-`/panda_assembly_pose` with
+the desired final object pose on `/object_place_pose` with
 `achieved_pose_source=gazebo_entity_pose_observer`.
+
+`/panda_assembly_pose` remains the Panda hand planning target. It is distinct
+from the desired final object pose even though both currently use the fixed
+socket pose for backward compatibility.
 
 The demo remains simulator-only. Its gripper is logical, attachment is
 kinematic, and insertion evaluation is final-pose geometry only; it provides
