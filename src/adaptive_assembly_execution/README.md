@@ -16,3 +16,9 @@ Gazebo robot, or support real hardware. See
 [`docs/dry_run_execution.md`](../../docs/dry_run_execution.md) and
 [`docs/gazebo_ros2_control_execution.md`](../../docs/gazebo_ros2_control_execution.md)
 for launch and validation instructions.
+
+Initial execution can optionally be gated by retained target-sync status with
+`require_target_sync_success:=true`. The executor then waits until all
+trajectory and joint-state prerequisites are ready and
+`/gazebo_target_sync_status` reports `event=success`. This gate is disabled by
+default and does not affect transitions after the pre-grasp goal is sent.
