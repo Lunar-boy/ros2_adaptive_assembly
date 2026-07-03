@@ -46,6 +46,8 @@ def generate_launch_description() -> LaunchDescription:
             launch_arguments={
                 'enable_service_calls': enable_calls,
                 'params_file': params_file,
+                'require_grasp_trajectory': 'true',
+                'attach_stage': 'grasp',
             }.items(),
         ),
         IncludeLaunchDescription(

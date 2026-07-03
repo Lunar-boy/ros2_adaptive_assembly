@@ -19,6 +19,7 @@ def generate_launch_description() -> LaunchDescription:
         'adaptive_assembly_sequence_reachable_params.yaml',
     ])
     params_file = LaunchConfiguration('params_file')
+    require_grasp_pose = LaunchConfiguration('require_grasp_pose')
     pipeline_launch = PathJoinSubstitution([
         bringup_share,
         'launch',
@@ -33,6 +34,9 @@ def generate_launch_description() -> LaunchDescription:
         planning_share,
         'launch',
         'panda_pre_grasp_pose_adapter.launch.py',
+    ])
+    grasp_adapter_launch = PathJoinSubstitution([
+        planning_share, 'launch', 'panda_grasp_pose_adapter.launch.py',
     ])
     assembly_adapter_launch = PathJoinSubstitution([
         planning_share,
@@ -80,6 +84,10 @@ def generate_launch_description() -> LaunchDescription:
             'params_file', default_value=reachable_params,
             description='Parameter YAML for perception and task nodes.',
         ),
+        DeclareLaunchArgument(
+            'require_grasp_pose', default_value='false',
+            description='Enable the intermediate grasp planning stage.',
+        ),
         LogInfo(msg=(
             'Launching Gazebo-compatible plan-only Panda sequence planning. '
             'move_group consumes Gazebo joint states; no mock ros2_control '
@@ -104,6 +112,9 @@ def generate_launch_description() -> LaunchDescription:
             PythonLaunchDescriptionSource(pre_grasp_adapter_launch),
         ),
         IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(grasp_adapter_launch),
+        ),
+        IncludeLaunchDescription(
             PythonLaunchDescriptionSource(assembly_adapter_launch),
         ),
         IncludeLaunchDescription(
@@ -115,7 +126,9 @@ def generate_launch_description() -> LaunchDescription:
                 'position_tolerance': '0.01',
                 'orientation_tolerance': '0.10',
                 'pre_grasp_trajectory_topic': '/pre_grasp_trajectory',
+                'grasp_trajectory_topic': '/grasp_trajectory',
                 'assembly_trajectory_topic': '/assembly_trajectory',
+                'require_grasp_pose': require_grasp_pose,
             }.items(),
         ),
         IncludeLaunchDescription(

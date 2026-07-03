@@ -11,10 +11,12 @@ def generate_launch_description() -> LaunchDescription:
     """Create the assembly task launch description."""
     parameter_defaults = {
         'pre_grasp_height_offset': '0.20',
+        'grasp_height_offset': '0.05',
         'assembly_height_offset': '0.05',
         'replan_distance_threshold': '0.03',
     }
     string_defaults = {
+        'grasp_pose_topic': '/grasp_pose',
         'assembly_pose_mode': 'target_offset',
         'socket_frame_id': 'world',
     }

@@ -42,6 +42,7 @@ class LogicalGraspLifecycleNode(Node):
             'object_id': 'target_object',
             'gripper_id': 'panda_hand',
             'attach_parent_frame': 'panda_hand',
+            'attach_stage': 'pre_grasp',
             'release_parent_frame': 'world',
             'detach_on_failure': False,
             'simulated_only': True,
@@ -54,6 +55,7 @@ class LogicalGraspLifecycleNode(Node):
         self._attach_parent = str(
             self.get_parameter('attach_parent_frame').value
         )
+        self._attach_stage = str(self.get_parameter('attach_stage').value)
         self._release_parent = str(
             self.get_parameter('release_parent_frame').value
         )
@@ -67,7 +69,7 @@ class LogicalGraspLifecycleNode(Node):
             )
         for name in (
             'object_id', 'gripper_id', 'attach_parent_frame',
-            'release_parent_frame',
+            'release_parent_frame', 'attach_stage',
         ):
             if not str(self.get_parameter(name).value):
                 raise ValueError(f'{name} must not be empty')
@@ -123,27 +125,29 @@ class LogicalGraspLifecycleNode(Node):
         self.get_logger().info(
             'Logical grasp lifecycle ready: '
             f"object='{self._object_id}', gripper='{self._gripper_id}', "
+            f"attach_stage='{self._attach_stage}', "
             f'detach_on_failure={self._detach_on_failure}, '
             'simulated_only=true, gazebo_attach=false, real_hardware=false.'
         )
 
     def _stage_status_callback(self, message: String) -> None:
-        """Close and logically attach after pre-grasp stage success."""
+        """Close and logically attach after the configured stage succeeds."""
         fields = parse_status(message.data)
         if (
             self._terminal
             or self._attached
             or fields.get('event') != 'success'
-            or fields.get('stage') != 'pre_grasp'
+            or fields.get('stage') != self._attach_stage
         ):
             return
-        self._publish_command('close', 'pre_grasp_success')
+        trigger = f'{self._attach_stage}_success'
+        self._publish_command('close', trigger)
         self._attached = True
         self._publish_object_state(
-            'attached', self._attach_parent, 'pre_grasp_success'
+            'attached', self._attach_parent, trigger
         )
         self._publish_attached(True)
-        self._publish_lifecycle('attached', 'pre_grasp_success')
+        self._publish_lifecycle('attached', trigger)
 
     def _execution_status_callback(self, message: String) -> None:
         """Release on success or report a deterministic terminal failure."""
@@ -211,6 +215,7 @@ class LogicalGraspLifecycleNode(Node):
             f'event={event};reason={reason};object={self._object_id};'
             f'gripper={self._gripper_id};attached='
             f'{str(self._attached).lower()};logical=true;'
+            f'attach_stage={self._attach_stage};'
             'simulated_only=true;gazebo_attach=false;real_hardware=false'
         )
         self._publish_string(self._lifecycle_publisher, status)

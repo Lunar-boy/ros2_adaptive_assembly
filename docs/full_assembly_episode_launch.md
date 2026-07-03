@@ -6,6 +6,12 @@
 
 The launch includes full Gazebo Panda execution, Gazebo target pose synchronization, the logical grasp lifecycle, kinematic Gazebo attach/detach, the Gazebo achieved object pose observer, contact-lite insertion evaluation, and the passive assembly episode supervisor.
 
+The visual single-trial launch uses the explicit sequence `pre_grasp -> grasp
+-> assembly`. Its source cylinder center is at `z=0.10`, which places the
+0.10 m-tall object on the support instead of floating above it. Logical and
+kinematic attachment occurs only after the ros2_control `grasp` stage reports
+success; aggregate execution success still releases the object.
+
 Before grasp attachment takes ownership, the target synchronizer mirrors
 `/target_pose` into the Gazebo `target_object`. It publishes retained status on
 `/gazebo_target_sync_status` and writes only while

@@ -7,7 +7,9 @@ fake_object_pose_node:
     x_max: 0.442
     y_min: 0.148
     y_max: 0.148
-    z: 0.15
+    # target_object is a 0.10 m cylinder and this pose is its model center;
+    # z=0.10 visually rests it on the support whose top is about z=0.05.
+    z: 0.10
     random_seed: 42
     frame_id: world
     target_frame_id: target_object
@@ -18,6 +20,7 @@ fake_object_pose_node:
 assembly_task_node:
   ros__parameters:
     pre_grasp_height_offset: 0.20
+    grasp_height_offset: 0.05
     assembly_height_offset: 0.05
     replan_distance_threshold: 0.03
     assembly_pose_mode: fixed_socket

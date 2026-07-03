@@ -2,8 +2,8 @@
 
 This ROS 2 Jazzy package converts perceived target poses into simple
 task-level poses for adaptive assembly. The `assembly_task_node` subscribes to
-`/target_pose`, publishes vertically offset poses on `/pre_grasp_pose` and
-`/assembly_pose`, and reports when target movement exceeds the replanning
+`/target_pose`, publishes vertically offset poses on `/pre_grasp_pose`,
+`/grasp_pose`, and `/assembly_pose`, and reports when target movement exceeds the replanning
 threshold. It does not perform motion planning or call MoveIt 2.
 
 ## Parameters
@@ -11,6 +11,8 @@ threshold. It does not perform motion planning or call MoveIt 2.
 | Parameter | Default | Description |
 | --- | ---: | --- |
 | `pre_grasp_height_offset` | `0.20` | Pre-grasp height above the target in meters |
+| `grasp_height_offset` | `0.05` | Grasp height above the target in meters |
+| `grasp_pose_topic` | `/grasp_pose` | Output topic for the explicit grasp pose |
 | `assembly_height_offset` | `0.05` | Assembly height above the target in meters |
 | `replan_distance_threshold` | `0.03` | Target movement requiring replanning in meters |
 
@@ -64,6 +66,7 @@ Inspect the outputs:
 
 ```bash
 ros2 topic echo /pre_grasp_pose
+ros2 topic echo /grasp_pose
 ros2 topic echo /assembly_pose
 ```
 

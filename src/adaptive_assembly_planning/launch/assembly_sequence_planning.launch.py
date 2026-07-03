@@ -19,7 +19,9 @@ def generate_launch_description() -> LaunchDescription:
     pre_grasp_trajectory_topic = LaunchConfiguration(
         'pre_grasp_trajectory_topic'
     )
+    grasp_trajectory_topic = LaunchConfiguration('grasp_trajectory_topic')
     assembly_trajectory_topic = LaunchConfiguration('assembly_trajectory_topic')
+    require_grasp_pose = LaunchConfiguration('require_grasp_pose')
     trajectory_status_topic = LaunchConfiguration('trajectory_status_topic')
     start_state_mode = LaunchConfiguration('start_state_mode')
 
@@ -65,6 +67,11 @@ def generate_launch_description() -> LaunchDescription:
             description='Topic for successful pre-grasp trajectories.',
         ),
         DeclareLaunchArgument(
+            'grasp_trajectory_topic',
+            default_value='/grasp_trajectory',
+            description='Topic for successful grasp trajectories.',
+        ),
+        DeclareLaunchArgument(
             'assembly_trajectory_topic',
             default_value='/assembly_trajectory',
             description='Topic for successful assembly trajectories.',
@@ -73,6 +80,11 @@ def generate_launch_description() -> LaunchDescription:
             'trajectory_status_topic',
             default_value='/assembly_sequence_trajectory_status',
             description='Topic for trajectory publication status.',
+        ),
+        DeclareLaunchArgument(
+            'require_grasp_pose',
+            default_value='false',
+            description='Require and plan the intermediate grasp stage.',
         ),
         DeclareLaunchArgument(
             'start_state_mode',
@@ -88,6 +100,7 @@ def generate_launch_description() -> LaunchDescription:
             output='screen',
             parameters=[{
                 'pre_grasp_topic': '/panda_pre_grasp_pose',
+                'grasp_topic': '/panda_grasp_pose',
                 'assembly_topic': '/panda_assembly_pose',
                 'success_topic': '/assembly_sequence_plan_success',
                 'status_topic': '/assembly_sequence_planning_status',
@@ -96,7 +109,12 @@ def generate_launch_description() -> LaunchDescription:
                 'stage_success_topic': '/assembly_sequence_stage_success',
                 'stage_duration_topic': '/assembly_sequence_stage_duration_ms',
                 'pre_grasp_trajectory_topic': pre_grasp_trajectory_topic,
+                'grasp_trajectory_topic': grasp_trajectory_topic,
                 'assembly_trajectory_topic': assembly_trajectory_topic,
+                'require_grasp_pose': ParameterValue(
+                    require_grasp_pose,
+                    value_type=bool,
+                ),
                 'trajectory_status_topic': trajectory_status_topic,
                 'publish_diagnostics': ParameterValue(
                     publish_diagnostics,

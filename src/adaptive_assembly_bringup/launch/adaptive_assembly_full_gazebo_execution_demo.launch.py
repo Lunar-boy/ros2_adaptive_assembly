@@ -35,6 +35,7 @@ def generate_launch_description() -> LaunchDescription:
     world = LaunchConfiguration('world')
     gz_args = LaunchConfiguration('gz_args')
     params_file = LaunchConfiguration('params_file')
+    require_grasp = LaunchConfiguration('require_grasp_trajectory')
     default_world = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_sim'),
         'worlds',
@@ -49,6 +50,10 @@ def generate_launch_description() -> LaunchDescription:
                 'adaptive_assembly_sequence_reachable_params.yaml',
             ]),
             description='Parameter YAML for perception and task nodes.',
+        ),
+        DeclareLaunchArgument(
+            'require_grasp_trajectory', default_value='false',
+            description='Plan and execute the intermediate grasp stage.',
         ),
         DeclareLaunchArgument(
             'controller_action_name',
@@ -99,7 +104,10 @@ def generate_launch_description() -> LaunchDescription:
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(planning_launch),
-            launch_arguments={'params_file': params_file}.items(),
+            launch_arguments={
+                'params_file': params_file,
+                'require_grasp_pose': require_grasp,
+            }.items(),
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(execution_launch),
@@ -109,6 +117,8 @@ def generate_launch_description() -> LaunchDescription:
                 'result_timeout_sec': result_timeout_sec,
                 'use_planning_scene_audit': use_planning_scene_audit,
                 'launch_reachable_sequence': 'false',
+                'grasp_trajectory_topic': '/grasp_trajectory',
+                'require_grasp_trajectory': require_grasp,
             }.items(),
         ),
     ])
