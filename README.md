@@ -598,7 +598,10 @@ support real hardware. See
 
 ### Static PlanningScene objects
 
-The Panda planning demo applies simple static collision objects for the workcell.
+The Panda planning demo applies simple static collision objects for the workcell,
+including a five-box approximation of the Gazebo socket fixture. This makes
+MoveIt aware of the socket geometry for collision-aware planning only; it does
+not add force control, contact-rich insertion, or physical peg-in-hole behavior.
 
 Services and topics:
 
@@ -610,6 +613,7 @@ Validate:
 
 ```bash
 bash scripts/check_static_planning_scene_services.sh
+bash scripts/check_socket_fixture_planning_scene.py
 bash scripts/clear_static_planning_scene_once.sh
 bash scripts/reapply_static_planning_scene_once.sh
 python3 scripts/check_static_planning_scene_status.py
