@@ -24,6 +24,8 @@ def generate_launch_description() -> LaunchDescription:
     ])
     enable_calls = LaunchConfiguration('enable_service_calls')
     params_file = LaunchConfiguration('params_file')
+    require_grasp = LaunchConfiguration('require_grasp_trajectory')
+    attach_stage = LaunchConfiguration('attach_stage')
     return LaunchDescription([
         DeclareLaunchArgument(
             'params_file',
@@ -32,6 +34,14 @@ def generate_launch_description() -> LaunchDescription:
                 'adaptive_assembly_sequence_reachable_params.yaml',
             ]),
             description='Parameter YAML for perception and task nodes.',
+        ),
+        DeclareLaunchArgument(
+            'require_grasp_trajectory', default_value='false',
+            description='Plan and execute the intermediate grasp stage.',
+        ),
+        DeclareLaunchArgument(
+            'attach_stage', default_value='pre_grasp',
+            description='Successful execution stage that triggers attachment.',
         ),
         DeclareLaunchArgument(
             'enable_service_calls', default_value='true',
@@ -45,9 +55,15 @@ def generate_launch_description() -> LaunchDescription:
         )),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(full_demo),
-            launch_arguments={'params_file': params_file}.items(),
+            launch_arguments={
+                'params_file': params_file,
+                'require_grasp_trajectory': require_grasp,
+            }.items(),
         ),
-        IncludeLaunchDescription(PythonLaunchDescriptionSource(lifecycle)),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(lifecycle),
+            launch_arguments={'attach_stage': attach_stage}.items(),
+        ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(attachment),
             launch_arguments={'enable_service_calls': enable_calls}.items(),

@@ -21,7 +21,7 @@ from std_msgs.msg import Bool, Float64, String
 
 
 class Ros2ControlSequenceExecutorNode(Node):
-    """Execute one exported two-stage sequence through ros2_control."""
+    """Execute an exported two- or three-stage sequence via ros2_control."""
 
     def __init__(self) -> None:
         """Declare parameters and create the ROS interfaces."""
@@ -31,8 +31,12 @@ class Ros2ControlSequenceExecutorNode(Node):
             'pre_grasp_trajectory_topic', '/pre_grasp_trajectory'
         )
         self.declare_parameter(
+            'grasp_trajectory_topic', '/grasp_trajectory'
+        )
+        self.declare_parameter(
             'assembly_trajectory_topic', '/assembly_trajectory'
         )
+        self.declare_parameter('require_grasp_trajectory', False)
         self.declare_parameter(
             'controller_action_name',
             '/panda_arm_controller/follow_joint_trajectory',
@@ -68,6 +72,12 @@ class Ros2ControlSequenceExecutorNode(Node):
         ).value
         self._assembly_topic = self.get_parameter(
             'assembly_trajectory_topic'
+        ).value
+        self._grasp_topic = self.get_parameter(
+            'grasp_trajectory_topic'
+        ).value
+        self._require_grasp_trajectory = self.get_parameter(
+            'require_grasp_trajectory'
         ).value
         self._controller_action_name = self.get_parameter(
             'controller_action_name'
@@ -149,6 +159,12 @@ class Ros2ControlSequenceExecutorNode(Node):
             self._assembly_callback,
             10,
         )
+        self._grasp_subscription = self.create_subscription(
+            RobotTrajectory,
+            self._grasp_topic,
+            self._grasp_callback,
+            10,
+        )
         self._joint_state_subscription = self.create_subscription(
             JointState,
             self._joint_state_topic,
@@ -157,6 +173,7 @@ class Ros2ControlSequenceExecutorNode(Node):
         )
 
         self._pre_grasp_trajectory: Optional[RobotTrajectory] = None
+        self._grasp_trajectory: Optional[RobotTrajectory] = None
         self._assembly_trajectory: Optional[RobotTrajectory] = None
         self._sequence_start = 0.0
         self._stage_start = 0.0
@@ -169,7 +186,9 @@ class Ros2ControlSequenceExecutorNode(Node):
         self.get_logger().info(
             'Simulator-only ros2_control sequence executor ready: '
             f"pre_grasp_topic='{self._pre_grasp_topic}', "
+            f"grasp_topic='{self._grasp_topic}', "
             f"assembly_topic='{self._assembly_topic}', "
+            f'require_grasp_trajectory={self._require_grasp_trajectory}, '
             f"controller='{self._controller_action_name}', "
             f'wait_for_controller_sec={self._wait_for_controller_sec}, '
             f'result_timeout_sec={self._result_timeout_sec}, '
@@ -217,6 +236,13 @@ class Ros2ControlSequenceExecutorNode(Node):
         self._assembly_trajectory = trajectory
         self._try_start_sequence()
 
+    def _grasp_callback(self, trajectory: RobotTrajectory) -> None:
+        """Store the first grasp trajectory and try execution."""
+        if self._started or self._grasp_trajectory is not None:
+            return
+        self._grasp_trajectory = trajectory
+        self._try_start_sequence()
+
     def _joint_state_callback(self, joint_state: JointState) -> None:
         """Retain the latest complete finite Panda joint-state sample."""
         if len(joint_state.name) != len(joint_state.position):
@@ -241,6 +267,8 @@ class Ros2ControlSequenceExecutorNode(Node):
             return
         if self._assembly_trajectory is None:
             return
+        if self._require_grasp_trajectory and self._grasp_trajectory is None:
+            return
         if self._require_joint_state and not self._joint_state_received:
             return
 
@@ -255,6 +283,11 @@ class Ros2ControlSequenceExecutorNode(Node):
         if not valid:
             self._publish_failure('assembly', reason)
             return
+        if self._require_grasp_trajectory:
+            valid, reason = self._validate_trajectory(self._grasp_trajectory)
+            if not valid:
+                self._publish_failure('grasp', reason)
+                return
 
         if not self._send_goals:
             self._publish_skipped('send_goals_disabled')
@@ -477,12 +510,20 @@ class Ros2ControlSequenceExecutorNode(Node):
         )
 
         if stage == 'pre_grasp':
+            if self._require_grasp_trajectory:
+                self._send_stage('grasp', self._grasp_trajectory)
+            else:
+                self._send_stage('assembly', self._assembly_trajectory)
+            return
+
+        if stage == 'grasp':
             self._send_stage('assembly', self._assembly_trajectory)
             return
 
         duration_ms = (time.monotonic() - self._sequence_start) * 1000.0
         status = (
-            'event=success;mode=ros2_control;stage_count=2;'
+            'event=success;mode=ros2_control;stage_count='
+            f'{3 if self._require_grasp_trajectory else 2};'
             f'duration_ms={duration_ms:.6f};execution=true;'
             'simulated_execution_only=true;real_hardware=false'
         )

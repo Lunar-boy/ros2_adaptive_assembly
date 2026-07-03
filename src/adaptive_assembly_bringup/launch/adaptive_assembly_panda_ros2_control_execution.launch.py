@@ -24,7 +24,9 @@ def generate_launch_description() -> LaunchDescription:
     ])
 
     pre_grasp_topic = LaunchConfiguration('pre_grasp_trajectory_topic')
+    grasp_topic = LaunchConfiguration('grasp_trajectory_topic')
     assembly_topic = LaunchConfiguration('assembly_trajectory_topic')
+    require_grasp = LaunchConfiguration('require_grasp_trajectory')
     controller = LaunchConfiguration('controller_action_name')
     status_topic = LaunchConfiguration('status_topic')
     success_topic = LaunchConfiguration('success_topic')
@@ -52,9 +54,19 @@ def generate_launch_description() -> LaunchDescription:
             description='Exported pre-grasp RobotTrajectory topic.',
         ),
         DeclareLaunchArgument(
+            'grasp_trajectory_topic',
+            default_value='/grasp_trajectory',
+            description='Exported grasp RobotTrajectory topic.',
+        ),
+        DeclareLaunchArgument(
             'assembly_trajectory_topic',
             default_value='/assembly_trajectory',
             description='Exported assembly RobotTrajectory topic.',
+        ),
+        DeclareLaunchArgument(
+            'require_grasp_trajectory',
+            default_value='false',
+            description='Require and execute the intermediate grasp stage.',
         ),
         DeclareLaunchArgument(
             'controller_action_name',
@@ -148,7 +160,11 @@ def generate_launch_description() -> LaunchDescription:
             output='screen',
             parameters=[{
                 'pre_grasp_trajectory_topic': pre_grasp_topic,
+                'grasp_trajectory_topic': grasp_topic,
                 'assembly_trajectory_topic': assembly_topic,
+                'require_grasp_trajectory': ParameterValue(
+                    require_grasp, value_type=bool
+                ),
                 'controller_action_name': controller,
                 'status_topic': status_topic,
                 'success_topic': success_topic,
@@ -181,6 +197,7 @@ def generate_launch_description() -> LaunchDescription:
             condition=IfCondition(launch_reachable_sequence),
             launch_arguments={
                 'pre_grasp_trajectory_topic': pre_grasp_topic,
+                'grasp_trajectory_topic': grasp_topic,
                 'assembly_trajectory_topic': assembly_topic,
                 'use_planning_scene_audit': use_planning_scene_audit,
             }.items(),

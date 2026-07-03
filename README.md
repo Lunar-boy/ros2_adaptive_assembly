@@ -807,7 +807,10 @@ ros2 launch adaptive_assembly_bringup adaptive_assembly_full_episode_visual_demo
 ```
 
 This remains simulator-only, with a logical gripper, kinematic object
-attachment, and final-pose geometric insertion evaluation. It does not model
+attachment, and final-pose geometric insertion evaluation. The visual profile
+places the cylinder center at `z=0.10` so it rests on the support and uses the
+three-stage `pre_grasp -> grasp -> assembly` path. Attachment occurs only after
+the `grasp` execution stage succeeds. It does not model
 physical gripping or contact-rich insertion. See
 [`docs/full_assembly_episode_launch.md`](docs/full_assembly_episode_launch.md).
 

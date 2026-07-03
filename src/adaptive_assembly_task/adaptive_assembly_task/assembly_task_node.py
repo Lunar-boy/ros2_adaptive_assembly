@@ -8,13 +8,15 @@ from rclpy.node import Node
 
 
 class AssemblyTaskNode(Node):
-    """Publish pre-grasp and assembly poses for each perceived target."""
+    """Publish pre-grasp, grasp, and assembly poses for each target."""
 
     def __init__(self) -> None:
         """Initialize parameters, publishers, and target pose subscription."""
         super().__init__('assembly_task_node')
 
         self.declare_parameter('pre_grasp_height_offset', 0.20)
+        self.declare_parameter('grasp_height_offset', 0.05)
+        self.declare_parameter('grasp_pose_topic', '/grasp_pose')
         self.declare_parameter('assembly_height_offset', 0.05)
         self.declare_parameter('replan_distance_threshold', 0.03)
         self.declare_parameter('assembly_pose_mode', 'target_offset')
@@ -30,6 +32,12 @@ class AssemblyTaskNode(Node):
         self._assembly_height_offset = self.get_parameter(
             'assembly_height_offset'
         ).value
+        self._grasp_height_offset = self.get_parameter(
+            'grasp_height_offset'
+        ).value
+        self._grasp_pose_topic = str(
+            self.get_parameter('grasp_pose_topic').value
+        )
         self._replan_distance_threshold = self.get_parameter(
             'replan_distance_threshold'
         ).value
@@ -51,6 +59,9 @@ class AssemblyTaskNode(Node):
         self._assembly_publisher = self.create_publisher(
             PoseStamped, '/assembly_pose', 10
         )
+        self._grasp_publisher = self.create_publisher(
+            PoseStamped, self._grasp_pose_topic, 10
+        )
         self._target_subscription = self.create_subscription(
             PoseStamped, '/target_pose', self._target_pose_callback, 10
         )
@@ -67,6 +78,12 @@ class AssemblyTaskNode(Node):
                 'replan_distance_threshold must be greater than or equal to '
                 'zero'
             )
+        if self._grasp_height_offset < 0.0:
+            raise ValueError(
+                'grasp_height_offset must be greater than or equal to zero'
+            )
+        if not self._grasp_pose_topic:
+            raise ValueError('grasp_pose_topic must not be empty')
         if self._assembly_pose_mode not in ('target_offset', 'fixed_socket'):
             raise ValueError(
                 'assembly_pose_mode must be target_offset or fixed_socket'
@@ -87,6 +104,7 @@ class AssemblyTaskNode(Node):
         pre_grasp_pose = self._offset_pose(
             target_pose, self._pre_grasp_height_offset
         )
+        grasp_pose = self._offset_pose(target_pose, self._grasp_height_offset)
         if self._assembly_pose_mode == 'fixed_socket':
             assembly_pose = self._fixed_socket_pose(target_pose)
         else:
@@ -95,8 +113,15 @@ class AssemblyTaskNode(Node):
             )
 
         self._pre_grasp_publisher.publish(pre_grasp_pose)
+        self._grasp_publisher.publish(grasp_pose)
         self._assembly_publisher.publish(assembly_pose)
 
+        self.get_logger().info(
+            'Computed grasp pose: '
+            f'x={grasp_pose.pose.position.x:.3f}, '
+            f'y={grasp_pose.pose.position.y:.3f}, '
+            f'z={grasp_pose.pose.position.z:.3f}'
+        )
         self.get_logger().info(
             'Computed pre-grasp pose: '
             f'x={pre_grasp_pose.pose.position.x:.3f}, '

@@ -23,6 +23,8 @@ public:
   : node_(node),
     pre_grasp_topic_(declare_parameter<std::string>(
         "pre_grasp_topic", "/panda_pre_grasp_pose")),
+    grasp_topic_(declare_parameter<std::string>(
+        "grasp_topic", "/panda_grasp_pose")),
     assembly_topic_(declare_parameter<std::string>(
         "assembly_topic", "/panda_assembly_pose")),
     success_topic_(declare_parameter<std::string>(
@@ -39,12 +41,15 @@ public:
         "stage_duration_topic", "/assembly_sequence_stage_duration_ms")),
     pre_grasp_trajectory_topic_(declare_parameter<std::string>(
         "pre_grasp_trajectory_topic", "/pre_grasp_trajectory")),
+    grasp_trajectory_topic_(declare_parameter<std::string>(
+        "grasp_trajectory_topic", "/grasp_trajectory")),
     assembly_trajectory_topic_(declare_parameter<std::string>(
         "assembly_trajectory_topic", "/assembly_trajectory")),
     trajectory_status_topic_(declare_parameter<std::string>(
         "trajectory_status_topic", "/assembly_sequence_trajectory_status")),
     publish_diagnostics_(declare_parameter<bool>("publish_diagnostics", true)),
     publish_trajectories_(declare_parameter<bool>("publish_trajectories", true)),
+    require_grasp_pose_(declare_parameter<bool>("require_grasp_pose", false)),
     planning_group_(declare_parameter<std::string>("planning_group", "panda_arm")),
     planner_id_(declare_parameter<std::string>("planner_id", "")),
     num_planning_attempts_(declare_parameter<int>("num_planning_attempts", 1)),
@@ -76,6 +81,9 @@ public:
     pre_grasp_trajectory_publisher_ =
       node_->create_publisher<moveit_msgs::msg::RobotTrajectory>(
       pre_grasp_trajectory_topic_, 10);
+    grasp_trajectory_publisher_ =
+      node_->create_publisher<moveit_msgs::msg::RobotTrajectory>(
+      grasp_trajectory_topic_, 10);
     assembly_trajectory_publisher_ =
       node_->create_publisher<moveit_msgs::msg::RobotTrajectory>(
       assembly_trajectory_topic_, 10);
@@ -90,6 +98,14 @@ public:
         pre_grasp_updated_ = true;
         try_plan_sequence();
       });
+    grasp_subscription_ =
+      node_->create_subscription<geometry_msgs::msg::PoseStamped>(
+      grasp_topic_, 10,
+      [this](const geometry_msgs::msg::PoseStamped::SharedPtr message) {
+        grasp_pose_ = *message;
+        grasp_updated_ = true;
+        try_plan_sequence();
+      });
     assembly_subscription_ =
       node_->create_subscription<geometry_msgs::msg::PoseStamped>(
       assembly_topic_, 10,
@@ -101,20 +117,23 @@ public:
 
     RCLCPP_INFO(
       node_->get_logger(),
-      "Assembly sequence planner ready: pre_grasp_topic='%s', assembly_topic='%s', "
+      "Assembly sequence planner ready: pre_grasp_topic='%s', grasp_topic='%s', "
+      "assembly_topic='%s', require_grasp_pose=%s, "
       "planning_group='%s', planner_id='%s', num_planning_attempts=%d, "
       "planning_time_sec=%.3f, position_tolerance=%.3f, "
       "orientation_tolerance=%.3f, start_state_mode='%s', publish_diagnostics=%s. "
       "Stage diagnostics: status='%s', success='%s', duration='%s'. "
-      "Trajectory export: enabled=%s, pre_grasp='%s', assembly='%s', status='%s'. "
-      "The pre-grasp and assembly stages are planned only; execution is disabled.",
-      pre_grasp_topic_.c_str(), assembly_topic_.c_str(), planning_group_.c_str(),
+      "Trajectory export: enabled=%s, pre_grasp='%s', grasp='%s', assembly='%s', status='%s'. "
+      "All sequence stages are planned only; execution is disabled.",
+      pre_grasp_topic_.c_str(), grasp_topic_.c_str(), assembly_topic_.c_str(),
+      require_grasp_pose_ ? "true" : "false", planning_group_.c_str(),
       planner_id_.c_str(), num_planning_attempts_, planning_time_sec_,
       position_tolerance_, orientation_tolerance_, start_state_mode_.c_str(),
       publish_diagnostics_ ? "true" : "false", stage_status_topic_.c_str(),
       stage_success_topic_.c_str(), stage_duration_topic_.c_str(),
       publish_trajectories_ ? "true" : "false", pre_grasp_trajectory_topic_.c_str(),
-      assembly_trajectory_topic_.c_str(), trajectory_status_topic_.c_str());
+      grasp_trajectory_topic_.c_str(), assembly_trajectory_topic_.c_str(),
+      trajectory_status_topic_.c_str());
   }
 
 private:
@@ -159,12 +178,14 @@ private:
   void try_plan_sequence()
   {
     if (!pre_grasp_pose_.has_value() || !assembly_pose_.has_value() ||
-      !pre_grasp_updated_ || !assembly_updated_)
+      !pre_grasp_updated_ || !assembly_updated_ ||
+      (require_grasp_pose_ && (!grasp_pose_.has_value() || !grasp_updated_)))
     {
       return;
     }
 
     pre_grasp_updated_ = false;
+    grasp_updated_ = false;
     assembly_updated_ = false;
     const auto & pre_grasp_pose = pre_grasp_pose_.value();
     const auto & assembly_pose = assembly_pose_.value();
@@ -194,6 +215,10 @@ private:
     if (!pre_grasp_result.succeeded) {
       publish_trajectory_status(
         "skipped", "pre_grasp", pre_grasp_trajectory_topic_, nullptr, "planning_failed");
+      if (require_grasp_pose_) {
+        publish_trajectory_status(
+          "skipped", "grasp", grasp_trajectory_topic_, nullptr, "pre_grasp_failed");
+      }
       publish_trajectory_status(
         "skipped", "assembly", assembly_trajectory_topic_, nullptr, "pre_grasp_failed");
       publish_result(false, "failure", "pre_grasp", planned_stage_count, total_duration_ms);
@@ -208,8 +233,13 @@ private:
       "pre_grasp", pre_grasp_plan.trajectory, pre_grasp_trajectory_topic_,
       pre_grasp_trajectory_publisher_);
 
-    const auto assembly_start_state = final_state_from_plan(pre_grasp_plan);
+    auto assembly_start_state = final_state_from_plan(pre_grasp_plan);
     if (!assembly_start_state.has_value()) {
+      if (require_grasp_pose_) {
+        publish_trajectory_status(
+          "skipped", "grasp", grasp_trajectory_topic_, nullptr,
+          "invalid_pre_grasp_trajectory");
+      }
       publish_trajectory_status(
         "skipped", "assembly", assembly_trajectory_topic_, nullptr,
         "invalid_pre_grasp_trajectory");
@@ -219,6 +249,38 @@ private:
         "Pre-grasp plan had no final joint state; assembly stage was not planned. "
         "No execution attempted.");
       return;
+    }
+
+    if (require_grasp_pose_) {
+      move_group_.setStartState(assembly_start_state.value());
+      set_pose_target(grasp_pose_.value());
+      moveit::planning_interface::MoveGroupInterface::Plan grasp_plan;
+      const auto grasp_result = plan_stage(grasp_plan);
+      total_duration_ms += grasp_result.duration_ms;
+      move_group_.clearPoseTargets();
+      publish_stage_result("grasp", grasp_result.succeeded, grasp_result.duration_ms);
+
+      if (!grasp_result.succeeded) {
+        publish_trajectory_status(
+          "skipped", "grasp", grasp_trajectory_topic_, nullptr, "planning_failed");
+        publish_trajectory_status(
+          "skipped", "assembly", assembly_trajectory_topic_, nullptr, "grasp_failed");
+        publish_result(false, "failure", "grasp", planned_stage_count, total_duration_ms);
+        RCLCPP_WARN(node_->get_logger(), "Assembly sequence planning failed at grasp.");
+        return;
+      }
+      ++planned_stage_count;
+      publish_trajectory(
+        "grasp", grasp_plan.trajectory, grasp_trajectory_topic_,
+        grasp_trajectory_publisher_);
+      assembly_start_state = final_state_from_plan(grasp_plan);
+      if (!assembly_start_state.has_value()) {
+        publish_trajectory_status(
+          "skipped", "assembly", assembly_trajectory_topic_, nullptr,
+          "invalid_grasp_trajectory");
+        publish_result(false, "failure", "assembly", planned_stage_count, total_duration_ms);
+        return;
+      }
     }
 
     move_group_.setStartState(assembly_start_state.value());
@@ -249,7 +311,7 @@ private:
     RCLCPP_INFO(
       node_->get_logger(),
       "Assembly sequence planning succeeded for %zu stages in %.3f ms total. "
-      "Neither trajectory was executed.", planned_stage_count, total_duration_ms);
+      "No trajectory was executed by the planner.", planned_stage_count, total_duration_ms);
   }
 
   void set_pose_target(const geometry_msgs::msg::PoseStamped & pose)
@@ -446,6 +508,7 @@ private:
 
   rclcpp::Node::SharedPtr node_;
   std::string pre_grasp_topic_;
+  std::string grasp_topic_;
   std::string assembly_topic_;
   std::string success_topic_;
   std::string status_topic_;
@@ -454,10 +517,12 @@ private:
   std::string stage_success_topic_;
   std::string stage_duration_topic_;
   std::string pre_grasp_trajectory_topic_;
+  std::string grasp_trajectory_topic_;
   std::string assembly_trajectory_topic_;
   std::string trajectory_status_topic_;
   bool publish_diagnostics_;
   bool publish_trajectories_;
+  bool require_grasp_pose_;
   std::string planning_group_;
   std::string planner_id_;
   int num_planning_attempts_;
@@ -475,13 +540,18 @@ private:
   rclcpp::Publisher<moveit_msgs::msg::RobotTrajectory>::SharedPtr
     pre_grasp_trajectory_publisher_;
   rclcpp::Publisher<moveit_msgs::msg::RobotTrajectory>::SharedPtr
+    grasp_trajectory_publisher_;
+  rclcpp::Publisher<moveit_msgs::msg::RobotTrajectory>::SharedPtr
     assembly_trajectory_publisher_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr trajectory_status_publisher_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pre_grasp_subscription_;
+  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr grasp_subscription_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr assembly_subscription_;
   std::optional<geometry_msgs::msg::PoseStamped> pre_grasp_pose_;
+  std::optional<geometry_msgs::msg::PoseStamped> grasp_pose_;
   std::optional<geometry_msgs::msg::PoseStamped> assembly_pose_;
   bool pre_grasp_updated_{false};
+  bool grasp_updated_{false};
   bool assembly_updated_{false};
 };
 
