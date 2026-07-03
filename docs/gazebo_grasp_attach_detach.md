@@ -4,9 +4,10 @@
 
 This simulator-only layer consumes the existing logical grasp lifecycle. While
 attached, it looks up `world -> panda_hand` and repeatedly sets the Gazebo
-`target_object` model pose to that transform. Detach stops pose updates, leaving
-the model at its last world pose. This is deterministic kinematic following,
-not physics-accurate grasping.
+`target_object` model pose to the hand transform composed with a fixed local
+hand-to-object offset. Detach stops pose updates, leaving the model at its last
+world pose. This is deterministic kinematic following, not physics-accurate
+grasping.
 
 The node arbitrates Gazebo pose ownership on the retained
 `/target_object_control_owner` topic:
@@ -62,6 +63,10 @@ Published with transient-local durability:
 | `target_entity_name` | `target_object` | Gazebo model name |
 | `world_frame` | `world` | Gazebo world TF frame |
 | `gripper_frame` | `panda_hand` | Followed TF frame |
+| `attached_object_offset_x` | `0.0` | Local hand-frame object X offset (m) |
+| `attached_object_offset_y` | `0.0` | Local hand-frame object Y offset (m) |
+| `attached_object_offset_z` | `0.0` | Local hand-frame object Z offset (m) |
+| `attached_object_use_hand_orientation` | `true` | Inherit hand orientation; otherwise use identity |
 | `attach_update_period_sec` | `0.05` | Follow update period |
 | `service_timeout_sec` | `2.0` | Set-pose response timeout |
 | `enable_service_calls` | `true` | Enable Gazebo set-pose calls |
@@ -72,7 +77,7 @@ Published with transient-local durability:
 Statuses are semicolon-delimited key/value fields. Examples:
 
 ```text
-event=attached;mode=gazebo_attach_detach;owner=gripper_attach;object=target_object;parent=panda_hand;simulated_only=true;real_hardware=false
+event=attached;mode=gazebo_attach_detach;owner=gripper_attach;object=target_object;hand_to_object_offset=0.0,0.0,0.1;parent=panda_hand;simulated_only=true;real_hardware=false
 event=detached;mode=gazebo_attach_detach;owner=released;object=target_object;parent=world;simulated_only=true;real_hardware=false
 event=skipped;mode=gazebo_attach_detach;reason=tf_unavailable;owner=gripper_attach;object=target_object;simulated_only=true;real_hardware=false
 ```
@@ -87,6 +92,7 @@ python3 scripts/check_gazebo_attach_detach_success_path.py
 python3 scripts/check_gazebo_attach_detach_failure_path.py
 python3 scripts/check_gazebo_object_attached_status.py
 python3 scripts/check_gazebo_attach_owner_transitions.py
+python3 scripts/check_gazebo_attachment_offset.py
 ```
 
 The first two Python fixture checks do not require Gazebo. The retained-status
@@ -111,9 +117,10 @@ optional for environments where a live simulator is too heavy.
 
 ## Limitations
 
-The object origin is mirrored directly to the gripper frame; no grasp offset,
-collision constraint, contact detection, force control, tactile feedback, or
-physics-accurate joint is modeled. Detach only stops kinematic updates. This
-feature has no real-robot or hardware path. Live Gazebo set-pose attachment is
-exercised by an optional bounded validation script; this remains kinematic pose
-mirroring only.
+The configurable offset is rotated by the hand orientation before being added
+to the hand position. Zero offset preserves direct origin mirroring. The visual
+single-trial demo uses a tunable `0.10 m` local Z offset to place the cylinder
+at the simplified Panda tool geometry. This is only a visual-correctness aid:
+no collision constraint, contact detection, force control, tactile feedback,
+or physics-accurate joint is modeled. Detach only stops kinematic updates. This
+feature has no real-robot or hardware path.

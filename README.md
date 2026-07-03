@@ -550,7 +550,10 @@ ros2 launch adaptive_assembly_bringup \
 
 The demo composes full simulator execution, the logical grasp lifecycle, and a
 simulator-only kinematic attachment layer. While logically attached, Gazebo's
-`target_object` follows `panda_hand`; detach leaves it at its last world pose.
+`target_object` follows `panda_hand` plus a configurable fixed local
+hand-to-object offset; detach leaves it at its last world pose. The visual
+single-trial demo uses a `0.10 m` local Z offset for the simplified Panda hand,
+while other demos retain the zero-offset default.
 Retained state and diagnostics are published on `/gazebo_object_attached`,
 `/gazebo_attach_detach_status`, and `/gazebo_attach_pose_error_mm`.
 
@@ -559,12 +562,14 @@ bash scripts/check_gazebo_attach_detach_available.sh
 python3 scripts/check_gazebo_attach_detach_success_path.py
 python3 scripts/check_gazebo_attach_detach_failure_path.py
 python3 scripts/check_gazebo_attach_owner_transitions.py
+python3 scripts/check_gazebo_attachment_offset.py
 python3 scripts/check_live_gazebo_attach_detach.py
 ```
 
 The last command is an optional bounded, headless live Gazebo validation; the
 fixture checks remain available without a running simulator. Live attachment
-is kinematic set-pose mirroring only.
+is kinematic set-pose mirroring only. The fixed offset is a visual-correctness
+aid, not physical grasp simulation.
 
 See [`docs/gazebo_grasp_attach_detach.md`](docs/gazebo_grasp_attach_detach.md).
 
