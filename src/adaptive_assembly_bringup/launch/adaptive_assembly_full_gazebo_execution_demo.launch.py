@@ -3,6 +3,7 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.actions import LogInfo
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
@@ -41,6 +42,7 @@ def generate_launch_description() -> LaunchDescription:
     require_target_sync = LaunchConfiguration('require_target_sync_success')
     target_sync_topic = LaunchConfiguration('target_sync_status_topic')
     target_sync_timeout = LaunchConfiguration('target_sync_timeout_sec')
+    launch_simulation = LaunchConfiguration('launch_simulation')
     default_world = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_sim'),
         'worlds',
@@ -48,6 +50,10 @@ def generate_launch_description() -> LaunchDescription:
     ])
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'launch_simulation', default_value='true',
+            description='Start Gazebo; false when an outer launch owns it.',
+        ),
         DeclareLaunchArgument(
             'params_file',
             default_value=PathJoinSubstitution([
@@ -118,6 +124,7 @@ def generate_launch_description() -> LaunchDescription:
                 'world': world,
                 'gz_args': gz_args,
             }.items(),
+            condition=IfCondition(launch_simulation),
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(planning_launch),

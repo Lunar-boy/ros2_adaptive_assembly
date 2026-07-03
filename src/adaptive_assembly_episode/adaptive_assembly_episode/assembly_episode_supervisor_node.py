@@ -25,7 +25,9 @@ def parse_status(status: str) -> Dict[str, str]:
 class AssemblyEpisodeSupervisorNode(Node):
     """Observe existing status topics without commanding the runtime."""
 
-    _TERMINAL_FAILURE_EVENTS = {'failure', 'timeout', 'skipped'}
+    _TERMINAL_FAILURE_EVENTS = {
+        'failure', 'timeout', 'skipped', 'rejected', 'aborted', 'canceled'
+    }
 
     def __init__(self) -> None:
         super().__init__('assembly_episode_supervisor_node')
@@ -104,6 +106,7 @@ class AssemblyEpisodeSupervisorNode(Node):
         self._assembly_success = False
         self._execution_success_signal = False
         self._execution_terminal_success = False
+        self._execution_terminal_received = False
         self._logical_grasp_attached = False
         self._logical_grasp_released = False
         self._gazebo_attach_success = False
@@ -176,9 +179,11 @@ class AssemblyEpisodeSupervisorNode(Node):
     def _execution_status_cb(self, message: String) -> None:
         event = parse_status(message.data).get('event', '').lower()
         if event == 'success':
+            self._execution_terminal_received = True
             self._execution_terminal_success = True
             self._evaluate()
         elif event in self._TERMINAL_FAILURE_EVENTS:
+            self._execution_terminal_received = True
             self._fail_if_required('execution', 'execution_failed')
 
     def _execution_success_cb(self, message: Bool) -> None:
@@ -294,8 +299,11 @@ class AssemblyEpisodeSupervisorNode(Node):
             stage = 'wait_grasp_attached'
         elif not self._assembly_success and self._requirements['execution']:
             stage = 'wait_assembly_execution'
-        elif not self._execution_success and self._requirements['execution']:
-            stage = 'wait_execution_start'
+        elif (
+            self._requirements['execution']
+            and not self._execution_terminal_received
+        ):
+            stage = 'wait_execution_terminal'
         elif (
             self._requirements['logical_release']
             and not self._logical_grasp_released

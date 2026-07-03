@@ -30,6 +30,7 @@ def generate_launch_description() -> LaunchDescription:
     require_target_sync = LaunchConfiguration('require_target_sync_success')
     target_sync_topic = LaunchConfiguration('target_sync_status_topic')
     target_sync_timeout = LaunchConfiguration('target_sync_timeout_sec')
+    launch_simulation = LaunchConfiguration('launch_simulation')
     attach_stage = LaunchConfiguration('attach_stage')
     release_stage = LaunchConfiguration('release_stage')
     offset_x = LaunchConfiguration('attached_object_offset_x')
@@ -39,6 +40,10 @@ def generate_launch_description() -> LaunchDescription:
         'attached_object_use_hand_orientation'
     )
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'launch_simulation', default_value='true',
+            description='Start Gazebo; false when an outer launch owns it.',
+        ),
         DeclareLaunchArgument(
             'params_file',
             default_value=PathJoinSubstitution([
@@ -93,6 +98,7 @@ def generate_launch_description() -> LaunchDescription:
                 'require_target_sync_success': require_target_sync,
                 'target_sync_status_topic': target_sync_topic,
                 'target_sync_timeout_sec': target_sync_timeout,
+                'launch_simulation': launch_simulation,
             }.items(),
         ),
         IncludeLaunchDescription(

@@ -769,6 +769,47 @@ python3 scripts/check_full_episode_terminal_status.py
 See [`docs/full_assembly_episode_launch.md`](docs/full_assembly_episode_launch.md)
 for composition details, success criteria, and limitations.
 
+<<<<<<< HEAD
+=======
+### Single-trial deterministic episode demo
+
+Launch the deterministic-correctness profile with distinct deterministic source and
+socket/place poses:
+
+```bash
+ros2 launch adaptive_assembly_bringup adaptive_assembly_full_episode_deterministic_demo.launch.py
+```
+
+This remains simulator-only, with a logical gripper, kinematic object
+attachment, and final-pose geometric insertion evaluation. The deterministic profile
+places the cylinder center at `z=0.10` so it rests on the support and uses
+`pre_grasp -> grasp -> pre_place -> place -> release -> retreat`. Attachment
+occurs after successful `grasp`; release occurs after successful `place`, so
+the detached object remains at the socket during retreat. It does not model
+physical gripping, force control, or contact-rich insertion. See
+[`docs/full_assembly_episode_launch.md`](docs/full_assembly_episode_launch.md).
+
+The deterministic evaluator compares the desired final object pose on
+`/object_place_pose` with the observed Gazebo pose on
+`/gazebo_target_object_pose`. `/panda_assembly_pose` remains the Panda hand
+planning target and is not used as the evaluator target.
+
+The deterministic executor also waits for `/gazebo_target_sync_status` to report
+`event=success` before sending its first ros2_control trajectory. This prevents
+execution from starting before Gazebo mirrors the planned source pose. The
+gate applies only at sequence startup and is disabled by default in generic
+execution demos.
+
+Before any planning, execution, grasp lifecycle, evaluation, or supervision
+starts, the deterministic launch now waits on retained
+`/gazebo_controller_ready_status`. Success requires both Panda controllers to
+be active, the simulated `FollowJointTrajectory` server to be available, and
+finite values for all seven Panda joints on `/joint_states`. The target-sync
+gate remains the second startup gate before the first trajectory goal. The
+episode supervisor waits for an explicit terminal executor status (or its
+episode timeout) and does not infer failure from an initially absent success.
+
+>>>>>>> origin/main
 ### Suggested result table
 
 After recording benchmark data, add a small result table here:
