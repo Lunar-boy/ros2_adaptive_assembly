@@ -792,6 +792,20 @@ python3 scripts/check_full_episode_terminal_status.py
 See [`docs/full_assembly_episode_launch.md`](docs/full_assembly_episode_launch.md)
 for composition details, success criteria, and limitations.
 
+### Single-trial visual episode demo
+
+Launch the visual-correctness profile with distinct deterministic source and
+socket/place poses:
+
+```bash
+ros2 launch adaptive_assembly_bringup adaptive_assembly_full_episode_visual_demo.launch.py
+```
+
+This remains simulator-only, with a logical gripper, kinematic object
+attachment, and final-pose geometric insertion evaluation. It does not model
+physical gripping or contact-rich insertion. See
+[`docs/full_assembly_episode_launch.md`](docs/full_assembly_episode_launch.md).
+
 ### Suggested result table
 
 After recording benchmark data, add a small result table here:

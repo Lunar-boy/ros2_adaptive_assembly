@@ -23,7 +23,16 @@ def generate_launch_description() -> LaunchDescription:
         'gazebo_attach_detach.launch.py',
     ])
     enable_calls = LaunchConfiguration('enable_service_calls')
+    params_file = LaunchConfiguration('params_file')
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'params_file',
+            default_value=PathJoinSubstitution([
+                FindPackageShare('adaptive_assembly_bringup'), 'config',
+                'adaptive_assembly_sequence_reachable_params.yaml',
+            ]),
+            description='Parameter YAML for perception and task nodes.',
+        ),
         DeclareLaunchArgument(
             'enable_service_calls', default_value='true',
             description=(
@@ -34,7 +43,10 @@ def generate_launch_description() -> LaunchDescription:
             'Launching simulator-only Gazebo Panda execution with logical '
             'grasp lifecycle and kinematic object attachment.'
         )),
-        IncludeLaunchDescription(PythonLaunchDescriptionSource(full_demo)),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(full_demo),
+            launch_arguments={'params_file': params_file}.items(),
+        ),
         IncludeLaunchDescription(PythonLaunchDescriptionSource(lifecycle)),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(attachment),
