@@ -769,7 +769,7 @@ python3 scripts/check_full_episode_terminal_status.py
 See [`docs/full_assembly_episode_launch.md`](docs/full_assembly_episode_launch.md)
 for composition details, success criteria, and limitations.
 
-<<<<<<< HEAD
+
 =======
 ### Single-trial deterministic episode demo
 
@@ -777,7 +777,7 @@ Launch the deterministic-correctness profile with distinct deterministic source 
 socket/place poses:
 
 ```bash
-ros2 launch adaptive_assembly_bringup adaptive_assembly_full_episode_deterministic_demo.launch.py
+ros2 launch adaptive_assembly_bringup adaptive_assembly_full_episode_vision_demo.launch.py
 ```
 
 This remains simulator-only, with a logical gripper, kinematic object
@@ -809,7 +809,7 @@ gate remains the second startup gate before the first trajectory goal. The
 episode supervisor waits for an explicit terminal executor status (or its
 episode timeout) and does not infer failure from an initially absent success.
 
->>>>>>> origin/main
+
 ### Suggested result table
 
 After recording benchmark data, add a small result table here:
