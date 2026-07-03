@@ -24,17 +24,26 @@ PR24 adds a read-only PlanningScene audit node that can verify whether
 `work_table`, `target_support`, and `target_object_dynamic` are present in the
 MoveIt2 PlanningScene. See [planning_scene_audit.md](planning_scene_audit.md).
 
-Initial objects:
+Static objects:
 
 - `work_table`: a broad table/workcell box in frame `panda_link0`
 - `target_support`: a small support block near the target area in frame
   `panda_link0`
+- `assembly_socket_base` and four `assembly_socket_*_wall` objects: boxes that
+  mirror the Gazebo socket fixture geometry in frame `panda_link0`
+
+The socket objects are a geometric collision approximation. They only make
+MoveIt aware of the socket fixture for collision-aware planning; they do not
+implement force control, contact-rich insertion, or physical peg-in-hole
+behavior.
 
 ```text
 static_planning_scene_node
      │
      ├── work_table collision object
      ├── target_support collision object
+     ├── assembly_socket_base collision object
+     ├── four assembly_socket wall collision objects
      ├── /planning_scene_objects_ready
      ├── /static_planning_scene_status
      ├── /clear_static_planning_scene
@@ -66,6 +75,7 @@ ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_demo.laun
 
 ```bash
 bash scripts/check_static_planning_scene_available.sh
+bash scripts/check_socket_fixture_planning_scene.py
 bash scripts/check_static_planning_scene_ready.sh
 bash scripts/check_static_planning_scene_services.sh
 python3 scripts/check_planning_scene_audit_status.py

@@ -36,7 +36,27 @@ public:
     target_support_z_(declare_parameter<double>("target_support_z", 0.01)),
     target_support_size_x_(declare_parameter<double>("target_support_size_x", 0.12)),
     target_support_size_y_(declare_parameter<double>("target_support_size_y", 0.12)),
-    target_support_size_z_(declare_parameter<double>("target_support_size_z", 0.02))
+    target_support_size_z_(declare_parameter<double>("target_support_size_z", 0.02)),
+    add_socket_fixture_(declare_parameter<bool>("add_socket_fixture", true)),
+    socket_x_(declare_parameter<double>("socket_x", 0.62)),
+    socket_y_(declare_parameter<double>("socket_y", -0.18)),
+    socket_z_(declare_parameter<double>("socket_z", 0.0)),
+    socket_base_size_x_(declare_parameter<double>("socket_base_size_x", 0.20)),
+    socket_base_size_y_(declare_parameter<double>("socket_base_size_y", 0.20)),
+    socket_base_size_z_(declare_parameter<double>("socket_base_size_z", 0.03)),
+    socket_wall_height_(declare_parameter<double>("socket_wall_height", 0.08)),
+    socket_wall_thickness_(declare_parameter<double>("socket_wall_thickness", 0.03)),
+    socket_side_wall_length_(declare_parameter<double>("socket_side_wall_length", 0.16)),
+    socket_back_front_wall_length_(
+      declare_parameter<double>("socket_back_front_wall_length", 0.10)),
+    socket_side_wall_y_offset_(
+      declare_parameter<double>("socket_side_wall_y_offset", 0.065)),
+    socket_back_front_wall_x_offset_(
+      declare_parameter<double>("socket_back_front_wall_x_offset", 0.065)),
+    socket_base_center_z_offset_(
+      declare_parameter<double>("socket_base_center_z_offset", 0.015)),
+    socket_wall_center_z_offset_(
+      declare_parameter<double>("socket_wall_center_z_offset", 0.055))
   {
     ready_publisher_ = node_->create_publisher<std_msgs::msg::Bool>(
       "/planning_scene_objects_ready",
@@ -105,6 +125,32 @@ private:
         "target_support",
         target_support_x_, target_support_y_, target_support_z_,
         target_support_size_x_, target_support_size_y_, target_support_size_z_));
+    }
+    if (add_socket_fixture_) {
+      collision_objects.push_back(make_box_collision_object(
+        "assembly_socket_base",
+        socket_x_, socket_y_, socket_z_ + socket_base_center_z_offset_,
+        socket_base_size_x_, socket_base_size_y_, socket_base_size_z_));
+      collision_objects.push_back(make_box_collision_object(
+        "assembly_socket_left_wall",
+        socket_x_, socket_y_ + socket_side_wall_y_offset_,
+        socket_z_ + socket_wall_center_z_offset_,
+        socket_side_wall_length_, socket_wall_thickness_, socket_wall_height_));
+      collision_objects.push_back(make_box_collision_object(
+        "assembly_socket_right_wall",
+        socket_x_, socket_y_ - socket_side_wall_y_offset_,
+        socket_z_ + socket_wall_center_z_offset_,
+        socket_side_wall_length_, socket_wall_thickness_, socket_wall_height_));
+      collision_objects.push_back(make_box_collision_object(
+        "assembly_socket_back_wall",
+        socket_x_ - socket_back_front_wall_x_offset_, socket_y_,
+        socket_z_ + socket_wall_center_z_offset_,
+        socket_wall_thickness_, socket_back_front_wall_length_, socket_wall_height_));
+      collision_objects.push_back(make_box_collision_object(
+        "assembly_socket_front_wall",
+        socket_x_ + socket_back_front_wall_x_offset_, socket_y_,
+        socket_z_ + socket_wall_center_z_offset_,
+        socket_wall_thickness_, socket_back_front_wall_length_, socket_wall_height_));
     }
 
     if (collision_objects.empty()) {
@@ -286,6 +332,13 @@ private:
     if (add_target_support_) {
       object_ids.push_back("target_support");
     }
+    if (add_socket_fixture_) {
+      object_ids.push_back("assembly_socket_base");
+      object_ids.push_back("assembly_socket_left_wall");
+      object_ids.push_back("assembly_socket_right_wall");
+      object_ids.push_back("assembly_socket_back_wall");
+      object_ids.push_back("assembly_socket_front_wall");
+    }
     return object_ids;
   }
 
@@ -322,6 +375,21 @@ private:
   double target_support_size_x_;
   double target_support_size_y_;
   double target_support_size_z_;
+  bool add_socket_fixture_;
+  double socket_x_;
+  double socket_y_;
+  double socket_z_;
+  double socket_base_size_x_;
+  double socket_base_size_y_;
+  double socket_base_size_z_;
+  double socket_wall_height_;
+  double socket_wall_thickness_;
+  double socket_side_wall_length_;
+  double socket_back_front_wall_length_;
+  double socket_side_wall_y_offset_;
+  double socket_back_front_wall_x_offset_;
+  double socket_base_center_z_offset_;
+  double socket_wall_center_z_offset_;
   bool ready_{false};
   moveit::planning_interface::PlanningSceneInterface planning_scene_interface_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr ready_publisher_;
