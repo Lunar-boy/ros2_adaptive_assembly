@@ -5,10 +5,8 @@
 1. Add gripper abstraction and logical grasp lifecycle.
 2. Synchronize Gazebo target object pose with the adaptive perception pipeline.
 3. Add richer benchmark reports with real recorded tables and plots.
-4. Add screenshots or GIFs for RViz, PlanningScene, and Gazebo workcell demos.
-5. Extend optional ArUco perception toward RGB-D target pose estimation.
-6. Introduce task-level retry orchestration that consumes recovery supervisor actions.
-7. Add contact-aware insertion approximation or force-control extension points.
+4. Introduce task-level retry orchestration that consumes recovery supervisor actions.
+5. Add contact-aware insertion approximation or force-control extension points.
 
 ## Longer-term extensions:
 
@@ -17,6 +15,9 @@
 - learned grasp or assembly target proposal;
 - HPC-based batch evaluation over randomized target poses and obstacle layouts;
 - hardware interface preparation for real robot experiments.
+
+Camera/image-based perception, marker detection, and visual servoing are out of
+scope here and may be developed in a separate future repository.
 
 
 ## PR
@@ -44,7 +45,6 @@
 - PR22: TF2-based Panda pose adapter with status diagnostics
 - PR23: planning request guard and safety filter
 - PR24: PlanningScene object audit tool
-- PR25: simple RViz marker visualization
 - PR26: plan-only Panda pre-grasp and assembly sequence planning
 - PR27: deterministic fixed-start assembly sequence planning fallback
 - PR28: deterministic known-reachable assembly sequence profile

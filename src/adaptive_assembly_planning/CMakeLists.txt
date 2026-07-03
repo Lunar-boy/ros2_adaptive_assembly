@@ -23,7 +23,6 @@ find_package(shape_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
-find_package(visualization_msgs REQUIRED)
 
 add_executable(pre_grasp_planning_node src/pre_grasp_planning_node.cpp)
 ament_target_dependencies(
@@ -108,15 +107,6 @@ ament_target_dependencies(
   moveit_msgs
 )
 
-add_executable(adaptive_assembly_marker_node src/adaptive_assembly_marker_node.cpp)
-ament_target_dependencies(
-  adaptive_assembly_marker_node
-  rclcpp
-  geometry_msgs
-  std_msgs
-  visualization_msgs
-)
-
 install(
   TARGETS
     pre_grasp_planning_node
@@ -126,13 +116,13 @@ install(
     static_planning_scene_node
     dynamic_target_scene_node
     planning_scene_audit_node
-    adaptive_assembly_marker_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
 install(
   DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}
+  PATTERN "__pycache__" EXCLUDE
 )
 
 if(BUILD_TESTING)

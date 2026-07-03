@@ -15,11 +15,11 @@ setup(
         ('share/' + package_name, ['package.xml']),
         (
             os.path.join('share', package_name, 'launch'),
-            glob('launch/*.launch.py'),
+            [path for path in glob('launch/*.launch.py') if os.path.isfile(path)],
         ),
         (
             os.path.join('share', package_name, 'config'),
-            glob('config/*.yaml'),
+            [path for path in glob('config/*.yaml') if os.path.isfile(path)],
         ),
     ],
     install_requires=['setuptools'],

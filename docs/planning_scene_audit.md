@@ -9,11 +9,6 @@ The audit node is introspection-only:
 - it does not remove collision objects
 - it does not execute trajectories
 
-PR25 adds optional RViz2 marker visualization for the adaptive assembly pose
-topics. The marker node is independent of this audit node: it publishes
-`/adaptive_assembly_markers` and does not query or modify the PlanningScene.
-See [rviz_markers.md](rviz_markers.md).
-
 ## Expected objects
 
 The default expected object ids are:

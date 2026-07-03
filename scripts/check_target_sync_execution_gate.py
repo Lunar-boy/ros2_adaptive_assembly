@@ -14,9 +14,6 @@ executor = (
 generic = (
     launch_dir / 'adaptive_assembly_panda_ros2_control_execution.launch.py'
 ).read_text()
-visual = (
-    launch_dir / 'adaptive_assembly_full_episode_visual_demo.launch.py'
-).read_text()
 
 required_executor = (
     "'require_target_sync_success', False",
@@ -30,17 +27,10 @@ required_generic = (
     "'target_sync_status_topic'",
     "'target_sync_timeout_sec'",
 )
-required_visual = (
-    "'require_target_sync_success': 'true'",
-    "'target_sync_status_topic': '/gazebo_target_sync_status'",
-    "'target_sync_timeout_sec': '10.0'",
-)
-
 missing = [item for item in required_executor if item not in executor]
 missing += [item for item in required_generic if item not in generic]
-missing += [item for item in required_visual if item not in visual]
 if missing:
     print(f"FAIL: missing target-sync gate entries: {', '.join(missing)}")
     sys.exit(1)
 
-print('PASS: visual execution requires target sync; generic default is false')
+print('PASS: target-sync execution gate exists and generic default is false')
