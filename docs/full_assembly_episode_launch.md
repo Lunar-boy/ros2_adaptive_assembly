@@ -6,12 +6,6 @@
 
 The launch includes full Gazebo Panda execution, Gazebo target pose synchronization, the logical grasp lifecycle, kinematic Gazebo attach/detach, the Gazebo achieved object pose observer, contact-lite insertion evaluation, and the passive assembly episode supervisor.
 
-The visual single-trial launch uses the explicit sequence `pre_grasp -> grasp
--> assembly`. Its source cylinder center is at `z=0.10`, which places the
-0.10 m-tall object on the support instead of floating above it. Logical and
-kinematic attachment occurs only after the ros2_control `grasp` stage reports
-success; aggregate execution success still releases the object.
-
 Before grasp attachment takes ownership, the target synchronizer mirrors
 `/target_pose` into the Gazebo `target_object`. It publishes retained status on
 `/gazebo_target_sync_status` and writes only while
@@ -57,45 +51,6 @@ The topic and terminal checks run while the full episode launch is active. Use `
 - No physical grasping
 - Final-pose geometric insertion evaluation only
 - No force control or contact-rich insertion
-- No real camera or visual servoing
+- No camera/image perception, marker detection, or visual servoing
 - No real robot hardware
 - No CSV/Markdown benchmark recorder is added by this launch
-
-## Single-trial visual episode demo
-
-```bash
-ros2 launch adaptive_assembly_bringup adaptive_assembly_full_episode_visual_demo.launch.py
-```
-
-This visual-correctness launch uses the deterministic source pose
-`(0.442, 0.148, 0.15)` and a distinct fixed socket/place pose
-`(0.62, -0.18, 0.10)`. It synchronizes the source pose into Gazebo before
-logical attachment, then evaluates `/gazebo_target_object_pose` against
-the desired final object pose on `/object_place_pose` with
-`achieved_pose_source=gazebo_entity_pose_observer`.
-
-`/panda_assembly_pose` remains the Panda hand planning target. It is distinct
-from the desired final object pose even though both currently use the fixed
-socket pose for backward compatibility.
-
-Before the first `FollowJointTrajectory` goal is sent, the visual demo gates
-execution on `/gazebo_target_sync_status` reporting `event=success`. This
-ensures Gazebo `target_object` has been moved to the planned source pose before
-the `pre_grasp -> grasp -> pre_place -> place -> release -> retreat` sequence
-starts. The object attaches after successful `grasp`, remains attached through
-`pre_place` and `place`, and releases before `retreat`. The gate has a 10-second
-timeout after trajectories and joint state are ready; generic execution demos
-leave it disabled by default.
-
-The demo remains simulator-only. Its gripper is logical, attachment is
-kinematic set-pose following, and insertion evaluation is final-pose geometry
-only. It provides no physical fingers, force control, contact-rich insertion,
-visual servoing, camera, or real-robot support.
-
-Validation:
-
-```bash
-python3 scripts/check_fixed_socket_assembly_pose.py
-bash scripts/check_visual_episode_launch_available.sh
-python3 scripts/check_visual_episode_config.py
-```

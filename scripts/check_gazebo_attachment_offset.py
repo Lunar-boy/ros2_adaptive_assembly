@@ -32,11 +32,8 @@ assert all(math.isclose(a, b, abs_tol=1e-12)
 
 attachment_launch = (ROOT / 'src/adaptive_assembly_manipulation/launch'
                      / 'gazebo_attach_detach.launch.py').read_text()
-visual_launch = (ROOT / 'src/adaptive_assembly_bringup/launch'
-                 / 'adaptive_assembly_full_episode_visual_demo.launch.py').read_text()
 for name in ('attached_object_offset_x', 'attached_object_offset_y',
              'attached_object_offset_z',
              'attached_object_use_hand_orientation'):
     assert name in attachment_launch, f'missing launch argument: {name}'
-assert "'attached_object_offset_z': '0.10'" in visual_launch
-print('PASS: Gazebo attachment offset math and launch wiring')
+print('PASS: Gazebo attachment offset math and generic launch wiring')

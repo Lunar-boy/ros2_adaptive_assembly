@@ -43,12 +43,6 @@ of this non-MoveIt pipeline. PR22 adds an optional TF2 transform mode to that
 adapter and a status topic, `/panda_pose_adapter_status`. The default pipeline
 and default adapter launch behavior remain unchanged.
 
-The Panda planning demo can also publish lightweight RViz2 markers for
-`/target_pose`, `/pre_grasp_pose`, `/assembly_pose`, and
-`/panda_pre_grasp_pose` on `/adaptive_assembly_markers`. This visualization is
-optional and does not modify the non-MoveIt pipeline. See
-[rviz_markers.md](rviz_markers.md).
-
 ## Run the pipeline
 
 ```bash

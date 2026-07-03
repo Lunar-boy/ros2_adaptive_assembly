@@ -2,35 +2,15 @@
 
 Launch entry points for the current adaptive assembly pipeline.
 
-The simulator-only vision demo composes a deterministic camera-frame
-marker-pose perception emulator, task pose generation, the headless Gazebo
-workcell, and target synchronization. It is not pixel-based vision:
-
-```bash
-ros2 launch adaptive_assembly_bringup \
-  adaptive_assembly_simulated_vision_demo.launch.py
-```
-
 This package connects:
 
-- `adaptive_assembly_perception`, which publishes `/target_pose` and broadcasts
-  TF `world -> target_object`
+- `adaptive_assembly_perception`, whose deterministic fake pose source
+  publishes `/target_pose` and broadcasts TF `world -> target_object`
 - `adaptive_assembly_task`, which subscribes to `/target_pose` and publishes
   `/pre_grasp_pose` and `/assembly_pose`
 
 This is intentionally the non-MoveIt pipeline launch. It does not start Gazebo,
 RViz, a robot model, ros2_control, or MoveIt2.
-
-The optional simulated-image ArUco path composes the OpenCV detector with the
-same task pipeline:
-
-```bash
-ros2 launch adaptive_assembly_bringup \
-  adaptive_assembly_opencv_aruco_demo.launch.py
-```
-
-It expects simulator camera topics and does not open real camera hardware. The
-existing marker-pose emulator remains the default headless fallback.
 
 The optional Gazebo workcell wrapper is separate:
 
@@ -110,6 +90,10 @@ ros2 launch adaptive_assembly_bringup \
 ```
 
 It does not execute trajectories or command real hardware.
+
+Camera/image-based perception, marker detection, visual servoing, and real
+visual pipelines are intentionally out of scope for this repository and may be
+developed in a separate future repository.
 
 ## Build
 

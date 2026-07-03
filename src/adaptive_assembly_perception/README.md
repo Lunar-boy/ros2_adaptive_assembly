@@ -1,21 +1,14 @@
-# Adaptive Assembly Perception
+# Adaptive Assembly Target-Pose Source
 
-This ROS 2 Jazzy package provides fake and simulated-vision inputs for the
-adaptive assembly pipeline. The `fake_object_pose_node` publishes a randomized
+This ROS 2 Jazzy package provides the deterministic target-pose source used by
+the adaptive assembly pipeline. The `fake_object_pose_node` publishes a sampled
 `geometry_msgs/msg/PoseStamped` on `/target_pose` and broadcasts the same pose
-as the `world` to `target_object` TF transform.
+as the `world` to `target_object` TF transform. A configured random seed makes
+the pose sequence reproducible for demos and benchmarks.
 
-The simulator-only `simulated_marker_pose_node` provides a deterministic
-camera-frame marker pose emulator, not pixel-based vision. It publishes the raw
-observation in `simulated_camera`, converts it to the existing world-frame
-pipeline interface, broadcasts matching camera and target TF frames, and emits
-retained status. See
-[`docs/simulated_vision_perception.md`](../../docs/simulated_vision_perception.md).
-
-The optional `aruco_detector_node` detects configured ArUco markers in
-simulator-published images when `cv2.aruco` is available. OpenCV is loaded
-lazily and is not a package dependency. See
-[`docs/opencv_aruco_perception.md`](../../docs/opencv_aruco_perception.md).
+Camera/image-based perception, marker detection, visual servoing, and real
+visual pipelines are intentionally out of scope for this repository and may be
+developed in a separate future repository.
 
 ## Parameters
 

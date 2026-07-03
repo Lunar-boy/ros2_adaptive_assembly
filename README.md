@@ -1,29 +1,28 @@
 # ROS2 Adaptive Assembly
 
-A ROS2 Jazzy + MoveIt2 project for perception-driven adaptive robotic assembly in simulation.
+A ROS2 Jazzy + MoveIt2 project for deterministic adaptive robotic assembly in simulation.
 
 This repository builds a lightweight adaptive manipulation pipeline that converts randomized object poses into robot-aware Panda planning targets, maintains TF and PlanningScene state, performs plan-only two-stage assembly planning, exports trajectories, records planning diagnostics, and provides deterministic benchmark profiles for evaluating robustness under target-pose variation.
 
 > **Current scope:** reproducible adaptive assembly planning plus simulator-only Gazebo Panda arm execution.
-> **Not yet included:** real camera hardware, contact-rich insertion, force
-> control, or real robot hardware execution.
+> **Not included:** camera/image perception, marker detection, visual servoing,
+> real camera hardware, contact-rich insertion, force control, or real robot
+> hardware execution.
 
 ---
 
 ## Why this project
 
-Industrial assembly systems are brittle when object poses, fixtures, tolerances, or workspace conditions deviate from fixed assumptions. This project explores a small, testable ROS2 architecture for adaptive manipulation, where target poses are generated from perception, transformed into robot-specific planning frames, checked against a MoveIt2 PlanningScene, and evaluated through reproducible planning benchmarks.
+Industrial assembly systems are brittle when object poses, fixtures, tolerances, or workspace conditions deviate from fixed assumptions. This project explores a small, testable ROS2 architecture for adaptive manipulation, where deterministic target poses are transformed into robot-specific planning frames, checked against a MoveIt2 PlanningScene, and evaluated through reproducible planning benchmarks.
 
-The project is intentionally designed as a lightweight software stack rather than a high-fidelity simulator-first demo. This keeps the pipeline portable to local machines while preserving clear extension points for Gazebo, `ros2_control`, perception modules, and real robot hardware interfaces.
+The project is intentionally designed as a lightweight software stack rather than a high-fidelity simulator-first demo. This keeps the pipeline portable to local machines while preserving clear extension points for Gazebo, `ros2_control`, and real robot hardware interfaces.
 
 ---
 
 ## Key features
 
 - ROS2 Jazzy workspace with modular Python packages
-- Fake perception node publishing randomized target object poses
-- Simulated marker-pose perception emulator (simulator-only)
-- Optional OpenCV ArUco simulated image detection (simulator-only)
+- Deterministic fake target-pose node publishing sampled target object poses
 - TF2 target frame broadcasting
 - Task-level pre-grasp and assembly pose generation
 - Panda-specific pose adapters for MoveIt2 planning
@@ -77,7 +76,7 @@ dry-run execution / simulator-only ros2_control execution
 contact-lite insertion evaluator
 ```
 
-The current pipeline separates perception, task-level pose generation, robot-specific pose adaptation, planning, diagnostics, and execution abstraction. This makes the system easy to test incrementally and extend toward simulator or hardware execution.
+The current pipeline separates target-pose generation, task-level pose generation, robot-specific pose adaptation, planning, diagnostics, and execution abstraction. This makes the system easy to test incrementally and extend toward simulator or hardware execution.
 
 ---
 
@@ -85,9 +84,7 @@ The current pipeline separates perception, task-level pose generation, robot-spe
 
 | Area | Status |
 |---|---|
-| Fake perception | Implemented |
-| Simulated marker-pose perception emulator | Implemented / simulator-only |
-| Optional OpenCV ArUco image detection | Implemented / optional / simulator-only |
+| Deterministic fake target pose | Implemented |
 | TF2 target broadcasting | Implemented |
 | Task-level pose generation | Implemented |
 | Panda-specific pose adaptation | Implemented |
@@ -115,8 +112,9 @@ The current pipeline separates perception, task-level pose generation, robot-spe
 | Gazebo achieved object pose observer | Implemented / simulator-only |
 | Gripper control and object attachment | Implemented / simulator-only |
 | Contact-rich insertion | Not implemented |
-| Real camera hardware | Not implemented |
-| Visual servoing and force control | Not implemented |
+| Camera/image perception and marker detection | Out of scope |
+| Visual servoing | Out of scope |
+| Force control | Not implemented |
 | Real robot execution | Not implemented |
 
 ---
@@ -132,7 +130,7 @@ ros2_adaptive_assembly/
     ├── adaptive_assembly_bringup/     # Launch files and integration entry points
     ├── adaptive_assembly_benchmark/   # Contact-lite geometric benchmark nodes
     ├── adaptive_assembly_execution/   # Dry-run and execution-bridge abstractions
-    ├── adaptive_assembly_perception/  # Fake perception and target-pose generation
+    ├── adaptive_assembly_perception/  # Deterministic fake target-pose generation
     ├── adaptive_assembly_recovery/    # Recovery supervisor and deterministic actions
     ├── adaptive_assembly_sim/         # Gazebo workcell assets and launch files
     └── adaptive_assembly_task/        # Task pose generation and planning adapters
@@ -252,49 +250,13 @@ bash scripts/run_pipeline_validation.sh
 bash scripts/echo_pipeline_once.sh
 ```
 
-### Simulated vision perception
-
-Run the deterministic no-camera marker-pose emulator by itself:
-
-```bash
-ros2 launch adaptive_assembly_perception \
-  simulated_vision_perception.launch.py
-```
-
-For the headless Gazebo target synchronization demo:
-
-```bash
-ros2 launch adaptive_assembly_bringup \
-  adaptive_assembly_simulated_vision_demo.launch.py
-```
-
-The camera-frame marker pose emulator publishes `/perceived_target_pose` in
-`simulated_camera`, then feeds the existing world-frame `/target_pose` and
-`world -> target_object` TF interfaces. It is not pixel-based vision and does
-not use a real camera or hardware. See
-[`docs/simulated_vision_perception.md`](docs/simulated_vision_perception.md).
-
-An optional pixel-based path consumes simulated camera images when OpenCV ArUco
-support is installed:
-
-```bash
-ros2 launch adaptive_assembly_bringup \
-  adaptive_assembly_opencv_aruco_demo.launch.py
-```
-
-It does not make OpenCV mandatory and does not support real camera hardware.
-The marker-pose emulator above remains the recommended default fallback. See
-[`docs/opencv_aruco_perception.md`](docs/opencv_aruco_perception.md).
-
----
-
 ### 2. Plan-only Panda pre-grasp planning
 
 ```bash
 ros2 launch adaptive_assembly_bringup adaptive_assembly_panda_planning_demo.launch.py
 ```
 
-This starts the adaptive pose pipeline, Panda pose adaptation, MoveIt2 plan-only planning, static PlanningScene objects, optional dynamic target collision objects, diagnostics, and visualization markers.
+This starts the adaptive pose pipeline, Panda pose adaptation, MoveIt2 plan-only planning, static PlanningScene objects, optional dynamic target collision objects, and diagnostics.
 
 Useful diagnostics:
 
@@ -807,35 +769,6 @@ python3 scripts/check_full_episode_terminal_status.py
 See [`docs/full_assembly_episode_launch.md`](docs/full_assembly_episode_launch.md)
 for composition details, success criteria, and limitations.
 
-### Single-trial visual episode demo
-
-Launch the visual-correctness profile with distinct deterministic source and
-socket/place poses:
-
-```bash
-ros2 launch adaptive_assembly_bringup adaptive_assembly_full_episode_visual_demo.launch.py
-```
-
-This remains simulator-only, with a logical gripper, kinematic object
-attachment, and final-pose geometric insertion evaluation. The visual profile
-places the cylinder center at `z=0.10` so it rests on the support and uses
-`pre_grasp -> grasp -> pre_place -> place -> release -> retreat`. Attachment
-occurs after successful `grasp`; release occurs after successful `place`, so
-the detached object remains at the socket during retreat. It does not model
-physical gripping, force control, or contact-rich insertion. See
-[`docs/full_assembly_episode_launch.md`](docs/full_assembly_episode_launch.md).
-
-The visual evaluator compares the desired final object pose on
-`/object_place_pose` with the observed Gazebo pose on
-`/gazebo_target_object_pose`. `/panda_assembly_pose` remains the Panda hand
-planning target and is not used as the evaluator target.
-
-The visual executor also waits for `/gazebo_target_sync_status` to report
-`event=success` before sending its first ros2_control trajectory. This prevents
-execution from starting before Gazebo mirrors the planned source pose. The
-gate applies only at sequence startup and is disabled by default in generic
-execution demos.
-
 ### Suggested result table
 
 After recording benchmark data, add a small result table here:
@@ -877,13 +810,16 @@ Implemented:
 
 Not yet implemented:
 
-- camera-based perception;
+- camera/image perception, ArUco, and marker detection;
+- visual servoing and real camera hardware;
 - contact-rich insertion physics;
 - force-controlled or tactile insertion behavior;
 - force/torque feedback control;
 - real robot hardware execution.
 
-These are planned extensions after the planning, scene, diagnostics, and benchmark layers are stable.
+Camera/image-based perception, marker detection, visual servoing, and real
+visual pipelines are intentionally out of scope for this repository and may be
+developed in a separate future repository.
 
 ---
 
@@ -893,7 +829,7 @@ This project is motivated by industrial assembly scenarios where fixed, hard-cod
 
 The current implementation focuses on the software architecture required for adaptive manipulation:
 
-- perception-driven target poses;
+- deterministic target poses;
 - TF-based frame handling;
 - robot-specific pose adaptation;
 - collision-aware MoveIt2 planning;

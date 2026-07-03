@@ -15,11 +15,6 @@ adapter keeps the existing simple behavior:
 This mode is intentionally simple and remains the default for current demos and
 benchmarks.
 
-PR25 adds optional RViz2 marker visualization for both task-level poses and the
-adapted Panda pose. The markers are published separately on
-`/adaptive_assembly_markers` and do not change pose adapter behavior. See
-[rviz_markers.md](rviz_markers.md).
-
 ## Optional TF2 transform mode
 
 When `use_tf_transform: true`, the adapter uses TF2 to transform the incoming
