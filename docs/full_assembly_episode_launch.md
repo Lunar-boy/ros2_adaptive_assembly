@@ -45,3 +45,29 @@ The topic and terminal checks run while the full episode launch is active. Use `
 - No real camera or visual servoing
 - No real robot hardware
 - No CSV/Markdown benchmark recorder is added by this launch
+
+## Single-trial visual episode demo
+
+```bash
+ros2 launch adaptive_assembly_bringup adaptive_assembly_full_episode_visual_demo.launch.py
+```
+
+This visual-correctness launch uses the deterministic source pose
+`(0.442, 0.148, 0.15)` and a distinct fixed socket/place pose
+`(0.62, -0.18, 0.10)`. It synchronizes the source pose into Gazebo before
+logical attachment, then evaluates `/gazebo_target_object_pose` against
+`/panda_assembly_pose` with
+`achieved_pose_source=gazebo_entity_pose_observer`.
+
+The demo remains simulator-only. Its gripper is logical, attachment is
+kinematic, and insertion evaluation is final-pose geometry only; it provides
+no real gripper physics, force/contact insertion, visual servoing, camera, or
+hardware support.
+
+Validation:
+
+```bash
+python3 scripts/check_fixed_socket_assembly_pose.py
+bash scripts/check_visual_episode_launch_available.sh
+python3 scripts/check_visual_episode_config.py
+```

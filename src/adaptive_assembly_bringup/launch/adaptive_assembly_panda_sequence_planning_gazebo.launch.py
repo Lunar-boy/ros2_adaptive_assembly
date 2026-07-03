@@ -1,9 +1,9 @@
 """Launch known-reachable planning without a mock ros2_control stack."""
 
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, LogInfo
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 from moveit_configs_utils import MoveItConfigsBuilder
@@ -18,6 +18,7 @@ def generate_launch_description() -> LaunchDescription:
         'config',
         'adaptive_assembly_sequence_reachable_params.yaml',
     ])
+    params_file = LaunchConfiguration('params_file')
     pipeline_launch = PathJoinSubstitution([
         bringup_share,
         'launch',
@@ -75,6 +76,10 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'params_file', default_value=reachable_params,
+            description='Parameter YAML for perception and task nodes.',
+        ),
         LogInfo(msg=(
             'Launching Gazebo-compatible plan-only Panda sequence planning. '
             'move_group consumes Gazebo joint states; no mock ros2_control '
@@ -82,7 +87,7 @@ def generate_launch_description() -> LaunchDescription:
         )),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(pipeline_launch),
-            launch_arguments={'params_file': reachable_params}.items(),
+            launch_arguments={'params_file': params_file}.items(),
         ),
         Node(
             package='moveit_ros_move_group',

@@ -34,6 +34,7 @@ def generate_launch_description() -> LaunchDescription:
     )
     world = LaunchConfiguration('world')
     gz_args = LaunchConfiguration('gz_args')
+    params_file = LaunchConfiguration('params_file')
     default_world = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_sim'),
         'worlds',
@@ -41,6 +42,14 @@ def generate_launch_description() -> LaunchDescription:
     ])
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'params_file',
+            default_value=PathJoinSubstitution([
+                FindPackageShare('adaptive_assembly_bringup'), 'config',
+                'adaptive_assembly_sequence_reachable_params.yaml',
+            ]),
+            description='Parameter YAML for perception and task nodes.',
+        ),
         DeclareLaunchArgument(
             'controller_action_name',
             default_value='/panda_arm_controller/follow_joint_trajectory',
@@ -90,6 +99,7 @@ def generate_launch_description() -> LaunchDescription:
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(planning_launch),
+            launch_arguments={'params_file': params_file}.items(),
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(execution_launch),
