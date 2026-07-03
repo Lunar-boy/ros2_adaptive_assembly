@@ -17,6 +17,7 @@ def generate_launch_description() -> LaunchDescription:
     }
     string_defaults = {
         'grasp_pose_topic': '/grasp_pose',
+        'object_place_pose_topic': '/object_place_pose',
         'assembly_pose_mode': 'target_offset',
         'socket_frame_id': 'world',
     }

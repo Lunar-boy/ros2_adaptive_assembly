@@ -76,7 +76,7 @@ def generate_launch_description() -> LaunchDescription:
             name='contact_lite_insertion_evaluator_node',
             output='screen',
             parameters=[{
-                'target_pose_topic': '/panda_assembly_pose',
+                'target_pose_topic': '/object_place_pose',
                 'achieved_pose_topic': '/gazebo_target_object_pose',
                 'achieved_pose_source': 'gazebo_entity_pose_observer',
                 'require_execution_success': True,

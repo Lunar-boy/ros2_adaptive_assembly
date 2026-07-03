@@ -12,7 +12,7 @@ config = (root / 'src/adaptive_assembly_bringup/config/'
 required_launch = (
     'adaptive_assembly_visual_single_trial_params.yaml',
     'gazebo_target_pose_sync.launch.py',
-    "'target_pose_topic': '/panda_assembly_pose'",
+    "'target_pose_topic': '/object_place_pose'",
     "'achieved_pose_topic': '/gazebo_target_object_pose'",
     "'achieved_pose_source': 'gazebo_entity_pose_observer'",
     "'require_execution_success': True",
@@ -23,6 +23,8 @@ required_config = (
 )
 missing = [item for item in required_launch if item not in launch]
 missing += [item for item in required_config if item not in config]
+if "'target_pose_topic': '/panda_assembly_pose'" in launch:
+    missing.append('visual evaluator must not target /panda_assembly_pose')
 if missing:
     print(f"FAIL: missing visual contract entries: {', '.join(missing)}")
     sys.exit(1)
