@@ -836,6 +836,15 @@ execution from starting before Gazebo mirrors the planned source pose. The
 gate applies only at sequence startup and is disabled by default in generic
 execution demos.
 
+Before any planning, execution, grasp lifecycle, evaluation, or supervision
+starts, the visual launch now waits on retained
+`/gazebo_controller_ready_status`. Success requires both Panda controllers to
+be active, the simulated `FollowJointTrajectory` server to be available, and
+finite values for all seven Panda joints on `/joint_states`. The target-sync
+gate remains the second startup gate before the first trajectory goal. The
+episode supervisor waits for an explicit terminal executor status (or its
+episode timeout) and does not infer failure from an initially absent success.
+
 ### Suggested result table
 
 After recording benchmark data, add a small result table here:

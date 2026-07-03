@@ -9,6 +9,8 @@ sequence trajectories:
   them in order to a simulated `FollowJointTrajectory` controller.
 - `simulated_follow_joint_trajectory_server_node` provides deterministic
   success, rejection, failure, and timeout modes for local action-level checks.
+- `wait_for_gazebo_controller_ready_node` publishes retained readiness only
+  after both controllers, the action server, and valid Panda joint states exist.
 
 The ros2_control node can use the local fixture or an externally running
 simulator/controller stack. It does not define ros2_control hardware, move a

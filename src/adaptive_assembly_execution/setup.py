@@ -37,6 +37,12 @@ setup(
             'simulated_follow_joint_trajectory_server_node = '
             'adaptive_assembly_execution.'
             'simulated_follow_joint_trajectory_server_node:main',
+            'wait_for_gazebo_controller_ready_node = '
+            'adaptive_assembly_execution.'
+            'wait_for_gazebo_controller_ready_node:main',
+            'wait_for_gazebo_controller_ready_status_node = '
+            'adaptive_assembly_execution.'
+            'wait_for_gazebo_controller_ready_status_node:main',
         ],
     },
 )
