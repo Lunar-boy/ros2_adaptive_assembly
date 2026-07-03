@@ -20,6 +20,11 @@ def generate_launch_description() -> LaunchDescription:
         'launch',
         'gazebo_entity_pose_observer.launch.py',
     ])
+    target_sync = PathJoinSubstitution([
+        FindPackageShare('adaptive_assembly_sim'),
+        'launch',
+        'gazebo_target_pose_sync.launch.py',
+    ])
     episode_supervisor = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_episode'),
         'launch',
@@ -56,11 +61,26 @@ def generate_launch_description() -> LaunchDescription:
             }.items(),
         ),
         IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(target_sync),
+            launch_arguments={
+                'target_pose_topic': '/target_pose',
+                'target_entity_name': config['target_entity_name'],
+                'world_frame': config['world_frame'],
+                'enable_service_calls': config['enable_service_calls'],
+                'simulated_only': config['simulated_only'],
+                'control_owner_topic': '/target_object_control_owner',
+                'status_topic': '/gazebo_target_sync_status',
+                'pose_error_mm_topic': '/gazebo_target_pose_error_mm',
+                'pose_error_deg_topic': '/gazebo_target_pose_error_deg',
+            }.items(),
+        ),
+        IncludeLaunchDescription(
             PythonLaunchDescriptionSource(pose_observer),
             launch_arguments={
                 'target_entity_name': config['target_entity_name'],
                 'world_frame': config['world_frame'],
                 'output_pose_topic': config['achieved_pose_topic'],
+                'status_topic': '/gazebo_target_object_pose_status',
                 'simulated_only': config['simulated_only'],
             }.items(),
         ),
