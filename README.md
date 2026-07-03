@@ -781,10 +781,15 @@ Launch the complete simulator-only composed episode:
 ros2 launch adaptive_assembly_bringup adaptive_assembly_full_episode_demo.launch.py
 ```
 
+The episode synchronizes `/target_pose` into the Gazebo `target_object` before
+grasp attachment changes `/target_object_control_owner` from `target_sync`.
+Synchronization status is available on `/gazebo_target_sync_status`.
+
 While it is active, validate launch discovery, topics, and terminal status:
 
 ```bash
 bash scripts/check_full_episode_launch_available.sh
+python3 scripts/check_full_episode_target_sync.py
 bash scripts/check_full_episode_topics.sh
 python3 scripts/check_full_episode_terminal_status.py
 ```

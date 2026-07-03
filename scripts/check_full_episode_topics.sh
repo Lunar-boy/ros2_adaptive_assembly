@@ -6,6 +6,7 @@ topics=(
   /assembly_ros2_control_execution_success
   /logical_grasp_lifecycle_status
   /gazebo_attach_detach_status
+  /gazebo_target_sync_status
   /gazebo_target_object_pose
   /gazebo_target_object_pose_status
   /assembly_insertion_status

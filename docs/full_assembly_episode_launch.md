@@ -4,7 +4,14 @@
 
 `adaptive_assembly_full_episode_demo.launch.py` composes one complete simulator-only assembly episode from existing runtime components. It adds no new node behavior.
 
-The launch includes full Gazebo Panda execution, the logical grasp lifecycle, kinematic Gazebo attach/detach, the Gazebo achieved object pose observer, contact-lite insertion evaluation, and the passive assembly episode supervisor.
+The launch includes full Gazebo Panda execution, Gazebo target pose synchronization, the logical grasp lifecycle, kinematic Gazebo attach/detach, the Gazebo achieved object pose observer, contact-lite insertion evaluation, and the passive assembly episode supervisor.
+
+Before grasp attachment takes ownership, the target synchronizer mirrors
+`/target_pose` into the Gazebo `target_object`. It publishes retained status on
+`/gazebo_target_sync_status` and writes only while
+`/target_object_control_owner` is `target_sync`. While attached,
+`gripper_attach` owns the object; after release, the `released` state leaves it
+at its final world pose.
 
 ## Run
 
@@ -29,6 +36,7 @@ With the workspace built and sourced:
 
 ```bash
 bash scripts/check_full_episode_launch_available.sh
+python3 scripts/check_full_episode_target_sync.py
 bash scripts/check_full_episode_topics.sh
 python3 scripts/check_full_episode_terminal_status.py
 ```
@@ -40,6 +48,7 @@ The topic and terminal checks run while the full episode launch is active. Use `
 - Simulator-only
 - Logical gripper only
 - Kinematic Gazebo attachment only
+- No physical grasping
 - Final-pose geometric insertion evaluation only
 - No force control or contact-rich insertion
 - No real camera or visual servoing
