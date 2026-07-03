@@ -53,6 +53,12 @@ deterministic terminal non-success produces `event=failure` with
 `failure_reason=episode_timeout`. A process publishes at most one terminal
 result.
 
+An absent or false execution-success signal is pending evidence, not terminal
+failure. `execution_failed` is emitted only after the execution status topic
+reports an explicit terminal non-success event such as `failure`, `skipped`,
+`rejected`, or `timeout`; otherwise the episode remains pending until its
+overall timeout.
+
 ## Run and validate
 
 ```bash
