@@ -26,10 +26,12 @@ def generate_launch_description() -> LaunchDescription:
     enable_calls = LaunchConfiguration('enable_service_calls')
     params_file = LaunchConfiguration('params_file')
     require_grasp = LaunchConfiguration('require_grasp_trajectory')
+    require_place = LaunchConfiguration('require_place_sequence')
     require_target_sync = LaunchConfiguration('require_target_sync_success')
     target_sync_topic = LaunchConfiguration('target_sync_status_topic')
     target_sync_timeout = LaunchConfiguration('target_sync_timeout_sec')
     attach_stage = LaunchConfiguration('attach_stage')
+    release_stage = LaunchConfiguration('release_stage')
     offset_x = LaunchConfiguration('attached_object_offset_x')
     offset_y = LaunchConfiguration('attached_object_offset_y')
     offset_z = LaunchConfiguration('attached_object_offset_z')
@@ -49,6 +51,7 @@ def generate_launch_description() -> LaunchDescription:
             'require_grasp_trajectory', default_value='false',
             description='Plan and execute the intermediate grasp stage.',
         ),
+        DeclareLaunchArgument('require_place_sequence', default_value='false'),
         DeclareLaunchArgument(
             'require_target_sync_success', default_value='false',
             description='Optionally gate initial execution on target sync.',
@@ -64,6 +67,7 @@ def generate_launch_description() -> LaunchDescription:
             'attach_stage', default_value='pre_grasp',
             description='Successful execution stage that triggers attachment.',
         ),
+        DeclareLaunchArgument('release_stage', default_value='execution_success'),
         DeclareLaunchArgument(
             'enable_service_calls', default_value='true',
             description=(
@@ -85,6 +89,7 @@ def generate_launch_description() -> LaunchDescription:
             launch_arguments={
                 'params_file': params_file,
                 'require_grasp_trajectory': require_grasp,
+                'require_place_sequence': require_place,
                 'require_target_sync_success': require_target_sync,
                 'target_sync_status_topic': target_sync_topic,
                 'target_sync_timeout_sec': target_sync_timeout,
@@ -92,7 +97,10 @@ def generate_launch_description() -> LaunchDescription:
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(lifecycle),
-            launch_arguments={'attach_stage': attach_stage}.items(),
+            launch_arguments={
+                'attach_stage': attach_stage,
+                'release_stage': release_stage,
+            }.items(),
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(attachment),

@@ -81,14 +81,16 @@ socket pose for backward compatibility.
 Before the first `FollowJointTrajectory` goal is sent, the visual demo gates
 execution on `/gazebo_target_sync_status` reporting `event=success`. This
 ensures Gazebo `target_object` has been moved to the planned source pose before
-the `pre_grasp -> grasp -> assembly` sequence starts. The gate has a 10-second
+the `pre_grasp -> grasp -> pre_place -> place -> release -> retreat` sequence
+starts. The object attaches after successful `grasp`, remains attached through
+`pre_place` and `place`, and releases before `retreat`. The gate has a 10-second
 timeout after trajectories and joint state are ready; generic execution demos
 leave it disabled by default.
 
 The demo remains simulator-only. Its gripper is logical, attachment is
-kinematic, and insertion evaluation is final-pose geometry only; it provides
-no real gripper physics, force/contact insertion, visual servoing, camera, or
-hardware support.
+kinematic set-pose following, and insertion evaluation is final-pose geometry
+only. It provides no physical fingers, force control, contact-rich insertion,
+visual servoing, camera, or real-robot support.
 
 Validation:
 
