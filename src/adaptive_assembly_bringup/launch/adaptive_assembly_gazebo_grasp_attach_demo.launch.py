@@ -26,6 +26,12 @@ def generate_launch_description() -> LaunchDescription:
     params_file = LaunchConfiguration('params_file')
     require_grasp = LaunchConfiguration('require_grasp_trajectory')
     attach_stage = LaunchConfiguration('attach_stage')
+    offset_x = LaunchConfiguration('attached_object_offset_x')
+    offset_y = LaunchConfiguration('attached_object_offset_y')
+    offset_z = LaunchConfiguration('attached_object_offset_z')
+    use_hand_orientation = LaunchConfiguration(
+        'attached_object_use_hand_orientation'
+    )
     return LaunchDescription([
         DeclareLaunchArgument(
             'params_file',
@@ -49,6 +55,12 @@ def generate_launch_description() -> LaunchDescription:
                 'Call Gazebo set_pose; false enables fixture validation.'
             ),
         ),
+        DeclareLaunchArgument('attached_object_offset_x', default_value='0.0'),
+        DeclareLaunchArgument('attached_object_offset_y', default_value='0.0'),
+        DeclareLaunchArgument('attached_object_offset_z', default_value='0.0'),
+        DeclareLaunchArgument(
+            'attached_object_use_hand_orientation', default_value='true'
+        ),
         LogInfo(msg=(
             'Launching simulator-only Gazebo Panda execution with logical '
             'grasp lifecycle and kinematic object attachment.'
@@ -66,6 +78,12 @@ def generate_launch_description() -> LaunchDescription:
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(attachment),
-            launch_arguments={'enable_service_calls': enable_calls}.items(),
+            launch_arguments={
+                'enable_service_calls': enable_calls,
+                'attached_object_offset_x': offset_x,
+                'attached_object_offset_y': offset_y,
+                'attached_object_offset_z': offset_z,
+                'attached_object_use_hand_orientation': use_hand_orientation,
+            }.items(),
         ),
     ])

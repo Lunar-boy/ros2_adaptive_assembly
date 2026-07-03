@@ -48,6 +48,8 @@ def generate_launch_description() -> LaunchDescription:
                 'params_file': params_file,
                 'require_grasp_trajectory': 'true',
                 'attach_stage': 'grasp',
+                # Local panda_hand +Z keeps the cylinder visibly at the tool.
+                'attached_object_offset_z': '0.10',
             }.items(),
         ),
         IncludeLaunchDescription(

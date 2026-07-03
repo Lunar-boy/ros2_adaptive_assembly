@@ -14,6 +14,8 @@ from ros_gz_interfaces.srv import SetEntityPose
 from std_msgs.msg import Bool, Float64, String
 from tf2_ros import Buffer, TransformException, TransformListener
 
+from .attachment_math import rotate_vector_by_quaternion
+
 
 def parse_status(value: str) -> Dict[str, str]:
     """Parse a semicolon-delimited project status message."""
@@ -26,13 +28,22 @@ def parse_status(value: str) -> Dict[str, str]:
     return result
 
 
-def transform_to_pose(transform) -> Pose:
+def transform_to_pose(
+    transform, offset=(0.0, 0.0, 0.0), use_orientation=True
+) -> Pose:
     """Convert a stamped TF transform to a Gazebo world pose."""
     pose = Pose()
-    pose.position.x = transform.transform.translation.x
-    pose.position.y = transform.transform.translation.y
-    pose.position.z = transform.transform.translation.z
-    pose.orientation = transform.transform.rotation
+    rotation = transform.transform.rotation
+    rotated_offset = rotate_vector_by_quaternion(
+        offset, (rotation.x, rotation.y, rotation.z, rotation.w)
+    )
+    pose.position.x = transform.transform.translation.x + rotated_offset[0]
+    pose.position.y = transform.transform.translation.y + rotated_offset[1]
+    pose.position.z = transform.transform.translation.z + rotated_offset[2]
+    if use_orientation:
+        pose.orientation = rotation
+    else:
+        pose.orientation.w = 1.0
     return pose
 
 
@@ -51,6 +62,10 @@ class GazeboAttachDetachNode(Node):
             'target_entity_name': 'target_object',
             'world_frame': 'world',
             'gripper_frame': 'panda_hand',
+            'attached_object_offset_x': 0.0,
+            'attached_object_offset_y': 0.0,
+            'attached_object_offset_z': 0.0,
+            'attached_object_use_hand_orientation': True,
             'attach_update_period_sec': 0.05,
             'service_timeout_sec': 2.0,
             'enable_service_calls': True,
@@ -113,6 +128,7 @@ class GazeboAttachDetachNode(Node):
             'Gazebo attach/detach ready: '
             f"object={self._values['target_entity_name']}, "
             f"gripper={self._values['gripper_frame']}, "
+            f'offset={self._offset_status_value()}, '
             'enable_service_calls='
             f"{str(self._values['enable_service_calls']).lower()}, "
             'simulated_only=true, real_hardware=false'
@@ -136,6 +152,21 @@ class GazeboAttachDetachNode(Node):
             )
         if float(self._values['service_timeout_sec']) <= 0.0:
             raise ValueError('service_timeout_sec must be greater than zero')
+        for name in (
+            'attached_object_offset_x', 'attached_object_offset_y',
+            'attached_object_offset_z',
+        ):
+            if not math.isfinite(float(self._values[name])):
+                raise ValueError(f'{name} must be a finite number')
+
+    def _offset(self):
+        return tuple(float(self._values[name]) for name in (
+            'attached_object_offset_x', 'attached_object_offset_y',
+            'attached_object_offset_z',
+        ))
+
+    def _offset_status_value(self) -> str:
+        return ','.join(str(value) for value in self._offset())
 
     def _on_grasp_state(self, message: String) -> None:
         fields = parse_status(message.data)
@@ -197,7 +228,10 @@ class GazeboAttachDetachNode(Node):
             self._publish_status('skipped', 'tf_unavailable')
             self._error_pub.publish(Float64(data=math.nan))
             return
-        pose = transform_to_pose(transform)
+        pose = transform_to_pose(
+            transform, self._offset(),
+            bool(self._values['attached_object_use_hand_orientation']),
+        )
         self._last_pose = pose
         if not bool(self._values['enable_service_calls']):
             self._publish_status('skipped', 'service_calls_disabled')
@@ -259,6 +293,8 @@ class GazeboAttachDetachNode(Node):
             fields.append(f'reason={reason}')
         fields.append(f'owner={self._owner}')
         fields.append(f"object={self._values['target_entity_name']}")
+        if event in ('ready', 'attached'):
+            fields.append(f'hand_to_object_offset={self._offset_status_value()}')
         if parent:
             fields.append(f'parent={parent}')
         fields.extend(['simulated_only=true', 'real_hardware=false'])
