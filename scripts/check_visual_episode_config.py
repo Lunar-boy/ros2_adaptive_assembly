@@ -16,6 +16,9 @@ required_launch = (
     "'achieved_pose_topic': '/gazebo_target_object_pose'",
     "'achieved_pose_source': 'gazebo_entity_pose_observer'",
     "'require_execution_success': True",
+    "'require_target_sync_success': 'true'",
+    "'target_sync_status_topic': '/gazebo_target_sync_status'",
+    "'target_sync_timeout_sec': '10.0'",
 )
 required_config = (
     'assembly_pose_mode: fixed_socket', 'socket_x: 0.62',

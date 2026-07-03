@@ -40,6 +40,9 @@ def generate_launch_description() -> LaunchDescription:
     require_panda_joints = LaunchConfiguration('require_panda_joints')
     expected_joint_prefix = LaunchConfiguration('expected_joint_prefix')
     simulated_only = LaunchConfiguration('simulated_execution_only')
+    require_target_sync = LaunchConfiguration('require_target_sync_success')
+    target_sync_topic = LaunchConfiguration('target_sync_status_topic')
+    target_sync_timeout = LaunchConfiguration('target_sync_timeout_sec')
     use_planning_scene_audit = LaunchConfiguration(
         'use_planning_scene_audit'
     )
@@ -136,6 +139,19 @@ def generate_launch_description() -> LaunchDescription:
             description='Safety invariant; false is unsupported.',
         ),
         DeclareLaunchArgument(
+            'require_target_sync_success', default_value='false',
+            description='Gate initial controller execution on target sync.',
+        ),
+        DeclareLaunchArgument(
+            'target_sync_status_topic',
+            default_value='/gazebo_target_sync_status',
+            description='Retained Gazebo target-sync status topic.',
+        ),
+        DeclareLaunchArgument(
+            'target_sync_timeout_sec', default_value='10.0',
+            description='Ready-state wait for target-sync success.',
+        ),
+        DeclareLaunchArgument(
             'use_planning_scene_audit',
             default_value='true',
             description='Include the read-only PlanningScene audit.',
@@ -189,6 +205,13 @@ def generate_launch_description() -> LaunchDescription:
                 'expected_joint_prefix': expected_joint_prefix,
                 'simulated_execution_only': ParameterValue(
                     simulated_only, value_type=bool
+                ),
+                'require_target_sync_success': ParameterValue(
+                    require_target_sync, value_type=bool
+                ),
+                'target_sync_status_topic': target_sync_topic,
+                'target_sync_timeout_sec': ParameterValue(
+                    target_sync_timeout, value_type=float
                 ),
             }],
         ),

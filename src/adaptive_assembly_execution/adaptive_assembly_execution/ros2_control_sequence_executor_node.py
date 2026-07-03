@@ -20,6 +20,16 @@ from sensor_msgs.msg import JointState
 from std_msgs.msg import Bool, Float64, String
 
 
+def parse_status(status: str) -> dict[str, str]:
+    """Parse semicolon-delimited key/value status fields."""
+    fields = {}
+    for fragment in status.split(';'):
+        if '=' in fragment:
+            key, value = fragment.split('=', 1)
+            fields[key.strip()] = value.strip()
+    return fields
+
+
 class Ros2ControlSequenceExecutorNode(Node):
     """Execute an exported two- or three-stage sequence via ros2_control."""
 
@@ -66,6 +76,11 @@ class Ros2ControlSequenceExecutorNode(Node):
         self.declare_parameter('require_joint_state', True)
         self.declare_parameter('start_state_tolerance', 0.05)
         self.declare_parameter('simulated_execution_only', True)
+        self.declare_parameter('require_target_sync_success', False)
+        self.declare_parameter(
+            'target_sync_status_topic', '/gazebo_target_sync_status'
+        )
+        self.declare_parameter('target_sync_timeout_sec', 10.0)
 
         self._pre_grasp_topic = self.get_parameter(
             'pre_grasp_trajectory_topic'
@@ -122,6 +137,15 @@ class Ros2ControlSequenceExecutorNode(Node):
         self._simulated_execution_only = self.get_parameter(
             'simulated_execution_only'
         ).value
+        self._target_sync_required = self.get_parameter(
+            'require_target_sync_success'
+        ).value
+        self._target_sync_status_topic = self.get_parameter(
+            'target_sync_status_topic'
+        ).value
+        self._target_sync_timeout_sec = self.get_parameter(
+            'target_sync_timeout_sec'
+        ).value
         self._validate_parameters()
 
         result_qos = QoSProfile(
@@ -141,6 +165,23 @@ class Ros2ControlSequenceExecutorNode(Node):
         self._stage_status_publisher = self.create_publisher(
             String, self._stage_status_topic, 10
         )
+
+        self._pre_grasp_trajectory: Optional[RobotTrajectory] = None
+        self._grasp_trajectory: Optional[RobotTrajectory] = None
+        self._assembly_trajectory: Optional[RobotTrajectory] = None
+        self._sequence_start = 0.0
+        self._stage_start = 0.0
+        self._started = False
+        self._completed = False
+        self._result_timer = None
+        self._current_joint_positions = {}
+        self._joint_state_received = False
+        self._target_sync_succeeded = False
+        self._target_sync_failed = False
+        self._target_sync_failure_reason = ''
+        self._target_sync_mode = ''
+        self._target_sync_deadline: Optional[float] = None
+        self._target_sync_waiting_published = False
 
         self._action_client = ActionClient(
             self,
@@ -171,17 +212,20 @@ class Ros2ControlSequenceExecutorNode(Node):
             self._joint_state_callback,
             10,
         )
-
-        self._pre_grasp_trajectory: Optional[RobotTrajectory] = None
-        self._grasp_trajectory: Optional[RobotTrajectory] = None
-        self._assembly_trajectory: Optional[RobotTrajectory] = None
-        self._sequence_start = 0.0
-        self._stage_start = 0.0
-        self._started = False
-        self._completed = False
-        self._result_timer = None
-        self._current_joint_positions = {}
-        self._joint_state_received = False
+        target_sync_qos = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self._target_sync_subscription = self.create_subscription(
+            String,
+            self._target_sync_status_topic,
+            self._target_sync_status_callback,
+            target_sync_qos,
+        )
+        self._target_sync_timer = self.create_timer(
+            0.1, self._target_sync_timeout_callback
+        )
 
         self.get_logger().info(
             'Simulator-only ros2_control sequence executor ready: '
@@ -196,6 +240,9 @@ class Ros2ControlSequenceExecutorNode(Node):
             f'send_goals={self._send_goals}, '
             f"joint_state_topic='{self._joint_state_topic}', "
             f'require_joint_state={self._require_joint_state}, '
+            f'require_target_sync_success={self._target_sync_required}, '
+            f"target_sync_status_topic='{self._target_sync_status_topic}', "
+            f'target_sync_timeout_sec={self._target_sync_timeout_sec}, '
             'simulated_execution_only=true, real_hardware=false.'
         )
 
@@ -215,6 +262,15 @@ class Ros2ControlSequenceExecutorNode(Node):
         if self._start_state_tolerance < 0.0:
             raise ValueError(
                 'start_state_tolerance must be greater than or equal to zero'
+            )
+        if self._target_sync_required and not self._target_sync_status_topic:
+            raise ValueError(
+                'target_sync_status_topic must not be empty when target sync '
+                'is required'
+            )
+        if self._target_sync_timeout_sec <= 0.0:
+            raise ValueError(
+                'target_sync_timeout_sec must be greater than zero'
             )
         if not self._simulated_execution_only:
             raise ValueError(
@@ -259,17 +315,67 @@ class Ros2ControlSequenceExecutorNode(Node):
         self._joint_state_received = True
         self._try_start_sequence()
 
+    def _target_sync_status_callback(self, message: String) -> None:
+        """Open or fail the execution gate from retained sync status."""
+        if not self._target_sync_required or self._started or self._completed:
+            return
+        fields = parse_status(message.data)
+        event = fields.get('event', '').lower()
+        self._target_sync_mode = fields.get('mode', '')
+        if event == 'success':
+            self._target_sync_succeeded = True
+            self._target_sync_deadline = None
+            self.get_logger().info(
+                'Target sync succeeded; ros2_control execution gate opened.'
+            )
+            self._try_start_sequence()
+            return
+        if event == 'failure':
+            self._target_sync_failed = True
+            self._target_sync_failure_reason = fields.get('reason', '')
+            self._publish_target_sync_terminal('target_sync_failed')
+
+    def _execution_prerequisites_ready(self) -> bool:
+        """Return whether trajectory and joint-state inputs are complete."""
+        return all((
+            self._pre_grasp_trajectory is not None,
+            self._assembly_trajectory is not None,
+            not self._require_grasp_trajectory
+            or self._grasp_trajectory is not None,
+            not self._require_joint_state or self._joint_state_received,
+        ))
+
+    def _target_sync_timeout_callback(self) -> None:
+        """Fail once a ready sequence has waited too long for target sync."""
+        if (
+            not self._target_sync_required
+            or self._target_sync_succeeded
+            or self._started
+            or self._completed
+            or self._target_sync_deadline is None
+        ):
+            return
+        if time.monotonic() >= self._target_sync_deadline:
+            self._publish_target_sync_terminal('target_sync_timeout')
+
     def _try_start_sequence(self) -> None:
         """Validate both trajectories and connect to the controller once."""
-        if self._started:
+        if self._started or self._completed:
             return
-        if self._pre_grasp_trajectory is None:
+        if not self._execution_prerequisites_ready():
             return
-        if self._assembly_trajectory is None:
-            return
-        if self._require_grasp_trajectory and self._grasp_trajectory is None:
-            return
-        if self._require_joint_state and not self._joint_state_received:
+        if self._target_sync_required and not self._target_sync_succeeded:
+            if self._target_sync_deadline is None:
+                self._target_sync_deadline = (
+                    time.monotonic() + self._target_sync_timeout_sec
+                )
+            if not self._target_sync_waiting_published:
+                self._target_sync_waiting_published = True
+                self._publish_stage_status(
+                    'event=waiting;mode=ros2_control;'
+                    'reason=target_sync_required;target_sync_status_topic='
+                    f'{self._target_sync_status_topic};real_hardware=false'
+                )
             return
 
         self._started = True
@@ -557,6 +663,30 @@ class Ros2ControlSequenceExecutorNode(Node):
         self._publish_final_result(False, status, duration_ms)
         self.get_logger().warning(
             f'ros2_control sequence failed: stage={stage}, reason={reason}.'
+        )
+
+    def _publish_target_sync_terminal(self, reason: str) -> None:
+        """Publish one deterministic pre-execution target-sync failure."""
+        if self._completed or self._started:
+            return
+        if self._sequence_start == 0.0:
+            self._sequence_start = time.monotonic()
+        fields = [
+            'event=failure', 'mode=ros2_control', f'reason={reason}',
+            'execution=false', 'simulated_execution_only=true',
+            'real_hardware=false',
+            f'target_sync_status_topic={self._target_sync_status_topic}',
+        ]
+        if self._target_sync_mode:
+            fields.append(f'target_sync_mode={self._target_sync_mode}')
+        if self._target_sync_failure_reason:
+            fields.append(
+                'target_sync_failure_reason='
+                f'{self._target_sync_failure_reason}'
+            )
+        self._publish_final_result(False, ';'.join(fields), 0.0)
+        self.get_logger().warning(
+            f'ros2_control sequence blocked before execution: reason={reason}.'
         )
 
     def _publish_stage_status(self, status: str) -> None:

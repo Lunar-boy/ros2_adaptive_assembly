@@ -5,6 +5,7 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.actions import LogInfo
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -36,6 +37,9 @@ def generate_launch_description() -> LaunchDescription:
     gz_args = LaunchConfiguration('gz_args')
     params_file = LaunchConfiguration('params_file')
     require_grasp = LaunchConfiguration('require_grasp_trajectory')
+    require_target_sync = LaunchConfiguration('require_target_sync_success')
+    target_sync_topic = LaunchConfiguration('target_sync_status_topic')
+    target_sync_timeout = LaunchConfiguration('target_sync_timeout_sec')
     default_world = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_sim'),
         'worlds',
@@ -54,6 +58,17 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             'require_grasp_trajectory', default_value='false',
             description='Plan and execute the intermediate grasp stage.',
+        ),
+        DeclareLaunchArgument(
+            'require_target_sync_success', default_value='false',
+            description='Optionally gate initial execution on target sync.',
+        ),
+        DeclareLaunchArgument(
+            'target_sync_status_topic',
+            default_value='/gazebo_target_sync_status',
+        ),
+        DeclareLaunchArgument(
+            'target_sync_timeout_sec', default_value='10.0',
         ),
         DeclareLaunchArgument(
             'controller_action_name',
@@ -119,6 +134,9 @@ def generate_launch_description() -> LaunchDescription:
                 'launch_reachable_sequence': 'false',
                 'grasp_trajectory_topic': '/grasp_trajectory',
                 'require_grasp_trajectory': require_grasp,
+                'require_target_sync_success': require_target_sync,
+                'target_sync_status_topic': target_sync_topic,
+                'target_sync_timeout_sec': target_sync_timeout,
             }.items(),
         ),
     ])

@@ -1,15 +1,20 @@
 """Launch one visually coherent simulator-only assembly episode."""
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    LogInfo,
+)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description() -> LaunchDescription:
-    """Compose fixed source/place execution, synchronization, and evaluation."""
+    """Compose fixed source/place execution, sync, and evaluation."""
     bringup = FindPackageShare('adaptive_assembly_bringup')
     params_file = PathJoinSubstitution([
         bringup, 'config', 'adaptive_assembly_visual_single_trial_params.yaml'
@@ -38,8 +43,9 @@ def generate_launch_description() -> LaunchDescription:
             description='Enable simulator set-pose service calls.',
         ),
         LogInfo(msg=(
-            'Launching visual single-trial episode with distinct deterministic '
-            'source and fixed socket poses; simulator and logical gripper only.'
+            'Launching visual single-trial episode with distinct '
+            'deterministic source and fixed socket poses; simulator and '
+            'logical gripper only.'
         )),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(grasp_demo),
@@ -47,6 +53,9 @@ def generate_launch_description() -> LaunchDescription:
                 'enable_service_calls': enable_calls,
                 'params_file': params_file,
                 'require_grasp_trajectory': 'true',
+                'require_target_sync_success': 'true',
+                'target_sync_status_topic': '/gazebo_target_sync_status',
+                'target_sync_timeout_sec': '10.0',
                 'attach_stage': 'grasp',
                 # Local panda_hand +Z keeps the cylinder visibly at the tool.
                 'attached_object_offset_z': '0.10',

@@ -825,6 +825,12 @@ The visual evaluator compares the desired final object pose on
 `/gazebo_target_object_pose`. `/panda_assembly_pose` remains the Panda hand
 planning target and is not used as the evaluator target.
 
+The visual executor also waits for `/gazebo_target_sync_status` to report
+`event=success` before sending its first ros2_control trajectory. This prevents
+execution from starting before Gazebo mirrors the planned source pose. The
+gate applies only at sequence startup and is disabled by default in generic
+execution demos.
+
 ### Suggested result table
 
 After recording benchmark data, add a small result table here:
