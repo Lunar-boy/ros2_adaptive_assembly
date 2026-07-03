@@ -3,8 +3,9 @@
 This ROS 2 Jazzy package converts perceived target poses into simple
 task-level poses for adaptive assembly. The `assembly_task_node` subscribes to
 `/target_pose`, publishes vertically offset poses on `/pre_grasp_pose`,
-`/grasp_pose`, `/assembly_pose`, and `/object_place_pose`, and reports when
-target movement exceeds the replanning threshold. `/assembly_pose` is the
+`/grasp_pose`, `/pre_place_pose`, `/place_pose`, `/retreat_pose`, `/assembly_pose`, and `/object_place_pose`, and reports when
+target movement exceeds the replanning threshold. In fixed-socket mode,
+`/assembly_pose` is a legacy alias of `/place_pose`. `/assembly_pose` is the
 current robot hand target; `/object_place_pose` is the desired final object
 pose. It does not perform motion planning or call MoveIt 2.
 

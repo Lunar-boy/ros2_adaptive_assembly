@@ -53,10 +53,12 @@ def generate_launch_description() -> LaunchDescription:
                 'enable_service_calls': enable_calls,
                 'params_file': params_file,
                 'require_grasp_trajectory': 'true',
+                'require_place_sequence': 'true',
                 'require_target_sync_success': 'true',
                 'target_sync_status_topic': '/gazebo_target_sync_status',
                 'target_sync_timeout_sec': '10.0',
                 'attach_stage': 'grasp',
+                'release_stage': 'place',
                 # Local panda_hand +Z keeps the cylinder visibly at the tool.
                 'attached_object_offset_z': '0.10',
             }.items(),

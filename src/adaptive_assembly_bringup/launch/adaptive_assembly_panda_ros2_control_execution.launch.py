@@ -27,6 +27,7 @@ def generate_launch_description() -> LaunchDescription:
     grasp_topic = LaunchConfiguration('grasp_trajectory_topic')
     assembly_topic = LaunchConfiguration('assembly_trajectory_topic')
     require_grasp = LaunchConfiguration('require_grasp_trajectory')
+    require_place = LaunchConfiguration('require_place_sequence')
     controller = LaunchConfiguration('controller_action_name')
     status_topic = LaunchConfiguration('status_topic')
     success_topic = LaunchConfiguration('success_topic')
@@ -66,11 +67,15 @@ def generate_launch_description() -> LaunchDescription:
             default_value='/assembly_trajectory',
             description='Exported assembly RobotTrajectory topic.',
         ),
+        DeclareLaunchArgument('pre_place_trajectory_topic', default_value='/pre_place_trajectory'),
+        DeclareLaunchArgument('place_trajectory_topic', default_value='/place_trajectory'),
+        DeclareLaunchArgument('retreat_trajectory_topic', default_value='/retreat_trajectory'),
         DeclareLaunchArgument(
             'require_grasp_trajectory',
             default_value='false',
             description='Require and execute the intermediate grasp stage.',
         ),
+        DeclareLaunchArgument('require_place_sequence', default_value='false'),
         DeclareLaunchArgument(
             'controller_action_name',
             default_value=(
@@ -181,6 +186,13 @@ def generate_launch_description() -> LaunchDescription:
                 'require_grasp_trajectory': ParameterValue(
                     require_grasp, value_type=bool
                 ),
+                'require_place_sequence': ParameterValue(require_place, value_type=bool),
+                **{
+                    f'{name}_trajectory_topic': LaunchConfiguration(
+                        f'{name}_trajectory_topic'
+                    )
+                    for name in ('pre_place', 'place', 'retreat')
+                },
                 'controller_action_name': controller,
                 'status_topic': status_topic,
                 'success_topic': success_topic,
@@ -222,6 +234,13 @@ def generate_launch_description() -> LaunchDescription:
                 'pre_grasp_trajectory_topic': pre_grasp_topic,
                 'grasp_trajectory_topic': grasp_topic,
                 'assembly_trajectory_topic': assembly_topic,
+                'require_place_sequence': require_place,
+                **{
+                    f'{name}_trajectory_topic': LaunchConfiguration(
+                        f'{name}_trajectory_topic'
+                    )
+                    for name in ('pre_place', 'place', 'retreat')
+                },
                 'use_planning_scene_audit': use_planning_scene_audit,
             }.items(),
         ),

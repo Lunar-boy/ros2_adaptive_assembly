@@ -25,6 +25,7 @@ def generate_launch_description() -> LaunchDescription:
         ('gripper_id', 'panda_hand'),
         ('attach_parent_frame', 'panda_hand'),
         ('attach_stage', 'pre_grasp'),
+        ('release_stage', 'execution_success'),
         ('release_parent_frame', 'world'),
         ('detach_on_failure', 'false'),
         ('simulated_only', 'true'),

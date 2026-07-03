@@ -20,6 +20,7 @@ def generate_launch_description() -> LaunchDescription:
     ])
     params_file = LaunchConfiguration('params_file')
     require_grasp_pose = LaunchConfiguration('require_grasp_pose')
+    require_place_sequence = LaunchConfiguration('require_place_sequence')
     pipeline_launch = PathJoinSubstitution([
         bringup_share,
         'launch',
@@ -43,6 +44,12 @@ def generate_launch_description() -> LaunchDescription:
         'launch',
         'panda_assembly_pose_adapter.launch.py',
     ])
+    place_adapter_launches = [
+        PathJoinSubstitution([
+            planning_share, 'launch', f'panda_{name}_pose_adapter.launch.py'
+        ])
+        for name in ('pre_place', 'place', 'retreat')
+    ]
     sequence_planner_launch = PathJoinSubstitution([
         planning_share,
         'launch',
@@ -88,6 +95,7 @@ def generate_launch_description() -> LaunchDescription:
             'require_grasp_pose', default_value='false',
             description='Enable the intermediate grasp planning stage.',
         ),
+        DeclareLaunchArgument('require_place_sequence', default_value='false'),
         LogInfo(msg=(
             'Launching Gazebo-compatible plan-only Panda sequence planning. '
             'move_group consumes Gazebo joint states; no mock ros2_control '
@@ -117,6 +125,10 @@ def generate_launch_description() -> LaunchDescription:
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(assembly_adapter_launch),
         ),
+        *[
+            IncludeLaunchDescription(PythonLaunchDescriptionSource(path))
+            for path in place_adapter_launches
+        ],
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(sequence_planner_launch),
             launch_arguments={
@@ -129,6 +141,11 @@ def generate_launch_description() -> LaunchDescription:
                 'grasp_trajectory_topic': '/grasp_trajectory',
                 'assembly_trajectory_topic': '/assembly_trajectory',
                 'require_grasp_pose': require_grasp_pose,
+                'require_place_sequence': require_place_sequence,
+                **{
+                    f'{name}_trajectory_topic': f'/{name}_trajectory'
+                    for name in ('pre_place', 'place', 'retreat')
+                },
             }.items(),
         ),
         IncludeLaunchDescription(

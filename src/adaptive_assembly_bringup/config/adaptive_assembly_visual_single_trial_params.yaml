@@ -22,6 +22,9 @@ assembly_task_node:
     pre_grasp_height_offset: 0.20
     grasp_height_offset: 0.05
     assembly_height_offset: 0.05
+    pre_place_height_offset: 0.20
+    place_height_offset: 0.00
+    retreat_height_offset: 0.20
     replan_distance_threshold: 0.03
     assembly_pose_mode: fixed_socket
     socket_x: 0.62

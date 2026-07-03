@@ -22,6 +22,7 @@ def generate_launch_description() -> LaunchDescription:
     grasp_trajectory_topic = LaunchConfiguration('grasp_trajectory_topic')
     assembly_trajectory_topic = LaunchConfiguration('assembly_trajectory_topic')
     require_grasp_pose = LaunchConfiguration('require_grasp_pose')
+    require_place_sequence = LaunchConfiguration('require_place_sequence')
     trajectory_status_topic = LaunchConfiguration('trajectory_status_topic')
     start_state_mode = LaunchConfiguration('start_state_mode')
 
@@ -76,6 +77,9 @@ def generate_launch_description() -> LaunchDescription:
             default_value='/assembly_trajectory',
             description='Topic for successful assembly trajectories.',
         ),
+        DeclareLaunchArgument('pre_place_trajectory_topic', default_value='/pre_place_trajectory'),
+        DeclareLaunchArgument('place_trajectory_topic', default_value='/place_trajectory'),
+        DeclareLaunchArgument('retreat_trajectory_topic', default_value='/retreat_trajectory'),
         DeclareLaunchArgument(
             'trajectory_status_topic',
             default_value='/assembly_sequence_trajectory_status',
@@ -85,6 +89,12 @@ def generate_launch_description() -> LaunchDescription:
             'require_grasp_pose',
             default_value='false',
             description='Require and plan the intermediate grasp stage.',
+        ),
+        DeclareLaunchArgument(
+            'require_place_sequence', default_value='false',
+            description=(
+                'Plan pre-place, place, and retreat instead of legacy assembly.'
+            ),
         ),
         DeclareLaunchArgument(
             'start_state_mode',
@@ -102,6 +112,9 @@ def generate_launch_description() -> LaunchDescription:
                 'pre_grasp_topic': '/panda_pre_grasp_pose',
                 'grasp_topic': '/panda_grasp_pose',
                 'assembly_topic': '/panda_assembly_pose',
+                'pre_place_topic': '/panda_pre_place_pose',
+                'place_topic': '/panda_place_pose',
+                'retreat_topic': '/panda_retreat_pose',
                 'success_topic': '/assembly_sequence_plan_success',
                 'status_topic': '/assembly_sequence_planning_status',
                 'duration_topic': '/assembly_sequence_planning_duration_ms',
@@ -111,10 +124,17 @@ def generate_launch_description() -> LaunchDescription:
                 'pre_grasp_trajectory_topic': pre_grasp_trajectory_topic,
                 'grasp_trajectory_topic': grasp_trajectory_topic,
                 'assembly_trajectory_topic': assembly_trajectory_topic,
+                **{
+                    f'{name}_trajectory_topic': LaunchConfiguration(
+                        f'{name}_trajectory_topic'
+                    )
+                    for name in ('pre_place', 'place', 'retreat')
+                },
                 'require_grasp_pose': ParameterValue(
                     require_grasp_pose,
                     value_type=bool,
                 ),
+                'require_place_sequence': ParameterValue(require_place_sequence, value_type=bool),
                 'trajectory_status_topic': trajectory_status_topic,
                 'publish_diagnostics': ParameterValue(
                     publish_diagnostics,

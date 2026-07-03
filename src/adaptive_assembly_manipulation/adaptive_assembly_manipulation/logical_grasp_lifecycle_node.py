@@ -43,6 +43,7 @@ class LogicalGraspLifecycleNode(Node):
             'gripper_id': 'panda_hand',
             'attach_parent_frame': 'panda_hand',
             'attach_stage': 'pre_grasp',
+            'release_stage': 'execution_success',
             'release_parent_frame': 'world',
             'detach_on_failure': False,
             'simulated_only': True,
@@ -56,6 +57,7 @@ class LogicalGraspLifecycleNode(Node):
             self.get_parameter('attach_parent_frame').value
         )
         self._attach_stage = str(self.get_parameter('attach_stage').value)
+        self._release_stage = str(self.get_parameter('release_stage').value)
         self._release_parent = str(
             self.get_parameter('release_parent_frame').value
         )
@@ -126,13 +128,23 @@ class LogicalGraspLifecycleNode(Node):
             'Logical grasp lifecycle ready: '
             f"object='{self._object_id}', gripper='{self._gripper_id}', "
             f"attach_stage='{self._attach_stage}', "
+            f"release_stage='{self._release_stage}', "
             f'detach_on_failure={self._detach_on_failure}, '
             'simulated_only=true, gazebo_attach=false, real_hardware=false.'
         )
 
     def _stage_status_callback(self, message: String) -> None:
-        """Close and logically attach after the configured stage succeeds."""
+        """Attach or release after the configured stage succeeds."""
         fields = parse_status(message.data)
+        if (
+            not self._terminal
+            and self._attached
+            and self._release_stage not in ('', 'execution_success')
+            and fields.get('event') == 'success'
+            and fields.get('stage') == self._release_stage
+        ):
+            self._release(f'{self._release_stage}_success')
+            return
         if (
             self._terminal
             or self._attached
@@ -157,13 +169,10 @@ class LogicalGraspLifecycleNode(Node):
         event = fields.get('event')
         if event == 'success':
             self._terminal = True
-            self._publish_command('open', 'execution_success')
-            self._attached = False
-            self._publish_object_state(
-                'detached', self._release_parent, 'execution_success'
-            )
-            self._publish_attached(False)
-            self._publish_lifecycle('released', 'execution_success')
+            if self._attached or self._release_stage in ('', 'execution_success'):
+                self._release('execution_success')
+            else:
+                self._publish_lifecycle('released', 'execution_success')
         elif event in ('failure', 'timeout'):
             self._terminal = True
             reason = fields.get('reason', event)
@@ -175,6 +184,14 @@ class LogicalGraspLifecycleNode(Node):
                 )
                 self._publish_attached(False)
             self._publish_lifecycle('failure', reason)
+
+    def _release(self, trigger: str) -> None:
+        """Publish one logical release while preserving the last world pose."""
+        self._publish_command('open', trigger)
+        self._attached = False
+        self._publish_object_state('detached', self._release_parent, trigger)
+        self._publish_attached(False)
+        self._publish_lifecycle('released', trigger)
 
     def _publish_command(self, command: str, trigger: str) -> None:
         command_text = (
@@ -216,6 +233,7 @@ class LogicalGraspLifecycleNode(Node):
             f'gripper={self._gripper_id};attached='
             f'{str(self._attached).lower()};logical=true;'
             f'attach_stage={self._attach_stage};'
+            f'release_stage={self._release_stage};'
             'simulated_only=true;gazebo_attach=false;real_hardware=false'
         )
         self._publish_string(self._lifecycle_publisher, status)

@@ -21,6 +21,12 @@ class AssemblyTaskNode(Node):
         self.declare_parameter('replan_distance_threshold', 0.03)
         self.declare_parameter('assembly_pose_mode', 'target_offset')
         self.declare_parameter('object_place_pose_topic', '/object_place_pose')
+        self.declare_parameter('pre_place_pose_topic', '/pre_place_pose')
+        self.declare_parameter('place_pose_topic', '/place_pose')
+        self.declare_parameter('retreat_pose_topic', '/retreat_pose')
+        self.declare_parameter('pre_place_height_offset', 0.20)
+        self.declare_parameter('place_height_offset', 0.00)
+        self.declare_parameter('retreat_height_offset', 0.20)
         self.declare_parameter('socket_x', 0.62)
         self.declare_parameter('socket_y', -0.18)
         self.declare_parameter('socket_z', 0.10)
@@ -48,6 +54,12 @@ class AssemblyTaskNode(Node):
         self._object_place_pose_topic = str(
             self.get_parameter('object_place_pose_topic').value
         )
+        self._pre_place_pose_topic = str(self.get_parameter('pre_place_pose_topic').value)
+        self._place_pose_topic = str(self.get_parameter('place_pose_topic').value)
+        self._retreat_pose_topic = str(self.get_parameter('retreat_pose_topic').value)
+        self._pre_place_height_offset = float(self.get_parameter('pre_place_height_offset').value)
+        self._place_height_offset = float(self.get_parameter('place_height_offset').value)
+        self._retreat_height_offset = float(self.get_parameter('retreat_height_offset').value)
         self._socket_x = float(self.get_parameter('socket_x').value)
         self._socket_y = float(self.get_parameter('socket_y').value)
         self._socket_z = float(self.get_parameter('socket_z').value)
@@ -68,6 +80,15 @@ class AssemblyTaskNode(Node):
         )
         self._grasp_publisher = self.create_publisher(
             PoseStamped, self._grasp_pose_topic, 10
+        )
+        self._pre_place_publisher = self.create_publisher(
+            PoseStamped, self._pre_place_pose_topic, 10
+        )
+        self._place_publisher = self.create_publisher(
+            PoseStamped, self._place_pose_topic, 10
+        )
+        self._retreat_publisher = self.create_publisher(
+            PoseStamped, self._retreat_pose_topic, 10
         )
         self._target_subscription = self.create_subscription(
             PoseStamped, '/target_pose', self._target_pose_callback, 10
@@ -98,6 +119,8 @@ class AssemblyTaskNode(Node):
             )
         if not self._object_place_pose_topic:
             raise ValueError('object_place_pose_topic must not be empty')
+        if not all((self._pre_place_pose_topic, self._place_pose_topic, self._retreat_pose_topic)):
+            raise ValueError('place sequence pose topics must not be empty')
         if not self._socket_frame_id:
             raise ValueError('socket_frame_id must not be empty')
 
@@ -116,22 +139,27 @@ class AssemblyTaskNode(Node):
         )
         grasp_pose = self._offset_pose(target_pose, self._grasp_height_offset)
         if self._assembly_pose_mode == 'fixed_socket':
-            # Keep the hand target backward compatible while publishing the
-            # desired final object pose as a separate task-level concept.
-            assembly_pose = self._fixed_socket_pose(target_pose)
             object_place_pose = self._fixed_socket_pose(target_pose)
+            pre_place_pose = self._offset_pose(object_place_pose, self._pre_place_height_offset)
+            place_pose = self._offset_pose(object_place_pose, self._place_height_offset)
+            retreat_pose = self._offset_pose(object_place_pose, self._retreat_height_offset)
+            assembly_pose = place_pose
         else:
             assembly_pose = self._offset_pose(
                 target_pose, self._assembly_height_offset
             )
-            object_place_pose = self._offset_pose(
-                target_pose, self._assembly_height_offset
-            )
+            object_place_pose = assembly_pose
+            pre_place_pose = self._offset_pose(assembly_pose, self._pre_place_height_offset)
+            place_pose = self._offset_pose(assembly_pose, self._place_height_offset)
+            retreat_pose = self._offset_pose(assembly_pose, self._retreat_height_offset)
 
         self._pre_grasp_publisher.publish(pre_grasp_pose)
         self._grasp_publisher.publish(grasp_pose)
         self._assembly_publisher.publish(assembly_pose)
         self._object_place_publisher.publish(object_place_pose)
+        self._pre_place_publisher.publish(pre_place_pose)
+        self._place_publisher.publish(place_pose)
+        self._retreat_publisher.publish(retreat_pose)
 
         self.get_logger().info(
             'Computed grasp pose: '
@@ -158,6 +186,15 @@ class AssemblyTaskNode(Node):
             f'z={object_place_pose.pose.position.z:.3f}, '
             f'frame={object_place_pose.header.frame_id}'
         )
+        for name, pose in (
+            ('pre-place', pre_place_pose), ('place', place_pose),
+            ('retreat', retreat_pose),
+        ):
+            self.get_logger().info(
+                f'Computed {name} pose: x={pose.pose.position.x:.3f}, '
+                f'y={pose.pose.position.y:.3f}, z={pose.pose.position.z:.3f}, '
+                f'frame={pose.header.frame_id}'
+            )
 
         self._previous_target_pose = target_pose
 

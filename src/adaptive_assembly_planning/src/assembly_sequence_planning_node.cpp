@@ -27,6 +27,9 @@ public:
         "grasp_topic", "/panda_grasp_pose")),
     assembly_topic_(declare_parameter<std::string>(
         "assembly_topic", "/panda_assembly_pose")),
+    pre_place_topic_(declare_parameter<std::string>("pre_place_topic", "/panda_pre_place_pose")),
+    place_topic_(declare_parameter<std::string>("place_topic", "/panda_place_pose")),
+    retreat_topic_(declare_parameter<std::string>("retreat_topic", "/panda_retreat_pose")),
     success_topic_(declare_parameter<std::string>(
         "success_topic", "/assembly_sequence_plan_success")),
     status_topic_(declare_parameter<std::string>(
@@ -45,11 +48,15 @@ public:
         "grasp_trajectory_topic", "/grasp_trajectory")),
     assembly_trajectory_topic_(declare_parameter<std::string>(
         "assembly_trajectory_topic", "/assembly_trajectory")),
+    pre_place_trajectory_topic_(declare_parameter<std::string>("pre_place_trajectory_topic", "/pre_place_trajectory")),
+    place_trajectory_topic_(declare_parameter<std::string>("place_trajectory_topic", "/place_trajectory")),
+    retreat_trajectory_topic_(declare_parameter<std::string>("retreat_trajectory_topic", "/retreat_trajectory")),
     trajectory_status_topic_(declare_parameter<std::string>(
         "trajectory_status_topic", "/assembly_sequence_trajectory_status")),
     publish_diagnostics_(declare_parameter<bool>("publish_diagnostics", true)),
     publish_trajectories_(declare_parameter<bool>("publish_trajectories", true)),
     require_grasp_pose_(declare_parameter<bool>("require_grasp_pose", false)),
+    require_place_sequence_(declare_parameter<bool>("require_place_sequence", false)),
     planning_group_(declare_parameter<std::string>("planning_group", "panda_arm")),
     planner_id_(declare_parameter<std::string>("planner_id", "")),
     num_planning_attempts_(declare_parameter<int>("num_planning_attempts", 1)),
@@ -87,6 +94,9 @@ public:
     assembly_trajectory_publisher_ =
       node_->create_publisher<moveit_msgs::msg::RobotTrajectory>(
       assembly_trajectory_topic_, 10);
+    pre_place_trajectory_publisher_ = node_->create_publisher<moveit_msgs::msg::RobotTrajectory>(pre_place_trajectory_topic_, 10);
+    place_trajectory_publisher_ = node_->create_publisher<moveit_msgs::msg::RobotTrajectory>(place_trajectory_topic_, 10);
+    retreat_trajectory_publisher_ = node_->create_publisher<moveit_msgs::msg::RobotTrajectory>(retreat_trajectory_topic_, 10);
     trajectory_status_publisher_ =
       node_->create_publisher<std_msgs::msg::String>(trajectory_status_topic_, 10);
 
@@ -114,6 +124,9 @@ public:
         assembly_updated_ = true;
         try_plan_sequence();
       });
+    pre_place_subscription_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(pre_place_topic_, 10, [this](const geometry_msgs::msg::PoseStamped::SharedPtr message) {pre_place_pose_ = *message; pre_place_updated_ = true; try_plan_sequence();});
+    place_subscription_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(place_topic_, 10, [this](const geometry_msgs::msg::PoseStamped::SharedPtr message) {place_pose_ = *message; place_updated_ = true; try_plan_sequence();});
+    retreat_subscription_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(retreat_topic_, 10, [this](const geometry_msgs::msg::PoseStamped::SharedPtr message) {retreat_pose_ = *message; retreat_updated_ = true; try_plan_sequence();});
 
     RCLCPP_INFO(
       node_->get_logger(),
@@ -177,16 +190,29 @@ private:
 
   void try_plan_sequence()
   {
-    if (!pre_grasp_pose_.has_value() || !assembly_pose_.has_value() ||
-      !pre_grasp_updated_ || !assembly_updated_ ||
+    if (!pre_grasp_pose_.has_value() || (!require_place_sequence_ && !assembly_pose_.has_value()) ||
+      !pre_grasp_updated_ || (!require_place_sequence_ && !assembly_updated_) ||
       (require_grasp_pose_ && (!grasp_pose_.has_value() || !grasp_updated_)))
     {
+      return;
+    }
+    if (require_place_sequence_ &&
+      (!grasp_pose_.has_value() || !grasp_updated_ || !pre_place_pose_.has_value() ||
+      !pre_place_updated_ || !place_pose_.has_value() || !place_updated_ ||
+      !retreat_pose_.has_value() || !retreat_updated_)) {
       return;
     }
 
     pre_grasp_updated_ = false;
     grasp_updated_ = false;
     assembly_updated_ = false;
+    pre_place_updated_ = false;
+    place_updated_ = false;
+    retreat_updated_ = false;
+    if (require_place_sequence_) {
+      plan_place_sequence();
+      return;
+    }
     const auto & pre_grasp_pose = pre_grasp_pose_.value();
     const auto & assembly_pose = assembly_pose_.value();
 
@@ -312,6 +338,55 @@ private:
       node_->get_logger(),
       "Assembly sequence planning succeeded for %zu stages in %.3f ms total. "
       "No trajectory was executed by the planner.", planned_stage_count, total_duration_ms);
+  }
+
+  void plan_place_sequence()
+  {
+    const std::array<std::string, 5> names = {"pre_grasp", "grasp", "pre_place", "place", "retreat"};
+    const std::array<geometry_msgs::msg::PoseStamped, 5> poses = {
+      pre_grasp_pose_.value(), grasp_pose_.value(), pre_place_pose_.value(),
+      place_pose_.value(), retreat_pose_.value()};
+    const std::array<std::string, 5> topics = {
+      pre_grasp_trajectory_topic_, grasp_trajectory_topic_, pre_place_trajectory_topic_,
+      place_trajectory_topic_, retreat_trajectory_topic_};
+    const std::array<rclcpp::Publisher<moveit_msgs::msg::RobotTrajectory>::SharedPtr, 5> publishers = {
+      pre_grasp_trajectory_publisher_, grasp_trajectory_publisher_, pre_place_trajectory_publisher_,
+      place_trajectory_publisher_, retreat_trajectory_publisher_};
+    double total_duration_ms = 0.0;
+    std::size_t planned_stage_count = 0;
+    std::optional<moveit_msgs::msg::RobotState> start_state;
+    set_pre_grasp_start_state();
+    for (std::size_t index = 0; index < names.size(); ++index) {
+      if (index > 0) {
+        if (!start_state.has_value()) {
+          for (std::size_t remaining = index; remaining < names.size(); ++remaining) {
+            publish_trajectory_status("skipped", names[remaining], topics[remaining], nullptr, "invalid_previous_trajectory");
+          }
+          publish_result(false, "failure", names[index], planned_stage_count, total_duration_ms);
+          return;
+        }
+        move_group_.setStartState(start_state.value());
+      }
+      set_pose_target(poses[index]);
+      moveit::planning_interface::MoveGroupInterface::Plan plan;
+      const auto result = plan_stage(plan);
+      total_duration_ms += result.duration_ms;
+      move_group_.clearPoseTargets();
+      publish_stage_result(names[index], result.succeeded, result.duration_ms);
+      if (!result.succeeded) {
+        publish_trajectory_status("skipped", names[index], topics[index], nullptr, "planning_failed");
+        for (std::size_t remaining = index + 1; remaining < names.size(); ++remaining) {
+          publish_trajectory_status("skipped", names[remaining], topics[remaining], nullptr, names[index] + "_failed");
+        }
+        publish_result(false, "failure", names[index], planned_stage_count, total_duration_ms);
+        return;
+      }
+      ++planned_stage_count;
+      publish_trajectory(names[index], plan.trajectory, topics[index], publishers[index]);
+      start_state = final_state_from_plan(plan);
+    }
+    publish_result(true, "success", "none", planned_stage_count, total_duration_ms);
+    RCLCPP_INFO(node_->get_logger(), "Five-stage place sequence planning succeeded; execution remains disabled.");
   }
 
   void set_pose_target(const geometry_msgs::msg::PoseStamped & pose)
@@ -510,6 +585,7 @@ private:
   std::string pre_grasp_topic_;
   std::string grasp_topic_;
   std::string assembly_topic_;
+  std::string pre_place_topic_, place_topic_, retreat_topic_;
   std::string success_topic_;
   std::string status_topic_;
   std::string duration_topic_;
@@ -519,10 +595,12 @@ private:
   std::string pre_grasp_trajectory_topic_;
   std::string grasp_trajectory_topic_;
   std::string assembly_trajectory_topic_;
+  std::string pre_place_trajectory_topic_, place_trajectory_topic_, retreat_trajectory_topic_;
   std::string trajectory_status_topic_;
   bool publish_diagnostics_;
   bool publish_trajectories_;
   bool require_grasp_pose_;
+  bool require_place_sequence_;
   std::string planning_group_;
   std::string planner_id_;
   int num_planning_attempts_;
@@ -543,16 +621,20 @@ private:
     grasp_trajectory_publisher_;
   rclcpp::Publisher<moveit_msgs::msg::RobotTrajectory>::SharedPtr
     assembly_trajectory_publisher_;
+  rclcpp::Publisher<moveit_msgs::msg::RobotTrajectory>::SharedPtr pre_place_trajectory_publisher_, place_trajectory_publisher_, retreat_trajectory_publisher_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr trajectory_status_publisher_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pre_grasp_subscription_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr grasp_subscription_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr assembly_subscription_;
+  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pre_place_subscription_, place_subscription_, retreat_subscription_;
   std::optional<geometry_msgs::msg::PoseStamped> pre_grasp_pose_;
   std::optional<geometry_msgs::msg::PoseStamped> grasp_pose_;
   std::optional<geometry_msgs::msg::PoseStamped> assembly_pose_;
+  std::optional<geometry_msgs::msg::PoseStamped> pre_place_pose_, place_pose_, retreat_pose_;
   bool pre_grasp_updated_{false};
   bool grasp_updated_{false};
   bool assembly_updated_{false};
+  bool pre_place_updated_{false}, place_updated_{false}, retreat_updated_{false};
 };
 
 int main(int argc, char * argv[])

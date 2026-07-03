@@ -99,6 +99,10 @@ def _publish(publisher, value: str) -> None:
 def run_check(mode: str) -> int:
     """Validate startup and either success release or failure retention."""
     prefix = f'/logical_grasp_{mode}_validation'
+    attach_stage = 'grasp' if mode == 'place_release' else 'pre_grasp'
+    extra_parameters = (
+        ['-p', 'release_stage:=place'] if mode == 'place_release' else []
+    )
     process = subprocess.Popen([
         'ros2', 'run', 'adaptive_assembly_manipulation',
         'logical_grasp_lifecycle_node', '--ros-args',
@@ -110,6 +114,8 @@ def run_check(mode: str) -> int:
         '-p', f'object_grasp_state_topic:={prefix}/object_state',
         '-p', f'object_grasp_attached_topic:={prefix}/attached',
         '-p', f'lifecycle_status_topic:={prefix}/lifecycle',
+        '-p', f'attach_stage:={attach_stage}',
+        *extra_parameters,
     ])
     rclpy.init()
     node = Checker(prefix)
@@ -129,7 +135,7 @@ def run_check(mode: str) -> int:
 
         _publish(
             node.stage,
-            'event=success;mode=ros2_control;stage=pre_grasp;'
+            f'event=success;mode=ros2_control;stage={attach_stage};'
             'real_hardware=false',
         )
         attached = _spin_until(node, lambda: (
@@ -147,7 +153,24 @@ def run_check(mode: str) -> int:
             print('FAIL: pre-grasp success did not close and attach')
             return 1
 
-        if mode == 'success':
+        if mode == 'place_release':
+            _publish(
+                node.stage,
+                'event=success;mode=ros2_control;stage=place;'
+                'real_hardware=false',
+            )
+            terminal = _spin_until(node, lambda: (
+                _matches(node.command, {'command': 'open'})
+                and _matches(node.object_state, {
+                    'event': 'detached', 'trigger': 'place_success',
+                })
+                and node.attached is False
+                and _matches(node.lifecycle, {
+                    'event': 'released', 'release_stage': 'place',
+                })
+            ))
+            description = 'place-stage release before aggregate success'
+        elif mode == 'success':
             _publish(
                 node.execution,
                 'event=success;mode=ros2_control;execution=true;'
