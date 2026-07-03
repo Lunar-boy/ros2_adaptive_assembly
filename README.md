@@ -777,7 +777,7 @@ Launch the deterministic-correctness profile with distinct deterministic source 
 socket/place poses:
 
 ```bash
-ros2 launch adaptive_assembly_bringup adaptive_assembly_full_episode_vision_demo.launch.py
+ros2 launch adaptive_assembly_bringup adaptive_assembly_full_episode_visual_demo.launch.py
 ```
 
 This remains simulator-only, with a logical gripper, kinematic object
