@@ -170,8 +170,13 @@ class Ros2ControlSequenceExecutorNode(Node):
         self._duration_publisher = self.create_publisher(
             Float64, self._duration_topic, result_qos
         )
+        stage_status_qos = QoSProfile(
+            depth=10,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
         self._stage_status_publisher = self.create_publisher(
-            String, self._stage_status_topic, 10
+            String, self._stage_status_topic, stage_status_qos
         )
 
         self._pre_grasp_trajectory: Optional[RobotTrajectory] = None

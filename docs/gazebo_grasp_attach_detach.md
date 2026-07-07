@@ -127,9 +127,11 @@ The first two Python fixture checks do not require Gazebo. The retained-status
 check expects the launch to be running.
 
 The bounded demo-status checker assumes the visual demo is already running.
-Start it promptly in a second sourced shell so it observes the live, volatile
-grasp/place stage events as well as the retained sync, attachment, and final
-status messages. It prints the exact missing events on timeout.
+It may be started after execution begins because the executor retains the 10
+most recent grasp/place stage-status events. Start it before the retained
+`/gazebo_target_sync_status` success is replaced by the later ownership-release
+status; that topic retains only its latest event. It prints each missing
+condition and the last message received from every relevant topic on timeout.
 
 ### Live Gazebo validation
 

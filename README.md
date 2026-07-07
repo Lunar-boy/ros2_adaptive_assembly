@@ -545,8 +545,11 @@ python3 scripts/check_gazebo_attachment_offset.py
 python3 scripts/check_live_gazebo_attach_detach.py
 ```
 
-Run the demo-status checker in a second sourced shell immediately after
-starting the demo so it observes the live grasp/place transitions. The last
+Run the bounded demo-status checker in a second sourced shell. It may be
+started after the demo is already running because the executor retains the 10
+most recent stage-status events. Start it before target synchronization status
+is replaced by the later ownership-release status; the checker cannot recover
+that earlier event. The last
 command is an optional bounded, headless live Gazebo validation; the fixture
 checks remain available without a running simulator. Live attachment
 is simulator-only kinematic set-pose mirroring, not physics-accurate grasping,
