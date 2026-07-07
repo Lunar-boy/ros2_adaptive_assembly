@@ -119,6 +119,10 @@ def generate_launch_description() -> LaunchDescription:
                 'target_sync_timeout_sec': target_sync_timeout,
                 'launch_simulation': launch_simulation,
                 'enable_arm_collisions': enable_arm_collisions,
+                # The target-sync include also declares status_topic. Bind the
+                # nested executor explicitly so its terminal result cannot be
+                # redirected to /gazebo_target_sync_status by launch scoping.
+                'status_topic': '/assembly_ros2_control_execution_status',
             }.items(),
         ),
         IncludeLaunchDescription(

@@ -513,15 +513,31 @@ ros2 launch adaptive_assembly_bringup \
 
 The default visual demo starts the workcell and Panda-like arm, synchronizes
 `/target_pose` into Gazebo, and plans and executes the grasp and fixed-socket
-place sequence. The logical lifecycle attaches after `grasp`; Gazebo's
-`target_object` then follows `panda_hand` with a `0.10 m` local Z offset. It
-detaches after `place`, leaving the object in the fixture while the arm
-retreats. Other demos retain the zero-offset attachment default.
+place sequence. Gazebo starts, the Panda spawns, its controllers activate,
+target sync succeeds, and the grasp trajectory runs. The logical lifecycle
+then attaches the object to `panda_hand`; Gazebo's `target_object` follows the
+hand with a `0.10 m` local Z offset. The place trajectory runs, the object
+detaches at the socket fixture, the arm retreats, and the final ros2_control
+status reports success. Other demos retain the zero-offset attachment default.
 Retained state and diagnostics are published on `/gazebo_object_attached`,
 `/gazebo_attach_detach_status`, and `/gazebo_attach_pose_error_mm`.
 
+The fixed-socket profile uses `grasp_height_offset: 0.10` and
+`place_height_offset: 0.10`. Its PlanningScene target support is aligned with
+the Gazebo support at `(0.35, 0.18, 0.025)` with size
+`(0.18, 0.18, 0.05)`, keeping the MoveIt goal poses clear of the support.
+MoveIt uses the standard Panda model and continues to perform collision
+checking against this scene.
+
+The generic lightweight Gazebo Panda launch defaults `enable_arm_collisions`
+to `true`. Only this visual grasp-attach demo defaults it to `false`, avoiding
+interference from the lightweight simulator fixture's simplified box/cylinder
+arm collisions during trajectory playback. This option does not change
+MoveIt collision checking or make the demo physics-accurate.
+
 ```bash
 bash scripts/check_gazebo_attach_detach_available.sh
+python3 scripts/check_gazebo_grasp_attach_demo_status.py
 python3 scripts/check_gazebo_attach_detach_success_path.py
 python3 scripts/check_gazebo_attach_detach_failure_path.py
 python3 scripts/check_gazebo_attach_owner_transitions.py
@@ -529,8 +545,10 @@ python3 scripts/check_gazebo_attachment_offset.py
 python3 scripts/check_live_gazebo_attach_detach.py
 ```
 
-The last command is an optional bounded, headless live Gazebo validation; the
-fixture checks remain available without a running simulator. Live attachment
+Run the demo-status checker in a second sourced shell immediately after
+starting the demo so it observes the live grasp/place transitions. The last
+command is an optional bounded, headless live Gazebo validation; the fixture
+checks remain available without a running simulator. Live attachment
 is simulator-only kinematic set-pose mirroring, not physics-accurate grasping,
 contact-rich insertion, force control, tactile feedback, or real hardware
 execution. The fixed offset is only a visual-correctness aid.
