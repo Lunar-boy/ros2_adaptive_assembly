@@ -54,8 +54,7 @@ The topic and terminal checks run while the full episode launch is active. Use `
 - No camera/image perception, marker detection, or visual servoing
 - No real robot hardware
 - No CSV/Markdown benchmark recorder is added by this launch
-<<<<<<< HEAD
-=======
+
 
 ## Single-trial deterministic episode demo
 
@@ -112,4 +111,4 @@ python3 scripts/check_deterministic_episode_config.py
 python3 scripts/check_gazebo_controller_ready.py
 python3 scripts/check_deterministic_episode_runtime_order.py
 ```
->>>>>>> origin/main
+
