@@ -220,8 +220,8 @@ python3 scripts/check_full_episode_terminal_status.py
 See [`docs/full_assembly_episode_launch.md`](docs/full_assembly_episode_launch.md)
 for composition details, success criteria, and limitations.
 
+---
 
-=======
 ### Single-trial deterministic episode demo
 
 Launch the deterministic-correctness profile with distinct deterministic source and
