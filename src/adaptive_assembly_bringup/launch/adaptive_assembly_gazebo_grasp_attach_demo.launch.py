@@ -15,6 +15,10 @@ def generate_launch_description() -> LaunchDescription:
         FindPackageShare('adaptive_assembly_bringup'), 'launch',
         'adaptive_assembly_full_gazebo_execution_demo.launch.py',
     ])
+    target_sync = PathJoinSubstitution([
+        FindPackageShare('adaptive_assembly_sim'), 'launch',
+        'gazebo_target_pose_sync.launch.py',
+    ])
     lifecycle = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_manipulation'), 'launch',
         'logical_grasp_lifecycle.launch.py',
@@ -48,17 +52,17 @@ def generate_launch_description() -> LaunchDescription:
             'params_file',
             default_value=PathJoinSubstitution([
                 FindPackageShare('adaptive_assembly_bringup'), 'config',
-                'adaptive_assembly_sequence_reachable_params.yaml',
+                'adaptive_assembly_fixed_socket_params.yaml',
             ]),
             description='Parameter YAML for perception and task nodes.',
         ),
         DeclareLaunchArgument(
-            'require_grasp_trajectory', default_value='false',
+            'require_grasp_trajectory', default_value='true',
             description='Plan and execute the intermediate grasp stage.',
         ),
-        DeclareLaunchArgument('require_place_sequence', default_value='false'),
+        DeclareLaunchArgument('require_place_sequence', default_value='true'),
         DeclareLaunchArgument(
-            'require_target_sync_success', default_value='false',
+            'require_target_sync_success', default_value='true',
             description='Optionally gate initial execution on target sync.',
         ),
         DeclareLaunchArgument(
@@ -69,10 +73,10 @@ def generate_launch_description() -> LaunchDescription:
             'target_sync_timeout_sec', default_value='10.0',
         ),
         DeclareLaunchArgument(
-            'attach_stage', default_value='pre_grasp',
+            'attach_stage', default_value='grasp',
             description='Successful execution stage that triggers attachment.',
         ),
-        DeclareLaunchArgument('release_stage', default_value='execution_success'),
+        DeclareLaunchArgument('release_stage', default_value='place'),
         DeclareLaunchArgument(
             'enable_service_calls', default_value='true',
             description=(
@@ -81,7 +85,7 @@ def generate_launch_description() -> LaunchDescription:
         ),
         DeclareLaunchArgument('attached_object_offset_x', default_value='0.0'),
         DeclareLaunchArgument('attached_object_offset_y', default_value='0.0'),
-        DeclareLaunchArgument('attached_object_offset_z', default_value='0.0'),
+        DeclareLaunchArgument('attached_object_offset_z', default_value='0.10'),
         DeclareLaunchArgument(
             'attached_object_use_hand_orientation', default_value='true'
         ),
@@ -89,6 +93,13 @@ def generate_launch_description() -> LaunchDescription:
             'Launching simulator-only Gazebo Panda execution with logical '
             'grasp lifecycle and kinematic object attachment.'
         )),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(target_sync),
+            launch_arguments={
+                'enable_service_calls': enable_calls,
+                'status_topic': target_sync_topic,
+            }.items(),
+        ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(full_demo),
             launch_arguments={
@@ -112,6 +123,7 @@ def generate_launch_description() -> LaunchDescription:
             PythonLaunchDescriptionSource(attachment),
             launch_arguments={
                 'enable_service_calls': enable_calls,
+                'status_topic': '/gazebo_attach_detach_status',
                 'attached_object_offset_x': offset_x,
                 'attached_object_offset_y': offset_y,
                 'attached_object_offset_z': offset_z,

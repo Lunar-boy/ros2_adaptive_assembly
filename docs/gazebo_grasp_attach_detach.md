@@ -28,6 +28,13 @@ ros2 launch adaptive_assembly_bringup \
   adaptive_assembly_gazebo_grasp_attach_demo.launch.py
 ```
 
+By default this starts the Gazebo workcell and Panda-like arm, synchronizes
+`/target_pose` to Gazebo's `target_object`, and plans and executes the grasp and
+fixed-socket place sequence. The logical lifecycle attaches after `grasp`, the
+kinematic attachment makes `target_object` follow `panda_hand` with a `0.10 m`
+local Z offset, and it detaches after `place`. The object remains in the socket
+while the arm retreats.
+
 The package-local launch can be used without Gazebo for fixture validation:
 
 ```bash
@@ -121,6 +128,7 @@ The configurable offset is rotated by the hand orientation before being added
 to the hand position. Zero offset preserves direct origin mirroring. The visual
 single-trial demo uses a tunable `0.10 m` local Z offset to place the cylinder
 at the simplified Panda tool geometry. This is only a visual-correctness aid:
-no collision constraint, contact detection, force control, tactile feedback,
-or physics-accurate joint is modeled. Detach only stops kinematic updates. This
-feature has no real-robot or hardware path.
+no physics-accurate grasping, contact-rich insertion, collision constraint,
+force control, tactile feedback, or physics-accurate joint is modeled. Detach
+only stops kinematic updates. This feature has no real-robot or hardware
+execution path.
