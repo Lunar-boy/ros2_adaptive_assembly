@@ -279,7 +279,4 @@ Replace `TBD` values with locally recorded benchmark results.
 
 ## License
 
-Add a license before external reuse. Recommended options:
-
-- MIT License for permissive open-source reuse;
-- Apache-2.0 if patent clauses and robotics/industry compatibility matter.
+Apache-2.0 
