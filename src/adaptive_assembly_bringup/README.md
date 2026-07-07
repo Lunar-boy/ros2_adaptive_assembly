@@ -78,8 +78,11 @@ ros2 launch adaptive_assembly_bringup \
   adaptive_assembly_gazebo_grasp_attach_demo.launch.py
 ```
 
-It is simulator-only and does not model contact-rich or force-controlled
-grasping.
+By default it synchronizes the target into Gazebo, executes the grasp and
+fixed-socket place sequence, attaches after `grasp`, releases after `place`,
+and retreats with the object left in the fixture. It is simulator-only
+kinematic attachment, not physics-accurate grasping, contact-rich insertion,
+force control, tactile feedback, or real hardware execution.
 
 The PR37 recovery orchestration demo composes the existing supervisor with a
 bounded simulator-only reset and fake-perception republish loop:
