@@ -46,6 +46,7 @@ setup(
             'adaptive_assembly_sim.gazebo_entity_pose_observer_node:main',
             'activate_gazebo_controllers_node = '
             'adaptive_assembly_sim.activate_gazebo_controllers_node:main',
+            'fake_panda_finger_joint_state_node = adaptive_assembly_sim.fake_panda_finger_joint_state_node:main',
         ],
     },
 )

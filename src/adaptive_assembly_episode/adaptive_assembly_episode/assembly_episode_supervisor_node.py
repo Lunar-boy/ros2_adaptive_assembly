@@ -103,6 +103,7 @@ class AssemblyEpisodeSupervisorNode(Node):
         self._stage = 'init'
         self._planning_success = False
         self._pre_grasp_success = False
+        self._grasp_execution_success = False
         self._assembly_success = False
         self._execution_success_signal = False
         self._execution_terminal_success = False
@@ -170,9 +171,12 @@ class AssemblyEpisodeSupervisorNode(Node):
         fields = parse_status(message.data)
         if fields.get('event') != 'success':
             return
-        if fields.get('stage') == 'pre_grasp':
+        stage = fields.get('stage')
+        if stage == 'pre_grasp':
             self._pre_grasp_success = True
-        elif fields.get('stage') == 'assembly':
+        elif stage == 'grasp':
+            self._grasp_execution_success = True
+        elif stage in ('assembly', 'place'):
             self._assembly_success = True
         self._evaluate()
 
@@ -212,7 +216,17 @@ class AssemblyEpisodeSupervisorNode(Node):
         self._evaluate()
 
     def _gazebo_attach_cb(self, message: String) -> None:
-        event = parse_status(message.data).get('event', '').lower()
+        fields = parse_status(message.data)
+        event = fields.get('event', '').lower()
+
+        # Gazebo attach/detach may publish startup or transient status before
+        # the logical grasp point is reached. In the full visual episode,
+        # attachment is meaningful only after the ros2_control `grasp` stage
+        # succeeds, so ignore attach success/failure evidence before that.
+        if not self._grasp_execution_success:
+            if event == 'attached' or event in self._TERMINAL_FAILURE_EVENTS:
+                return
+
         if event == 'attached':
             self._gazebo_attach_success = True
             self._gazebo_attach_failed = False

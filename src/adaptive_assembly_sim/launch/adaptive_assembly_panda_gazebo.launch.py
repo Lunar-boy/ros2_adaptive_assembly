@@ -207,6 +207,13 @@ def _launch_setup(context, *args, **kwargs):
                 on_exit=[spawn_controllers],
             ),
         ),
+        Node(
+            package='adaptive_assembly_sim',
+            executable='fake_panda_finger_joint_state_node',
+            name='fake_panda_finger_joint_state_node',
+            output='screen',
+            parameters=[{'use_sim_time': True}],
+        ),
         RegisterEventHandler(
             OnProcessExit(
                 target_action=spawn_controllers,

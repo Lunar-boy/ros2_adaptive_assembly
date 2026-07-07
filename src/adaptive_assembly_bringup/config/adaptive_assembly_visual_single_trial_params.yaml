@@ -1,0 +1,33 @@
+fake_object_pose_node:
+  ros__parameters:
+    publish_period_sec: 3600.0
+    x_min: 0.35
+    x_max: 0.35
+    y_min: 0.18
+    y_max: 0.18
+    z: 0.10
+    random_seed: 42
+    frame_id: world
+    target_frame_id: target_object
+    yaw_min: 0.0
+    yaw_max: 0.0
+    publish_immediately: true
+    publish_once: true
+
+assembly_task_node:
+  ros__parameters:
+    pre_grasp_height_offset: 0.20
+    grasp_height_offset: 0.10
+    assembly_height_offset: 0.05
+    replan_distance_threshold: 0.03
+
+    assembly_pose_mode: fixed_socket
+    socket_x: 0.62
+    socket_y: -0.18
+    socket_z: 0.10
+    socket_yaw: 0.0
+    socket_frame_id: world
+
+    pre_place_height_offset: 0.20
+    place_height_offset: 0.10
+    retreat_height_offset: 0.20
