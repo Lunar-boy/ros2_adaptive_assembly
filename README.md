@@ -261,9 +261,7 @@ episode supervisor waits for an explicit terminal executor status (or its
 episode timeout) and does not infer failure from an initially absent success.
 
 
-### Suggested result table
-
-After recording benchmark data, add a small result table here:
+### Result table
 
 | Profile | Events | Success | Failed | Skipped | Mean planning time |
 |---|---:|---:|---:|---:|---:|
@@ -273,7 +271,6 @@ After recording benchmark data, add a small result table here:
 | fixed yaw | TBD | TBD | TBD | TBD | TBD |
 | guarded planner | TBD | TBD | TBD | TBD | TBD |
 
-Replace `TBD` values with locally recorded benchmark results.
 
 ---
 
