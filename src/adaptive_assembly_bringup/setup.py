@@ -24,10 +24,10 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='nate',
+    maintainer='Chunzhi Wu',
     maintainer_email='chunzhi.wu@mailbox.tu-dresden.de',
     description='Launch entry points for the adaptive assembly pipeline.',
-    license='TODO: License declaration',
+    license='Apache-2.0',
     extras_require={
         'test': [
             'pytest',

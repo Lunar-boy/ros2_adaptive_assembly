@@ -25,10 +25,10 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='nate',
+    maintainer='Chunzhi Wu',
     maintainer_email='chunzhi.wu@mailbox.tu-dresden.de',
     description='Simulator-only logical gripper and grasp lifecycle.',
-    license='TODO: License declaration',
+    license='Apache-2.0',
     entry_points={
         'console_scripts': [
             'logical_grasp_lifecycle_node = '

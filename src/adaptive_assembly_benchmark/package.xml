@@ -4,8 +4,8 @@
   <name>adaptive_assembly_benchmark</name>
   <version>0.0.0</version>
   <description>Contact-lite geometric benchmarks for adaptive assembly.</description>
-  <maintainer email="chunzhi.wu@mailbox.tu-dresden.de">nate</maintainer>
-  <license>TODO: License declaration</license>
+  <maintainer email="chunzhi.wu@mailbox.tu-dresden.de">Chunzhi Wu</maintainer>
+  <license>Apache-2.0</license>
   <depend>geometry_msgs</depend>
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
