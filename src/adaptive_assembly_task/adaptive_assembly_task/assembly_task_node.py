@@ -2,9 +2,11 @@
 
 import math
 
+from adaptive_assembly_task.replanning_gate import should_replan
 from geometry_msgs.msg import PoseStamped
 import rclpy
 from rclpy.node import Node
+from std_msgs.msg import String
 
 
 class AssemblyTaskNode(Node):
@@ -90,10 +92,11 @@ class AssemblyTaskNode(Node):
         self._retreat_publisher = self.create_publisher(
             PoseStamped, self._retreat_pose_topic, 10
         )
+        self._status_publisher = self.create_publisher(String, '~/status', 10)
         self._target_subscription = self.create_subscription(
             PoseStamped, '/target_pose', self._target_pose_callback, 10
         )
-        self._previous_target_pose = None
+        self._last_accepted_target_pose = None
         self.get_logger().info(
             f'Assembly task configured: assembly_pose_mode='
             f'{self._assembly_pose_mode}, object_place_pose_topic='
@@ -101,12 +104,7 @@ class AssemblyTaskNode(Node):
         )
 
     def _validate_parameters(self) -> None:
-        """Reject a negative replanning distance threshold."""
-        if self._replan_distance_threshold < 0.0:
-            raise ValueError(
-                'replan_distance_threshold must be greater than or equal to '
-                'zero'
-            )
+        """Validate task pose configuration parameters."""
         if self._grasp_height_offset < 0.0:
             raise ValueError(
                 'grasp_height_offset must be greater than or equal to zero'
@@ -132,7 +130,34 @@ class AssemblyTaskNode(Node):
             f'x={position.x:.3f}, y={position.y:.3f}, z={position.z:.3f}'
         )
 
-        self._log_replanning_decision(target_pose)
+        distance = self._target_displacement(target_pose)
+        if distance is not None and not should_replan(
+            distance, self._replan_distance_threshold
+        ):
+            self._publish_status(
+                'skipped_small_motion', target_pose, distance
+            )
+            self.get_logger().info(
+                f'Target moved {distance:.3f} m; target change is small and '
+                'planning targets were not updated'
+            )
+            return
+
+        if distance is None:
+            status = 'accepted_initial'
+            self.get_logger().info(
+                'First target pose accepted; initial planning is required'
+            )
+        elif self._replan_distance_threshold <= 0.0:
+            status = 'accepted_threshold_disabled'
+            self.get_logger().info(
+                'Replanning distance gate is disabled; target accepted'
+            )
+        else:
+            status = 'accepted_replan'
+            self.get_logger().info(
+                f'Target moved {distance:.3f} m; replanning is required'
+            )
 
         pre_grasp_pose = self._offset_pose(
             target_pose, self._pre_grasp_height_offset
@@ -196,7 +221,8 @@ class AssemblyTaskNode(Node):
                 f'frame={pose.header.frame_id}'
             )
 
-        self._previous_target_pose = target_pose
+        self._last_accepted_target_pose = target_pose
+        self._publish_status(status, target_pose, distance)
 
     def _fixed_socket_pose(self, target_pose: PoseStamped) -> PoseStamped:
         """Return the configured fixed socket pose with a yaw quaternion."""
@@ -210,33 +236,31 @@ class AssemblyTaskNode(Node):
         result.pose.orientation.w = math.cos(self._socket_yaw / 2.0)
         return result
 
-    def _log_replanning_decision(self, target_pose: PoseStamped) -> None:
-        """Log whether target movement requires planning or replanning."""
-        if self._previous_target_pose is None:
-            self.get_logger().info(
-                'First target pose accepted; initial planning is required'
-            )
-            return
+    def _target_displacement(self, target_pose: PoseStamped):
+        """Return displacement from the last published target, if any."""
+        if self._last_accepted_target_pose is None:
+            return None
 
         current = target_pose.pose.position
-        previous = self._previous_target_pose.pose.position
-        distance = math.sqrt(
+        previous = self._last_accepted_target_pose.pose.position
+        return math.sqrt(
             (current.x - previous.x) ** 2
             + (current.y - previous.y) ** 2
             + (current.z - previous.z) ** 2
         )
 
-        if distance > self._replan_distance_threshold:
-            self.get_logger().info(
-                'Target moved '
-                f'{distance:.3f} m; replanning is required'
-            )
-        else:
-            self.get_logger().info(
-                'Target moved '
-                f'{distance:.3f} m; target change is small and no replanning '
-                'is required'
-            )
+    def _publish_status(
+        self, status: str, target_pose: PoseStamped, distance
+    ) -> None:
+        """Publish the target acceptance decision in a stable text format."""
+        distance_field = 'n/a' if distance is None else f'{distance:.6f}'
+        message = String()
+        message.data = (
+            f'status={status};distance={distance_field};'
+            f'threshold={self._replan_distance_threshold:.6f};'
+            f'frame_id={target_pose.header.frame_id}'
+        )
+        self._status_publisher.publish(message)
 
     @staticmethod
     def _offset_pose(

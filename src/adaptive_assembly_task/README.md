@@ -3,8 +3,9 @@
 This ROS 2 Jazzy package converts perceived target poses into simple
 task-level poses for adaptive assembly. The `assembly_task_node` subscribes to
 `/target_pose`, publishes vertically offset poses on `/pre_grasp_pose`,
-`/grasp_pose`, `/pre_place_pose`, `/place_pose`, `/retreat_pose`, `/assembly_pose`, and `/object_place_pose`, and reports when
-target movement exceeds the replanning threshold. In fixed-socket mode,
+`/grasp_pose`, `/pre_place_pose`, `/place_pose`, `/retreat_pose`, `/assembly_pose`, and `/object_place_pose`. After the first target,
+updates at or below `replan_distance_threshold` are skipped; decisions are
+published on `~/status`. A threshold of zero or less disables this gate. In fixed-socket mode,
 `/assembly_pose` is a legacy alias of `/place_pose`. `/assembly_pose` is the
 current robot hand target; `/object_place_pose` is the desired final object
 pose. It does not perform motion planning or call MoveIt 2.
@@ -17,7 +18,7 @@ pose. It does not perform motion planning or call MoveIt 2.
 | `grasp_height_offset` | `0.05` | Grasp height above the target in meters |
 | `grasp_pose_topic` | `/grasp_pose` | Output topic for the explicit grasp pose |
 | `assembly_height_offset` | `0.05` | Assembly height above the target in meters |
-| `replan_distance_threshold` | `0.03` | Target movement requiring replanning in meters |
+| `replan_distance_threshold` | `0.03` | Target movement requiring replanning in meters; `<= 0.0` disables filtering |
 | `object_place_pose_topic` | `/object_place_pose` | Desired final object pose output topic |
 | `assembly_pose_mode` | `target_offset` | Use `target_offset` or a configured `fixed_socket` pose |
 | `socket_x`, `socket_y`, `socket_z` | `0.62`, `-0.18`, `0.10` | Fixed object/socket target position in meters |
