@@ -16,7 +16,7 @@ fake_object_pose_node:
 assembly_task_node:
   ros__parameters:
     pre_grasp_height_offset: 0.20
-    grasp_height_offset: 0.05
+    grasp_height_offset: 0.10
     assembly_height_offset: 0.05
     replan_distance_threshold: 0.03
 
@@ -28,5 +28,5 @@ assembly_task_node:
     socket_frame_id: world
 
     pre_place_height_offset: 0.20
-    place_height_offset: 0.00
+    place_height_offset: 0.10
     retreat_height_offset: 0.20

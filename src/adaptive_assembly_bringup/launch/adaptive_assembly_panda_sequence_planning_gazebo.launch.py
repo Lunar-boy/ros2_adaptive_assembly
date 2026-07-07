@@ -115,6 +115,14 @@ def generate_launch_description() -> LaunchDescription:
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(static_scene_launch),
+            launch_arguments={
+                'target_support_x': '0.35',
+                'target_support_y': '0.18',
+                'target_support_z': '0.025',
+                'target_support_size_x': '0.18',
+                'target_support_size_y': '0.18',
+                'target_support_size_z': '0.05',
+            }.items(),
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(pre_grasp_adapter_launch),

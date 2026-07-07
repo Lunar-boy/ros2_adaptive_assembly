@@ -1,12 +1,21 @@
 """Launch static PlanningScene collision objects for the Panda demo."""
 
 from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description() -> LaunchDescription:
     """Start the static PlanningScene node without launching MoveIt2."""
     return LaunchDescription([
+        DeclareLaunchArgument('target_support_x', default_value='0.45'),
+        DeclareLaunchArgument('target_support_y', default_value='0.0'),
+        DeclareLaunchArgument('target_support_z', default_value='0.01'),
+        DeclareLaunchArgument('target_support_size_x', default_value='0.12'),
+        DeclareLaunchArgument('target_support_size_y', default_value='0.12'),
+        DeclareLaunchArgument('target_support_size_z', default_value='0.02'),
         Node(
             package='adaptive_assembly_planning',
             executable='static_planning_scene_node',
@@ -23,12 +32,27 @@ def generate_launch_description() -> LaunchDescription:
                 'table_size_y': 0.80,
                 'table_size_z': 0.04,
                 'add_target_support': True,
-                'target_support_x': 0.45,
-                'target_support_y': 0.0,
-                'target_support_z': 0.01,
-                'target_support_size_x': 0.12,
-                'target_support_size_y': 0.12,
-                'target_support_size_z': 0.02,
+                'target_support_x': ParameterValue(
+                    LaunchConfiguration('target_support_x'), value_type=float
+                ),
+                'target_support_y': ParameterValue(
+                    LaunchConfiguration('target_support_y'), value_type=float
+                ),
+                'target_support_z': ParameterValue(
+                    LaunchConfiguration('target_support_z'), value_type=float
+                ),
+                'target_support_size_x': ParameterValue(
+                    LaunchConfiguration('target_support_size_x'),
+                    value_type=float,
+                ),
+                'target_support_size_y': ParameterValue(
+                    LaunchConfiguration('target_support_size_y'),
+                    value_type=float,
+                ),
+                'target_support_size_z': ParameterValue(
+                    LaunchConfiguration('target_support_size_z'),
+                    value_type=float,
+                ),
                 'add_socket_fixture': True,
                 'socket_x': 0.62,
                 'socket_y': -0.18,

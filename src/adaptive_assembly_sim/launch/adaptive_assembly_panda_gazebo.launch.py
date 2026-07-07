@@ -78,6 +78,7 @@ def _launch_setup(context, *args, **kwargs):
     spawn_y = LaunchConfiguration('spawn_y')
     spawn_z = LaunchConfiguration('spawn_z')
     spawn_yaw = LaunchConfiguration('spawn_yaw')
+    enable_arm_collisions = LaunchConfiguration('enable_arm_collisions')
     controller_manager_name = LaunchConfiguration('controller_manager_name')
     world_name = LaunchConfiguration('world_name')
     controllers_file = os.path.join(
@@ -90,6 +91,7 @@ def _launch_setup(context, *args, **kwargs):
         Command([
             'xacro ', model,
             ' controllers_file:=', controllers_file,
+            ' enable_arm_collisions:=', enable_arm_collisions,
         ]),
         value_type=str,
     )
@@ -244,6 +246,13 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument('spawn_y', default_value='0.0'),
         DeclareLaunchArgument('spawn_z', default_value='0.0'),
         DeclareLaunchArgument('spawn_yaw', default_value='0.0'),
+        DeclareLaunchArgument(
+            'enable_arm_collisions', default_value='true',
+            description=(
+                'Enable simplified Gazebo arm collision geometry. MoveIt '
+                'collision checking is configured separately.'
+            ),
+        ),
         DeclareLaunchArgument(
             'world_name',
             default_value='adaptive_assembly_workcell',
