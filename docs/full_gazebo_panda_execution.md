@@ -56,9 +56,12 @@ ros2 launch adaptive_assembly_bringup \
 ```
 
 Gazebo starts paused. The Panda is spawned first, and the controller spawner is
-started only after entity creation completes. Both controllers are loaded and
-configured while paused; launch then deterministically unpauses Gazebo and
-activates them. Do not manually unpause before controller configuration. The
+started only after entity creation completes. The controller spawner loads and
+configures both controllers while paused. Launch then unpauses Gazebo before a
+bounded helper calls the controller-manager switch service directly, activates
+both controllers as a strict group, and verifies their states. This avoids ROS
+CLI discovery races while retaining a 60-second bound. Do not manually alter
+this order. The
 Panda base is simulator-only kinematic, so it remains anchored while the seven
 arm joints remain controllable.
 
@@ -131,6 +134,12 @@ The topic/action check verifies ROS graph interfaces only. A visible
 Gazebo ros2_control controllers are active. Valid PR37 success requires both
 controllers to be reported `active` by
 `ros2 control list_controllers -c /controller_manager`.
+
+Validate controller states and a fresh joint-state timestamp with:
+
+```bash
+bash scripts/check_gazebo_controllers_active.sh
+```
 
 ## Troubleshooting
 

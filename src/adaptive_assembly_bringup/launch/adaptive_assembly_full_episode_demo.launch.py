@@ -1,7 +1,13 @@
 """Compose the complete simulator-only adaptive assembly episode."""
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    LogInfo,
+    RegisterEventHandler,
+)
+from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
@@ -30,6 +36,11 @@ def generate_launch_description() -> LaunchDescription:
         'launch',
         'assembly_episode_supervisor.launch.py',
     ])
+    simulation = PathJoinSubstitution([
+        FindPackageShare('adaptive_assembly_sim'),
+        'launch',
+        'adaptive_assembly_panda_gazebo.launch.py',
+    ])
 
     arguments = {
         'enable_service_calls': 'true',
@@ -44,20 +55,12 @@ def generate_launch_description() -> LaunchDescription:
     }
     config = {name: LaunchConfiguration(name) for name in arguments}
 
-    return LaunchDescription([
-        *[
-            DeclareLaunchArgument(name, default_value=default)
-            for name, default in arguments.items()
-        ],
-        LogInfo(msg=(
-            'Launching complete simulator-only adaptive assembly episode: '
-            'Gazebo execution + logical grasp + kinematic attachment + Gazebo '
-            'achieved pose + contact-lite insertion + passive episode supervisor.'
-        )),
-        IncludeLaunchDescription(
+    def downstream_actions():
+        return [IncludeLaunchDescription(
             PythonLaunchDescriptionSource(grasp_attach_demo),
             launch_arguments={
                 'enable_service_calls': config['enable_service_calls'],
+                'launch_simulation': 'false',
             }.items(),
         ),
         IncludeLaunchDescription(
@@ -105,4 +108,53 @@ def generate_launch_description() -> LaunchDescription:
                 'simulated_only': config['simulated_only'],
             }.items(),
         ),
+        ]
+
+    readiness_gate = Node(
+        package='adaptive_assembly_execution',
+        executable='wait_for_gazebo_controller_ready_node',
+        name='full_episode_controller_ready_node',
+        output='screen',
+        parameters=[{
+            'timeout_sec': 60.0,
+            'simulated_only': True,
+            'status_topic': '/full_episode_gazebo_controller_ready_status',
+        }],
+    )
+    readiness_waiter = Node(
+        package='adaptive_assembly_execution',
+        executable='wait_for_gazebo_controller_ready_status_node',
+        name='full_episode_controller_ready_waiter',
+        output='screen',
+        parameters=[{
+            'timeout_sec': 65.0,
+            'status_topic': '/full_episode_gazebo_controller_ready_status',
+        }],
+    )
+
+    def start_after_readiness(event, context):
+        del context
+        if event.returncode != 0:
+            return [LogInfo(msg=(
+                'Controller readiness failed; full episode consumers remain stopped.'
+            ))]
+        return downstream_actions()
+
+    return LaunchDescription([
+        *[
+            DeclareLaunchArgument(name, default_value=default)
+            for name, default in arguments.items()
+        ],
+        LogInfo(msg=(
+            'Launching complete simulator-only adaptive assembly episode: '
+            'Gazebo and controllers first, then controller-gated planning, '
+            'execution, attachment, evaluation, and supervision.'
+        )),
+        IncludeLaunchDescription(PythonLaunchDescriptionSource(simulation)),
+        readiness_gate,
+        readiness_waiter,
+        RegisterEventHandler(OnProcessExit(
+            target_action=readiness_waiter,
+            on_exit=start_after_readiness,
+        )),
     ])

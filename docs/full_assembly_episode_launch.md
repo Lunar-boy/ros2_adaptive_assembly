@@ -71,6 +71,10 @@ evaluation, or the episode supervisor. Readiness requires the
 Panda `/joint_states` message. The bounded gate defaults to 60 seconds and
 remains simulator-only.
 
+The main `adaptive_assembly_full_episode_demo.launch.py` uses the same
+controller and non-zero joint-state timestamp gate before starting MoveIt,
+execution, attachment, evaluation, or supervision.
+
 This deterministic-correctness launch uses the deterministic source pose
 `(0.442, 0.148, 0.15)` and a distinct fixed socket/place pose
 `(0.62, -0.18, 0.10)`. It synchronizes the source pose into Gazebo before
@@ -111,4 +115,3 @@ python3 scripts/check_deterministic_episode_config.py
 python3 scripts/check_gazebo_controller_ready.py
 python3 scripts/check_deterministic_episode_runtime_order.py
 ```
-

@@ -141,17 +141,32 @@ def _launch_setup(context, *args, **kwargs):
         name='unpause_gazebo_after_controller_configuration',
         output='screen',
     )
-    activate_controllers = ExecuteProcess(
-        cmd=[
-            'ros2', 'control', 'switch_controllers',
-            '--activate', 'joint_state_broadcaster', 'panda_arm_controller',
-            '--strict',
-            '--controller-manager', controller_manager_name,
-        ],
+    activate_controllers = Node(
+        package='adaptive_assembly_sim',
+        executable='activate_gazebo_controllers_node',
         name='activate_panda_controllers',
         output='screen',
+        parameters=[{
+            'controller_manager_name': controller_manager_name,
+            'timeout_sec': 60.0,
+        }],
     )
 
+    def unpause_after_controller_configuration(event, context):
+        del context
+        if event.returncode != 0:
+            return [LogInfo(msg=(
+                'Controller configuration failed; Gazebo remains paused.'
+            ))]
+        return [unpause_gazebo]
+
+    def activate_after_unpause(event, context):
+        del context
+        if event.returncode != 0:
+            return [LogInfo(msg=(
+                'Gazebo unpause failed; controller activation is not attempted.'
+            ))]
+        return [activate_controllers]
     return [
         LogInfo(msg=(
             'Launching Gazebo Harmonic with a simulator-only Panda '
@@ -195,13 +210,13 @@ def _launch_setup(context, *args, **kwargs):
         RegisterEventHandler(
             OnProcessExit(
                 target_action=spawn_controllers,
-                on_exit=[unpause_gazebo],
+                on_exit=unpause_after_controller_configuration,
             ),
         ),
         RegisterEventHandler(
             OnProcessExit(
                 target_action=unpause_gazebo,
-                on_exit=[activate_controllers],
+                on_exit=activate_after_unpause,
             ),
         ),
     ]

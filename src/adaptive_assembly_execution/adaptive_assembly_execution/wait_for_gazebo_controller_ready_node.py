@@ -97,7 +97,10 @@ class GazeboControllerReadyNode(Node):
 
     def _joint_state_callback(self, message: JointState) -> None:
         positions = dict(zip(message.name, message.position))
-        self._joint_states_received = all(
+        stamp_is_nonzero = (
+            message.header.stamp.sec != 0 or message.header.stamp.nanosec != 0
+        )
+        self._joint_states_received = stamp_is_nonzero and all(
             name in positions and math.isfinite(float(positions[name]))
             for name in self._expected_joints
         )
@@ -190,7 +193,8 @@ def main(args=None) -> None:
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

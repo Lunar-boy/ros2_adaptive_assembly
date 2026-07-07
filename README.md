@@ -207,6 +207,8 @@ ros2 launch adaptive_assembly_bringup adaptive_assembly_full_episode_demo.launch
 The episode synchronizes `/target_pose` into the Gazebo `target_object` before
 grasp attachment changes `/target_object_control_owner` from `target_sync`.
 Synchronization status is available on `/gazebo_target_sync_status`.
+MoveIt and the episode consumers start only after both Gazebo controllers are
+active and `/joint_states` has a non-zero simulator timestamp.
 
 While it is active, validate launch discovery, topics, and terminal status:
 
@@ -215,6 +217,7 @@ bash scripts/check_full_episode_launch_available.sh
 python3 scripts/check_full_episode_target_sync.py
 bash scripts/check_full_episode_topics.sh
 python3 scripts/check_full_episode_terminal_status.py
+bash scripts/check_gazebo_controllers_active.sh
 ```
 
 See [`docs/full_assembly_episode_launch.md`](docs/full_assembly_episode_launch.md)
