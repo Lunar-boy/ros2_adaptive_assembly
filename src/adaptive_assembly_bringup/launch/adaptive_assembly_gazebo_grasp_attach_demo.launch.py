@@ -35,6 +35,7 @@ def generate_launch_description() -> LaunchDescription:
     target_sync_topic = LaunchConfiguration('target_sync_status_topic')
     target_sync_timeout = LaunchConfiguration('target_sync_timeout_sec')
     launch_simulation = LaunchConfiguration('launch_simulation')
+    enable_arm_collisions = LaunchConfiguration('enable_arm_collisions')
     attach_stage = LaunchConfiguration('attach_stage')
     release_stage = LaunchConfiguration('release_stage')
     offset_x = LaunchConfiguration('attached_object_offset_x')
@@ -47,6 +48,13 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             'launch_simulation', default_value='true',
             description='Start Gazebo; false when an outer launch owns it.',
+        ),
+        DeclareLaunchArgument(
+            'enable_arm_collisions', default_value='false',
+            description=(
+                'Disable mismatched lightweight Gazebo arm collisions for '
+                'this MoveIt-collision-checked visual demo.'
+            ),
         ),
         DeclareLaunchArgument(
             'params_file',
@@ -110,6 +118,11 @@ def generate_launch_description() -> LaunchDescription:
                 'target_sync_status_topic': target_sync_topic,
                 'target_sync_timeout_sec': target_sync_timeout,
                 'launch_simulation': launch_simulation,
+                'enable_arm_collisions': enable_arm_collisions,
+                # The target-sync include also declares status_topic. Bind the
+                # nested executor explicitly so its terminal result cannot be
+                # redirected to /gazebo_target_sync_status by launch scoping.
+                'status_topic': '/assembly_ros2_control_execution_status',
             }.items(),
         ),
         IncludeLaunchDescription(

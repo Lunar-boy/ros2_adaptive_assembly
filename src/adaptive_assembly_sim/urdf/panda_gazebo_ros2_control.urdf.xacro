@@ -2,6 +2,8 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="adaptive_assembly_panda">
   <xacro:arg name="initial_positions_file" default=""/>
   <xacro:arg name="controllers_file" default=""/>
+  <xacro:arg name="enable_arm_collisions" default="true"/>
+  <xacro:property name="arm_collisions" value="$(arg enable_arm_collisions)"/>
 
   <material name="panda_white">
     <color rgba="0.86 0.88 0.90 1.0"/>
@@ -31,12 +33,14 @@
         </geometry>
         <material name="${material}"/>
       </visual>
-      <collision>
-        <origin xyz="${xyz}" rpy="0 0 0"/>
-        <geometry>
-          <box size="${size}"/>
-        </geometry>
-      </collision>
+      <xacro:if value="${arm_collisions}">
+        <collision>
+          <origin xyz="${xyz}" rpy="0 0 0"/>
+          <geometry>
+            <box size="${size}"/>
+          </geometry>
+        </collision>
+      </xacro:if>
     </link>
   </xacro:macro>
 
@@ -51,12 +55,14 @@
       </geometry>
       <material name="panda_dark"/>
     </visual>
-    <collision>
-      <origin xyz="0 0 0.12" rpy="0 0 0"/>
-      <geometry>
-        <cylinder radius="0.13" length="0.24"/>
-      </geometry>
-    </collision>
+    <xacro:if value="${arm_collisions}">
+      <collision>
+        <origin xyz="0 0 0.12" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="0.13" length="0.24"/>
+        </geometry>
+      </collision>
+    </xacro:if>
   </link>
 
   <joint name="panda_world_joint" type="fixed">
@@ -86,12 +92,14 @@
       </geometry>
       <material name="panda_joint_blue"/>
     </visual>
-    <collision>
-      <origin xyz="0 0 0.055" rpy="0 0 0"/>
-      <geometry>
-        <cylinder radius="0.06" length="0.11"/>
-      </geometry>
-    </collision>
+    <xacro:if value="${arm_collisions}">
+      <collision>
+        <origin xyz="0 0 0.055" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="0.06" length="0.11"/>
+        </geometry>
+      </collision>
+    </xacro:if>
   </link>
 
   <link name="panda_hand">
@@ -103,12 +111,14 @@
       </geometry>
       <material name="panda_dark"/>
     </visual>
-    <collision>
-      <origin xyz="0 0 0.06" rpy="0 0 0"/>
-      <geometry>
-        <box size="0.12 0.08 0.12"/>
-      </geometry>
-    </collision>
+    <xacro:if value="${arm_collisions}">
+      <collision>
+        <origin xyz="0 0 0.06" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.12 0.08 0.12"/>
+        </geometry>
+      </collision>
+    </xacro:if>
   </link>
 
   <joint name="panda_joint1" type="revolute">

@@ -33,7 +33,27 @@ By default this starts the Gazebo workcell and Panda-like arm, synchronizes
 fixed-socket place sequence. The logical lifecycle attaches after `grasp`, the
 kinematic attachment makes `target_object` follow `panda_hand` with a `0.10 m`
 local Z offset, and it detaches after `place`. The object remains in the socket
-while the arm retreats.
+while the arm retreats. The expected sequence is:
+
+1. Gazebo starts and the Panda spawns.
+2. The joint-state broadcaster and arm controller activate.
+3. Target synchronization succeeds.
+4. The grasp trajectory executes and the object attaches to `panda_hand`.
+5. The place trajectory executes and the object detaches at the socket fixture.
+6. The retreat trajectory executes and the final ros2_control status succeeds.
+
+The fixed-socket demo profile sets both `grasp_height_offset` and
+`place_height_offset` to `0.10`. The Gazebo-compatible planning launch also
+aligns the PlanningScene `target_support` box with the Gazebo support: center
+`(0.35, 0.18, 0.025)` and size `(0.18, 0.18, 0.05)`. These settings keep the
+adapted grasp and place goals clear of the modeled support/socket geometry.
+
+The lightweight Gazebo Panda fixture has an `enable_arm_collisions` argument,
+which defaults to `true` for the generic Gazebo Panda launch. This visual demo
+alone defaults it to `false` because its coarse box/cylinder collision shapes
+can interfere with simulator trajectory playback. The argument affects only
+the simplified Gazebo arm collision geometry. MoveIt planning still uses the
+`moveit_resources_panda` model and its PlanningScene collision checking.
 
 The package-local launch can be used without Gazebo for fixture validation:
 
@@ -95,6 +115,7 @@ After building and sourcing the workspace:
 
 ```bash
 bash scripts/check_gazebo_attach_detach_available.sh
+python3 scripts/check_gazebo_grasp_attach_demo_status.py
 python3 scripts/check_gazebo_attach_detach_success_path.py
 python3 scripts/check_gazebo_attach_detach_failure_path.py
 python3 scripts/check_gazebo_object_attached_status.py
@@ -104,6 +125,13 @@ python3 scripts/check_gazebo_attachment_offset.py
 
 The first two Python fixture checks do not require Gazebo. The retained-status
 check expects the launch to be running.
+
+The bounded demo-status checker assumes the visual demo is already running.
+It may be started after execution begins because the executor retains the 10
+most recent grasp/place stage-status events. Start it before the retained
+`/gazebo_target_sync_status` success is replaced by the later ownership-release
+status; that topic retains only its latest event. It prints each missing
+condition and the last message received from every relevant topic on timeout.
 
 ### Live Gazebo validation
 
@@ -128,7 +156,7 @@ The configurable offset is rotated by the hand orientation before being added
 to the hand position. Zero offset preserves direct origin mirroring. The visual
 single-trial demo uses a tunable `0.10 m` local Z offset to place the cylinder
 at the simplified Panda tool geometry. This is only a visual-correctness aid:
-no physics-accurate grasping, contact-rich insertion, collision constraint,
-force control, tactile feedback, or physics-accurate joint is modeled. Detach
-only stops kinematic updates. This feature has no real-robot or hardware
+no physics-accurate grasping, contact-rich insertion, force-controlled
+insertion, tactile feedback, or physics-accurate grasp contact is modeled.
+Detach only stops kinematic updates. This feature has no real-robot or hardware
 execution path.

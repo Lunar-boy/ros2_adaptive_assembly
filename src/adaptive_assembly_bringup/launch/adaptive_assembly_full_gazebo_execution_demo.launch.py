@@ -43,6 +43,7 @@ def generate_launch_description() -> LaunchDescription:
     target_sync_topic = LaunchConfiguration('target_sync_status_topic')
     target_sync_timeout = LaunchConfiguration('target_sync_timeout_sec')
     launch_simulation = LaunchConfiguration('launch_simulation')
+    enable_arm_collisions = LaunchConfiguration('enable_arm_collisions')
     default_world = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_sim'),
         'worlds',
@@ -53,6 +54,10 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             'launch_simulation', default_value='true',
             description='Start Gazebo; false when an outer launch owns it.',
+        ),
+        DeclareLaunchArgument(
+            'enable_arm_collisions', default_value='true',
+            description='Forward simplified Gazebo arm collision setting.',
         ),
         DeclareLaunchArgument(
             'params_file',
@@ -123,6 +128,7 @@ def generate_launch_description() -> LaunchDescription:
             launch_arguments={
                 'world': world,
                 'gz_args': gz_args,
+                'enable_arm_collisions': enable_arm_collisions,
             }.items(),
             condition=IfCondition(launch_simulation),
         ),
