@@ -2,6 +2,14 @@
 
 import math
 
+from adaptive_assembly_task.grasp_sequence_schema import (
+    format_grasp_candidates,
+    format_grasp_sequence_status,
+    generate_grasp_candidates,
+    lift_z,
+    select_candidate,
+    validate_candidate_configuration,
+)
 from adaptive_assembly_task.replanning_gate import should_replan
 from geometry_msgs.msg import PoseStamped
 import rclpy
@@ -19,6 +27,15 @@ class AssemblyTaskNode(Node):
         self.declare_parameter('pre_grasp_height_offset', 0.20)
         self.declare_parameter('grasp_height_offset', 0.05)
         self.declare_parameter('grasp_pose_topic', '/grasp_pose')
+        self.declare_parameter('grasp_candidates_topic', '/grasp_candidates')
+        self.declare_parameter('selected_grasp_pose_topic', '/selected_grasp_pose')
+        self.declare_parameter('lift_pose_topic', '/lift_pose')
+        self.declare_parameter('grasp_sequence_status_topic', '/grasp_sequence_status')
+        self.declare_parameter('grasp_candidate_count', 4)
+        self.declare_parameter('grasp_candidate_yaw_step_rad', math.pi / 2.0)
+        self.declare_parameter('selected_grasp_candidate_index', 0)
+        self.declare_parameter('lift_height_offset', 0.20)
+        self.declare_parameter('preserve_target_orientation_for_candidates', False)
         self.declare_parameter('assembly_height_offset', 0.05)
         self.declare_parameter('replan_distance_threshold', 0.03)
         self.declare_parameter('assembly_pose_mode', 'target_offset')
@@ -47,6 +64,23 @@ class AssemblyTaskNode(Node):
         self._grasp_pose_topic = str(
             self.get_parameter('grasp_pose_topic').value
         )
+        self._grasp_candidates_topic = str(
+            self.get_parameter('grasp_candidates_topic').value)
+        self._selected_grasp_pose_topic = str(
+            self.get_parameter('selected_grasp_pose_topic').value)
+        self._lift_pose_topic = str(self.get_parameter('lift_pose_topic').value)
+        self._grasp_sequence_status_topic = str(
+            self.get_parameter('grasp_sequence_status_topic').value)
+        self._grasp_candidate_count = int(
+            self.get_parameter('grasp_candidate_count').value)
+        self._grasp_candidate_yaw_step_rad = float(
+            self.get_parameter('grasp_candidate_yaw_step_rad').value)
+        self._selected_grasp_candidate_index = int(
+            self.get_parameter('selected_grasp_candidate_index').value)
+        self._lift_height_offset = float(
+            self.get_parameter('lift_height_offset').value)
+        self._preserve_target_orientation_for_candidates = bool(
+            self.get_parameter('preserve_target_orientation_for_candidates').value)
         self._replan_distance_threshold = self.get_parameter(
             'replan_distance_threshold'
         ).value
@@ -83,6 +117,14 @@ class AssemblyTaskNode(Node):
         self._grasp_publisher = self.create_publisher(
             PoseStamped, self._grasp_pose_topic, 10
         )
+        self._grasp_candidates_publisher = self.create_publisher(
+            String, self._grasp_candidates_topic, 10)
+        self._selected_grasp_publisher = self.create_publisher(
+            PoseStamped, self._selected_grasp_pose_topic, 10)
+        self._lift_publisher = self.create_publisher(
+            PoseStamped, self._lift_pose_topic, 10)
+        self._grasp_sequence_status_publisher = self.create_publisher(
+            String, self._grasp_sequence_status_topic, 10)
         self._pre_place_publisher = self.create_publisher(
             PoseStamped, self._pre_place_pose_topic, 10
         )
@@ -111,6 +153,18 @@ class AssemblyTaskNode(Node):
             )
         if not self._grasp_pose_topic:
             raise ValueError('grasp_pose_topic must not be empty')
+        topic_names = (
+            self._grasp_candidates_topic, self._selected_grasp_pose_topic,
+            self._lift_pose_topic, self._grasp_sequence_status_topic,
+        )
+        if not all(topic_names):
+            raise ValueError('grasp sequence topic names must not be empty')
+        validate_candidate_configuration(
+            self._grasp_candidate_count, self._selected_grasp_candidate_index)
+        if not math.isfinite(self._grasp_candidate_yaw_step_rad):
+            raise ValueError('grasp_candidate_yaw_step_rad must be finite')
+        if self._lift_height_offset < 0.0:
+            raise ValueError('lift_height_offset must be greater than or equal to zero')
         if self._assembly_pose_mode not in ('target_offset', 'fixed_socket'):
             raise ValueError(
                 'assembly_pose_mode must be target_offset or fixed_socket'
@@ -137,6 +191,7 @@ class AssemblyTaskNode(Node):
             self._publish_status(
                 'skipped_small_motion', target_pose, distance
             )
+            self._publish_skipped_grasp_sequence_status(target_pose)
             self.get_logger().info(
                 f'Target moved {distance:.3f} m; target change is small and '
                 'planning targets were not updated'
@@ -159,10 +214,22 @@ class AssemblyTaskNode(Node):
                 f'Target moved {distance:.3f} m; replanning is required'
             )
 
-        pre_grasp_pose = self._offset_pose(
-            target_pose, self._pre_grasp_height_offset
+        candidates = generate_grasp_candidates(
+            position.x, position.y, position.z + self._grasp_height_offset,
+            (
+                target_pose.pose.orientation.x, target_pose.pose.orientation.y,
+                target_pose.pose.orientation.z, target_pose.pose.orientation.w,
+            ),
+            self._grasp_candidate_count, self._grasp_candidate_yaw_step_rad,
+            self._preserve_target_orientation_for_candidates,
         )
-        grasp_pose = self._offset_pose(target_pose, self._grasp_height_offset)
+        selected = select_candidate(
+            candidates, self._selected_grasp_candidate_index)
+        grasp_pose = self._candidate_pose(target_pose, selected)
+        pre_grasp_pose = self._offset_pose(
+            grasp_pose,
+            self._pre_grasp_height_offset - self._grasp_height_offset)
+        lift_pose = self._offset_pose(grasp_pose, self._lift_height_offset)
         if self._assembly_pose_mode == 'fixed_socket':
             object_place_pose = self._fixed_socket_pose(target_pose)
             pre_place_pose = self._offset_pose(object_place_pose, self._pre_place_height_offset)
@@ -179,7 +246,14 @@ class AssemblyTaskNode(Node):
             retreat_pose = self._offset_pose(assembly_pose, self._retreat_height_offset)
 
         self._pre_grasp_publisher.publish(pre_grasp_pose)
+        candidates_message = String()
+        candidates_message.data = format_grasp_candidates(
+            candidates, self._selected_grasp_candidate_index,
+            target_pose.header.frame_id)
+        self._grasp_candidates_publisher.publish(candidates_message)
+        self._selected_grasp_publisher.publish(grasp_pose)
         self._grasp_publisher.publish(grasp_pose)
+        self._lift_publisher.publish(lift_pose)
         self._assembly_publisher.publish(assembly_pose)
         self._object_place_publisher.publish(object_place_pose)
         self._pre_place_publisher.publish(pre_place_pose)
@@ -223,6 +297,46 @@ class AssemblyTaskNode(Node):
 
         self._last_accepted_target_pose = target_pose
         self._publish_status(status, target_pose, distance)
+        self._publish_grasp_sequence_status(
+            status, target_pose, grasp_pose, lift_pose, object_place_pose)
+
+    def _publish_grasp_sequence_status(
+        self, status, target_pose, selected_pose, lift_pose, object_place_pose
+    ) -> None:
+        """Publish the explicit schema status for an accepted sequence."""
+        target = target_pose.pose.position
+        selected = selected_pose.pose.position
+        object_place = object_place_pose.pose.position
+        message = String()
+        message.data = format_grasp_sequence_status(
+            status, self._selected_grasp_candidate_index,
+            self._grasp_candidate_count, target_pose.header.frame_id,
+            (target.x, target.y, target.z),
+            (selected.x, selected.y, selected.z), lift_pose.pose.position.z,
+            (object_place.x, object_place.y, object_place.z),
+            self._assembly_pose_mode)
+        self._grasp_sequence_status_publisher.publish(message)
+
+    def _publish_skipped_grasp_sequence_status(self, target_pose) -> None:
+        """Explain a skipped update without republishing sequence poses."""
+        target = target_pose.pose.position
+        last = self._last_accepted_target_pose
+        selected_z = last.pose.position.z + self._grasp_height_offset
+        if self._assembly_pose_mode == 'fixed_socket':
+            object_place = (self._socket_x, self._socket_y, self._socket_z)
+        else:
+            object_place = (
+                last.pose.position.x, last.pose.position.y,
+                last.pose.position.z + self._assembly_height_offset)
+        message = String()
+        message.data = format_grasp_sequence_status(
+            'skipped_small_motion', self._selected_grasp_candidate_index,
+            self._grasp_candidate_count, target_pose.header.frame_id,
+            (target.x, target.y, target.z),
+            (last.pose.position.x, last.pose.position.y, selected_z),
+            lift_z(selected_z, self._lift_height_offset), object_place,
+            self._assembly_pose_mode)
+        self._grasp_sequence_status_publisher.publish(message)
 
     def _fixed_socket_pose(self, target_pose: PoseStamped) -> PoseStamped:
         """Return the configured fixed socket pose with a yaw quaternion."""
@@ -273,6 +387,20 @@ class AssemblyTaskNode(Node):
         result.pose.position.y = target_pose.pose.position.y
         result.pose.position.z = target_pose.pose.position.z + height_offset
         result.pose.orientation = target_pose.pose.orientation
+        return result
+
+    @staticmethod
+    def _candidate_pose(target_pose, candidate) -> PoseStamped:
+        """Convert one schema candidate into a PoseStamped message."""
+        result = PoseStamped()
+        result.header = target_pose.header
+        result.pose.position.x = candidate.x
+        result.pose.position.y = candidate.y
+        result.pose.position.z = candidate.z
+        result.pose.orientation.x = candidate.qx
+        result.pose.orientation.y = candidate.qy
+        result.pose.orientation.z = candidate.qz
+        result.pose.orientation.w = candidate.qw
         return result
 
 

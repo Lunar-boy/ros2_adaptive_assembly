@@ -47,7 +47,10 @@ fake_object_pose_node
               │
               ▼
 assembly_task_node
+    ├── /grasp_candidates (deterministic string schema)
+    ├── /selected_grasp_pose (= /grasp_pose legacy alias)
     ├── /pre_grasp_pose
+    ├── /lift_pose
     ├── /assembly_pose (robot hand target)
     └── /object_place_pose (desired final object pose)
               │
