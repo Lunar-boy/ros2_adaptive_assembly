@@ -61,13 +61,6 @@ The repository does not currently claim to implement:
 - real camera perception;
 - marker detection from live images;
 - visual servoing with a real camera;
-- contact-rich insertion;
-- physically accurate peg-in-hole contact simulation;
-- force/torque sensing;
-- force control;
-- impedance control;
-- admittance control;
-- learned grasp policies;
 - VLA policies;
 - Isaac Sim based workflows.
 
@@ -84,8 +77,6 @@ Unless the task explicitly says otherwise:
 - Keep all execution features simulator-only.
 - Keep Gazebo features headless-capable where practical.
 - Keep `ros2_control` usage limited to simulation.
-- Do not describe kinematic attach/detach as a physically accurate grasp.
-- Do not describe contact-lite validation as contact-rich assembly.
 - Do not describe fake perception as real perception.
 
 Gazebo, `ros2_control`, and trajectory execution are allowed only when they are clearly simulator-only and documented as such.
@@ -162,7 +153,6 @@ Use ROS2 topics, services, actions, and TF consistently. Avoid hidden state that
 - Avoid changing existing node behavior unless the task explicitly requires it.
 - PlanningScene updates should be minimal, deterministic, and validated by topic-level or launch-level checks.
 - Static collision objects and dynamic collision objects should remain separable when practical.
-- Do not remove or reset existing PlanningScene objects unless the PR explicitly requires it.
 - When planning depends on multiple pose topics, guard against stale mixed inputs by using timestamps, sequence IDs, or clear validation logic when practical.
 
 ## Gazebo and simulator conventions
@@ -171,9 +161,6 @@ Use ROS2 topics, services, actions, and TF consistently. Avoid hidden state that
 - Prefer headless-compatible launch paths for automated validation.
 - Do not require Gazebo GUI for smoke tests.
 - Do not require GPU acceleration.
-- Do not assume real sensors, real grippers, or real force/torque sensors.
-- Kinematic object attachment must be documented as kinematic or logical attachment.
-- Contact-lite checks should be documented as approximate validation, not as physically accurate insertion.
 - If a task introduces simulated contact or force signals, document exactly whether they are physical simulation outputs, approximations, or scripted abstractions.
 
 ## `ros2_control` conventions
@@ -209,8 +196,6 @@ Use ROS2 topics, services, actions, and TF consistently. Avoid hidden state that
 - Project docs: `docs/*.md`
 - Validation scripts: `scripts/check_*.sh` or `scripts/check_*.py`
 - Benchmark helpers: `scripts/run_*benchmark*.sh` or `scripts/compare_*.py`
-
-Do not place new project logic under Docker, devcontainer, or container-only directories.
 
 ## C++ conventions
 
@@ -301,12 +286,6 @@ For recovery, episode, or benchmark changes, validate at least one deterministic
 
 For documentation-only changes, run at minimum:
 
-```bash
-git diff --check
-grep -RIn "Docker\|docker\|compose.yaml\|docker_smoke_test\|/workspaces/ros2_adaptive_assembly_ws" README.md AGENTS.md docs scripts src || true
-```
-
-The grep command is intended to catch stale Docker references after Docker removal. If a Docker reference is intentionally kept, explain why.
 
 ## Final response format
 
