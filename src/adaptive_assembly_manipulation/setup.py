@@ -27,7 +27,10 @@ setup(
     zip_safe=True,
     maintainer='Chunzhi Wu',
     maintainer_email='chunzhi.wu@mailbox.tu-dresden.de',
-    description='Simulator-only logical gripper and grasp lifecycle.',
+    description=(
+        'Simulator-only logical gripper lifecycle, Gazebo attachment, and '
+        'gripper action bridge.'
+    ),
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
@@ -37,6 +40,9 @@ setup(
             'gazebo_attach_detach_node = '
             'adaptive_assembly_manipulation.'
             'gazebo_attach_detach_node:main',
+            'gripper_action_bridge_node = '
+            'adaptive_assembly_manipulation.'
+            'gripper_action_bridge_node:main',
         ],
     },
 )

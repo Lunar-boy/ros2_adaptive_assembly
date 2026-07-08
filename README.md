@@ -33,6 +33,7 @@ This repository builds a lightweight adaptive manipulation pipeline that convert
 - Lightweight Gazebo Harmonic workcell visualization
 - Simulator-only Gazebo Panda arm execution through ros2_control
 - Simulator-only Panda gripper links and finger joints in the Gazebo model
+- Simulator-only gripper trajectory controller and logical command action bridge
 - Simulator-only Gazebo target object synchronization from `/target_pose`
 
 ---

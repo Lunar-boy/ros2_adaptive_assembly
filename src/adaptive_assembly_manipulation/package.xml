@@ -3,15 +3,18 @@
 <package format="3">
   <name>adaptive_assembly_manipulation</name>
   <version>0.0.0</version>
-  <description>Simulator-only logical gripper and grasp lifecycle.</description>
+  <description>Simulator-only gripper lifecycle, attachment, and action bridge.</description>
   <maintainer email="chunzhi.wu@mailbox.tu-dresden.de">Chunzhi Wu</maintainer>
   <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
+  <depend>action_msgs</depend>
+  <depend>control_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>ros_gz_interfaces</depend>
   <depend>tf2_ros</depend>
+  <depend>trajectory_msgs</depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
 

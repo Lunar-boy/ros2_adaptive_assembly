@@ -118,6 +118,7 @@ def _launch_setup(context, *args, **kwargs):
         arguments=[
             'joint_state_broadcaster',
             'panda_arm_controller',
+            'panda_gripper_controller',
             '--controller-manager',
             controller_manager_name,
             '--controller-manager-timeout',
@@ -170,7 +171,9 @@ def _launch_setup(context, *args, **kwargs):
     return [
         LogInfo(msg=(
             'Launching Gazebo Harmonic with a simulator-only Panda '
-            'ros2_control arm. Real hardware support remains disabled.'
+            'ros2_control arm and gripper controllers. This provides joint '
+            'actuation only; real hardware and physical grasp verification '
+            'remain disabled.'
         )),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(gazebo_launch),
