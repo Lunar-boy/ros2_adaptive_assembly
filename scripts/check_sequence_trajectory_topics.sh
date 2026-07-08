@@ -22,6 +22,9 @@ check_topic_type() {
 
 check_topic_type "/pre_grasp_trajectory" "moveit_msgs/msg/RobotTrajectory"
 check_topic_type "/assembly_trajectory" "moveit_msgs/msg/RobotTrajectory"
+if ros2 topic list | grep -qx "/lift_trajectory"; then
+  check_topic_type "/lift_trajectory" "moveit_msgs/msg/RobotTrajectory"
+fi
 check_topic_type "/assembly_sequence_trajectory_status" "std_msgs/msg/String"
 
 echo "PASS: all assembly sequence trajectory export topics are available"

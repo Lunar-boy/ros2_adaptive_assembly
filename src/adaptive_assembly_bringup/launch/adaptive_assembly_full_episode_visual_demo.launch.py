@@ -62,6 +62,7 @@ def generate_launch_description() -> LaunchDescription:
                     'launch_simulation': 'false',
                     'require_grasp_trajectory': 'true',
                     'require_place_sequence': 'true',
+                    'stage_names': 'pre_grasp,grasp,pre_place,place,retreat',
                     'require_target_sync_success': 'true',
                     'target_sync_status_topic': '/gazebo_target_sync_status',
                     'target_sync_timeout_sec': '10.0',

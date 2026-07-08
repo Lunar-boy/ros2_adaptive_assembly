@@ -21,6 +21,7 @@ def generate_launch_description() -> LaunchDescription:
     params_file = LaunchConfiguration('params_file')
     require_grasp_pose = LaunchConfiguration('require_grasp_pose')
     require_place_sequence = LaunchConfiguration('require_place_sequence')
+    stage_names = LaunchConfiguration('stage_names')
     pipeline_launch = PathJoinSubstitution([
         bringup_share,
         'launch',
@@ -96,6 +97,13 @@ def generate_launch_description() -> LaunchDescription:
             description='Enable the intermediate grasp planning stage.',
         ),
         DeclareLaunchArgument('require_place_sequence', default_value='false'),
+        DeclareLaunchArgument(
+            'stage_names', default_value='',
+            description=(
+                'Optional explicit stage sequence. Empty preserves deprecated '
+                'require_grasp_pose/require_place_sequence compatibility.'
+            ),
+        ),
         LogInfo(msg=(
             'Launching Gazebo-compatible plan-only Panda sequence planning. '
             'move_group consumes Gazebo joint states; no mock ros2_control '
@@ -150,6 +158,7 @@ def generate_launch_description() -> LaunchDescription:
                 'assembly_trajectory_topic': '/assembly_trajectory',
                 'require_grasp_pose': require_grasp_pose,
                 'require_place_sequence': require_place_sequence,
+                'stage_names': stage_names,
                 **{
                     f'{name}_trajectory_topic': f'/{name}_trajectory'
                     for name in ('pre_place', 'place', 'retreat')

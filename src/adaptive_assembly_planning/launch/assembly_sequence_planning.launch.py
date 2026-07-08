@@ -16,11 +16,13 @@ def generate_launch_description() -> LaunchDescription:
     orientation_tolerance = LaunchConfiguration('orientation_tolerance')
     publish_diagnostics = LaunchConfiguration('publish_diagnostics')
     publish_trajectories = LaunchConfiguration('publish_trajectories')
+    stage_names = LaunchConfiguration('stage_names')
     pre_grasp_trajectory_topic = LaunchConfiguration(
         'pre_grasp_trajectory_topic'
     )
     grasp_trajectory_topic = LaunchConfiguration('grasp_trajectory_topic')
     assembly_trajectory_topic = LaunchConfiguration('assembly_trajectory_topic')
+    lift_trajectory_topic = LaunchConfiguration('lift_trajectory_topic')
     require_grasp_pose = LaunchConfiguration('require_grasp_pose')
     require_place_sequence = LaunchConfiguration('require_place_sequence')
     trajectory_status_topic = LaunchConfiguration('trajectory_status_topic')
@@ -28,9 +30,22 @@ def generate_launch_description() -> LaunchDescription:
 
     return LaunchDescription([
         DeclareLaunchArgument(
+            'stage_names',
+            default_value='pre_grasp,assembly',
+            description=(
+                'Comma-separated ordered planning stages. This explicit value '
+                'takes precedence over deprecated compatibility switches.'
+            ),
+        ),
+        DeclareLaunchArgument(
             'planner_id',
             default_value='',
             description='Optional MoveIt2 planner ID. Empty uses the default.',
+        ),
+        DeclareLaunchArgument(
+            'lift_trajectory_topic',
+            default_value='/lift_trajectory',
+            description='Topic for successful lift trajectories.',
         ),
         DeclareLaunchArgument(
             'num_planning_attempts',
@@ -88,12 +103,16 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             'require_grasp_pose',
             default_value='false',
-            description='Require and plan the intermediate grasp stage.',
+            description=(
+                'Deprecated compatibility switch for pre_grasp,grasp,assembly '
+                'when stage_names is not provided directly to the node.'
+            ),
         ),
         DeclareLaunchArgument(
             'require_place_sequence', default_value='false',
             description=(
-                'Plan pre-place, place, and retreat instead of legacy assembly.'
+                'Deprecated compatibility switch for the five-stage place '
+                'sequence when stage_names is not provided directly to the node.'
             ),
         ),
         DeclareLaunchArgument(
@@ -115,6 +134,7 @@ def generate_launch_description() -> LaunchDescription:
                 'pre_place_topic': '/panda_pre_place_pose',
                 'place_topic': '/panda_place_pose',
                 'retreat_topic': '/panda_retreat_pose',
+                'lift_topic': '/panda_lift_pose',
                 'success_topic': '/assembly_sequence_plan_success',
                 'status_topic': '/assembly_sequence_planning_status',
                 'duration_topic': '/assembly_sequence_planning_duration_ms',
@@ -124,6 +144,7 @@ def generate_launch_description() -> LaunchDescription:
                 'pre_grasp_trajectory_topic': pre_grasp_trajectory_topic,
                 'grasp_trajectory_topic': grasp_trajectory_topic,
                 'assembly_trajectory_topic': assembly_trajectory_topic,
+                'lift_trajectory_topic': lift_trajectory_topic,
                 **{
                     f'{name}_trajectory_topic': LaunchConfiguration(
                         f'{name}_trajectory_topic'
@@ -135,6 +156,7 @@ def generate_launch_description() -> LaunchDescription:
                     value_type=bool,
                 ),
                 'require_place_sequence': ParameterValue(require_place_sequence, value_type=bool),
+                'stage_names_csv': stage_names,
                 'trajectory_status_topic': trajectory_status_topic,
                 'publish_diagnostics': ParameterValue(
                     publish_diagnostics,

@@ -39,6 +39,7 @@ def generate_launch_description() -> LaunchDescription:
     params_file = LaunchConfiguration('params_file')
     require_grasp = LaunchConfiguration('require_grasp_trajectory')
     require_place = LaunchConfiguration('require_place_sequence')
+    stage_names = LaunchConfiguration('stage_names')
     require_target_sync = LaunchConfiguration('require_target_sync_success')
     target_sync_topic = LaunchConfiguration('target_sync_status_topic')
     target_sync_timeout = LaunchConfiguration('target_sync_timeout_sec')
@@ -72,6 +73,7 @@ def generate_launch_description() -> LaunchDescription:
             description='Plan and execute the intermediate grasp stage.',
         ),
         DeclareLaunchArgument('require_place_sequence', default_value='false'),
+        DeclareLaunchArgument('stage_names', default_value=''),
         DeclareLaunchArgument(
             'require_target_sync_success', default_value='false',
             description='Optionally gate initial execution on target sync.',
@@ -138,6 +140,7 @@ def generate_launch_description() -> LaunchDescription:
                 'params_file': params_file,
                 'require_grasp_pose': require_grasp,
                 'require_place_sequence': require_place,
+                'stage_names': stage_names,
             }.items(),
         ),
         IncludeLaunchDescription(

@@ -14,6 +14,8 @@ TIMEOUT_SEC = 60.0
 REQUIRED_KEYS = {
     'event',
     'stage',
+    'stage_index',
+    'requested_stage_count',
     'duration_ms',
     'planning_group',
     'planner_id',
