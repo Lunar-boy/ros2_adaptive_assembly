@@ -32,6 +32,7 @@ This repository builds a lightweight adaptive manipulation pipeline that convert
 - Contact-lite geometric insertion benchmark and report export
 - Lightweight Gazebo Harmonic workcell visualization
 - Simulator-only Gazebo Panda arm execution through ros2_control
+- Simulator-only Panda gripper links and finger joints in the Gazebo model
 - Simulator-only Gazebo target object synchronization from `/target_pose`
 
 ---

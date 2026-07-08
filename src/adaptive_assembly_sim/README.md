@@ -50,6 +50,23 @@ is composed from `adaptive_assembly_bringup`.
 Gazebo starts paused. Panda creation completes before both controllers are
 configured; launch then unpauses and activates them. Only the base is anchored.
 
+## Panda gripper model
+
+The Gazebo Panda fixture includes simulator-only parallel gripper finger links
+and prismatic finger joints:
+
+- `panda_leftfinger`
+- `panda_rightfinger`
+- `panda_finger_joint1`
+- `panda_finger_joint2`
+
+The finger joints are exposed through the Gazebo ros2_control hardware
+interface so their state can be observed through `joint_state_broadcaster`.
+This is model and state-visibility groundwork only. It does not add a gripper
+action controller, action bridge, physical grasping, contact sensing, force
+control, MoveIt Servo, real hardware support, or a physical executor. A later
+PR is expected to add the gripper controller/action bridge.
+
 The target synchronization node updates the static Gazebo model pose from
 `/target_pose`; `static` means physics does not move the model autonomously.
 This package does not add gripper control, object attach/detach, contact-rich
@@ -70,4 +87,12 @@ python3 scripts/check_target_pose_to_gazebo_entity_consistency.py
 bash scripts/check_gazebo_entity_pose_observer_available.sh
 python3 scripts/check_gazebo_entity_pose_observer_synthetic.py
 python3 scripts/check_gazebo_entity_pose_observer_stale.py
+python3 scripts/check_panda_gripper_urdf_contains_fingers.py
+```
+
+With the simulator-only Panda Gazebo launch already running, the optional live
+joint-state check can be run separately:
+
+```bash
+bash scripts/check_gazebo_gripper_joints_spawned.sh
 ```
