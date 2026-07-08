@@ -15,7 +15,11 @@ class ControllerActivator(Node):
         super().__init__('activate_gazebo_controllers_node')
         self.declare_parameter('controller_manager_name', '/controller_manager')
         self.declare_parameter(
-            'controllers', ['joint_state_broadcaster', 'panda_arm_controller']
+            'controllers', [
+                'joint_state_broadcaster',
+                'panda_arm_controller',
+                'panda_gripper_controller',
+            ]
         )
         self.declare_parameter('timeout_sec', 60.0)
 
