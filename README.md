@@ -2,7 +2,7 @@
 
 A ROS2 Jazzy + MoveIt2 project for deterministic adaptive robotic assembly in simulation.
 
-This repository builds a lightweight adaptive manipulation pipeline that converts randomized object poses into robot-aware Panda planning targets, maintains TF and PlanningScene state, performs plan-only two-stage assembly planning, exports trajectories, records planning diagnostics, and provides deterministic benchmark profiles for evaluating robustness under target-pose variation.
+This repository builds a lightweight adaptive manipulation pipeline that converts randomized object poses into robot-aware Panda planning targets, maintains TF and PlanningScene state, performs configurable plan-only multi-stage assembly planning, exports trajectories, records planning diagnostics, and provides deterministic benchmark profiles for evaluating robustness under target-pose variation.
 
 > **Current scope:** reproducible adaptive assembly planning plus simulator-only Gazebo Panda arm execution.
 > **Not included:** camera/image perception, marker detection, visual servoing,
@@ -19,7 +19,7 @@ This repository builds a lightweight adaptive manipulation pipeline that convert
 - Task-level pre-grasp and assembly pose generation
 - Panda-specific pose adapters for MoveIt2 planning
 - Plan-only MoveIt2 pre-grasp planning
-- Plan-only two-stage `pre_grasp -> assembly` sequence planning
+- Configurable plan-only sequence planning (default: `pre_grasp -> assembly`)
 - Static PlanningScene collision objects
 - Dynamic target PlanningScene object
 - PlanningScene audit and reset workflows

@@ -28,6 +28,7 @@ def generate_launch_description() -> LaunchDescription:
     assembly_topic = LaunchConfiguration('assembly_trajectory_topic')
     require_grasp = LaunchConfiguration('require_grasp_trajectory')
     require_place = LaunchConfiguration('require_place_sequence')
+    stage_names = LaunchConfiguration('stage_names')
     controller = LaunchConfiguration('controller_action_name')
     status_topic = LaunchConfiguration('status_topic')
     success_topic = LaunchConfiguration('success_topic')
@@ -76,6 +77,7 @@ def generate_launch_description() -> LaunchDescription:
             description='Require and execute the intermediate grasp stage.',
         ),
         DeclareLaunchArgument('require_place_sequence', default_value='false'),
+        DeclareLaunchArgument('stage_names', default_value=''),
         DeclareLaunchArgument(
             'controller_action_name',
             default_value=(
@@ -235,6 +237,7 @@ def generate_launch_description() -> LaunchDescription:
                 'grasp_trajectory_topic': grasp_topic,
                 'assembly_trajectory_topic': assembly_topic,
                 'require_place_sequence': require_place,
+                'stage_names': stage_names,
                 **{
                     f'{name}_trajectory_topic': LaunchConfiguration(
                         f'{name}_trajectory_topic'

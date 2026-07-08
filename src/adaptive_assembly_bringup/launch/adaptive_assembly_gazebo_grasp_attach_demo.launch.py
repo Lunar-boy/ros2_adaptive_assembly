@@ -114,6 +114,7 @@ def generate_launch_description() -> LaunchDescription:
                 'params_file': params_file,
                 'require_grasp_trajectory': require_grasp,
                 'require_place_sequence': require_place,
+                'stage_names': 'pre_grasp,grasp,pre_place,place,retreat',
                 'require_target_sync_success': require_target_sync,
                 'target_sync_status_topic': target_sync_topic,
                 'target_sync_timeout_sec': target_sync_timeout,
