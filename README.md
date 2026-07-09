@@ -150,6 +150,15 @@ source install/setup.bash
 ros2 launch adaptive_assembly_bringup adaptive_assembly_full_physical_pick_place_demo.launch.py
 ```
 
+To save terminal output from each full physical pick-place simulation attempt,
+use the manual run logging wrapper:
+
+```bash
+bash scripts/run_full_physical_pick_place_with_logs.sh
+```
+
+See `docs/run_logging.md` for `RUN_ID`, `RUN_DIR`, and launch-argument usage.
+
 
 ### Result table
 
