@@ -53,6 +53,36 @@ def generate_launch_description() -> LaunchDescription:
         'launch',
         'assembly_sequence_planning.launch.py',
     ])
+    grasp_adapter = PathJoinSubstitution([
+    FindPackageShare('adaptive_assembly_planning'),
+    'launch',
+    'panda_grasp_pose_adapter.launch.py',
+    ])
+
+    lift_adapter = PathJoinSubstitution([
+    FindPackageShare('adaptive_assembly_planning'),
+    'launch',
+    'panda_lift_pose_adapter.launch.py',
+    ])
+
+    pre_place_adapter = PathJoinSubstitution([
+        FindPackageShare('adaptive_assembly_planning'),
+        'launch',
+        'panda_pre_place_pose_adapter.launch.py',
+    ])
+
+    place_adapter = PathJoinSubstitution([
+        FindPackageShare('adaptive_assembly_planning'),
+        'launch',
+        'panda_place_pose_adapter.launch.py',
+    ])
+
+    retreat_adapter = PathJoinSubstitution([
+        FindPackageShare('adaptive_assembly_planning'),
+        'launch',
+        'panda_retreat_pose_adapter.launch.py',
+    ])
+
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -179,4 +209,9 @@ def generate_launch_description() -> LaunchDescription:
                 'start_state_mode': start_state_mode,
             }.items(),
         ),
+        IncludeLaunchDescription(PythonLaunchDescriptionSource(grasp_adapter)),
+        IncludeLaunchDescription(PythonLaunchDescriptionSource(lift_adapter)),
+        IncludeLaunchDescription(PythonLaunchDescriptionSource(pre_place_adapter)),
+        IncludeLaunchDescription(PythonLaunchDescriptionSource(place_adapter)),
+        IncludeLaunchDescription(PythonLaunchDescriptionSource(retreat_adapter)),
     ])
