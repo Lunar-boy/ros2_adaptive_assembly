@@ -3,7 +3,10 @@
 PR66 adds `physical_pick_place_executor_node`, a simulator-only executor that
 consumes the PR65 multi-stage arm trajectory exports and interleaves PR63
 gripper bridge commands. PR67 adds optional simulator-only contact, lift, and
-slip verification after gripper close and after the lift stage.
+slip verification after gripper close and after the lift stage. The executor
+now waits for `/physical_grasp_preflight_status` by default before sending arm
+goals, so the physical world, object pose observer, contact topics, and
+kinematic attach separation are checked before execution starts.
 
 The default sequence is:
 
@@ -78,6 +81,16 @@ Published executor topics:
 All status strings include `mode=physical_pick_place` and
 `real_hardware=false`.
 
+When preflight is required and fails, the terminal execution status uses:
+
+```text
+event=failure;mode=physical_pick_place;stage=preflight;reason=physical_grasp_preflight_failed;execution=false;simulated_execution_only=true;real_hardware=false
+```
+
+If trajectories and joint state are ready but no preflight success arrives
+within the configured timeout, the reason is
+`physical_grasp_preflight_timeout`.
+
 Launch the composed simulator-only entry point:
 
 ```bash
@@ -85,6 +98,13 @@ cd ~/ros2_adaptive_assembly_ws
 source install/setup.bash
 ros2 launch adaptive_assembly_bringup \
   adaptive_assembly_physical_pick_place_execution.launch.py
+```
+
+For the full Gazebo path, prefer:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_full_physical_pick_place_demo.launch.py
 ```
 
 For a message-only executor dry run, provide trajectories and joint states with

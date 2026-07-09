@@ -2,11 +2,11 @@
 """Run a bounded message-only dry run of the PR66 executor."""
 
 import subprocess
-import sys
 import time
 
-import rclpy
 from moveit_msgs.msg import RobotTrajectory
+
+import rclpy
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import JointState
@@ -50,6 +50,8 @@ class DryRunHarness(Node):
         if 'event=success' in message.data:
             self.success = True
         elif 'event=failure' in message.data:
+            if 'reason=physical_grasp_preflight_failed' in message.data:
+                return
             self.failure = message.data
 
     def publish_inputs(self) -> None:
@@ -76,6 +78,7 @@ def main() -> int:
         '--ros-args',
         '-p', 'send_arm_goals:=false',
         '-p', 'send_gripper_commands:=false',
+        '-p', 'require_physical_grasp_preflight:=false',
         '-p', 'require_grasp_verification:=false',
         '-p', 'require_lift_verification:=false',
         '-p', 'require_joint_state:=true',

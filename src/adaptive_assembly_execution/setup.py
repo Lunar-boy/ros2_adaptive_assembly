@@ -37,6 +37,9 @@ setup(
             'physical_pick_place_executor_node = '
             'adaptive_assembly_execution.'
             'physical_pick_place_executor_node:main',
+            'physical_grasp_preflight_node = '
+            'adaptive_assembly_execution.'
+            'physical_grasp_preflight_node:main',
             'gazebo_grasp_contact_status_node = '
             'adaptive_assembly_execution.'
             'gazebo_grasp_contact_status_node:main',

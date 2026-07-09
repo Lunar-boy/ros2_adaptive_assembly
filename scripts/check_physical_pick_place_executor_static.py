@@ -40,6 +40,12 @@ def main() -> int:
         'raise ValueError',
         'require_grasp_verification',
         'require_lift_verification',
+        'require_physical_grasp_preflight',
+        'physical_grasp_preflight_status_topic',
+        'physical_grasp_preflight_timeout_sec',
+        '/physical_grasp_preflight_status',
+        'physical_grasp_preflight_failed',
+        'physical_grasp_preflight_timeout',
         'verification_skipped',
     ]
     for token in required_tokens:

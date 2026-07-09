@@ -17,6 +17,36 @@ uses `adaptive_assembly_physical_workcell.sdf`, where `target_object` is
 dynamic. The original `adaptive_assembly_workcell.sdf` keeps the target object
 static for existing visual and logical demos.
 
+Finger contact messages depend on the Panda finger collision geometry. Use the
+full physical wrapper launch or pass `enable_arm_collisions:=true` when starting
+Gazebo for this path. The older kinematic attach visual demo may keep arm
+collisions disabled because it does not prove physical contact.
+
+The kinematic attach path
+(`adaptive_assembly_gazebo_grasp_attach_demo.launch.py`,
+`logical_grasp_lifecycle_node.py`, and `gazebo_attach_detach_node.py`) remains
+available for visual/logical demos. If `gazebo_attach_detach_node` is running,
+the result is not a physical grasp verification run.
+
+## Physical preflight
+
+`physical_grasp_preflight_node` publishes retained diagnostics on
+`/physical_grasp_preflight_status` before the physical executor sends arm goals.
+It checks that the physical Gazebo pose topic is used, target object pose is
+available, kinematic attachment is not active, raw left/right finger contact
+topics have been observed, and `/grasp_contact_status` has been observed.
+
+Status strings use:
+
+```text
+event=success|failure|waiting;mode=physical_grasp_preflight;physical_world=true|false;object_pose_available=true|false;kinematic_attach_active=true|false;left_contact_observed=true|false;right_contact_observed=true|false;contact_status_observed=true|false;reason=<reason>;simulated_only=true;real_hardware=false
+```
+
+Important failure reasons include `kinematic_attach_node_active`,
+`left_contact_topic_unobserved`, `right_contact_topic_unobserved`,
+`contact_status_topic_unobserved`, `object_pose_unavailable`, and
+`wrong_pose_info_topic`.
+
 ## Contact status node
 
 `gazebo_grasp_contact_status_node` consumes bridged
@@ -76,28 +106,60 @@ event=success|failure|waiting|reset;mode=grasp_verifier;verification=grasp|lift;
 
 ## Launch example
 
-Start Gazebo with the physical workcell, then launch the pick-place execution:
+Start the full simulator-only physical demo:
+
+```bash
+cd ~/ros2_adaptive_assembly_ws
+source install/setup.bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_full_physical_pick_place_demo.launch.py
+```
+
+Or start Gazebo with the physical workcell, then launch the pick-place
+execution:
 
 ```bash
 cd ~/ros2_adaptive_assembly_ws
 source install/setup.bash
 ros2 launch adaptive_assembly_sim adaptive_assembly_panda_gazebo.launch.py \
   world:=install/adaptive_assembly_sim/share/adaptive_assembly_sim/worlds/adaptive_assembly_physical_workcell.sdf \
-  world_name:=adaptive_assembly_physical_workcell
+  world_name:=adaptive_assembly_physical_workcell \
+  enable_arm_collisions:=true
 ros2 launch adaptive_assembly_bringup \
   adaptive_assembly_physical_pick_place_execution.launch.py
 ```
 
 The physical pick-place launch starts the contact bridge, contact status node,
 target object pose observer, grasp verifier, gripper bridge, and executor by
-default. Verification can be disabled for dry runs with:
+default. It also starts the preflight node by default and the executor waits for
+preflight success before sending arm goals. Verification can be disabled for dry
+runs with:
 
 ```bash
 ros2 launch adaptive_assembly_bringup \
   adaptive_assembly_physical_pick_place_execution.launch.py \
+  require_physical_grasp_preflight:=false \
   require_grasp_verification:=false \
   require_lift_verification:=false
 ```
+
+## Debug checklist
+
+```bash
+ros2 topic echo /physical_grasp_preflight_status
+ros2 topic echo /physical_pick_place_stage_status
+ros2 topic echo /physical_pick_place_execution_status --once
+ros2 topic echo /grasp_contact_status
+ros2 topic echo /grasp_verification_status
+ros2 topic echo /physical_gripper_command_status
+ros2 topic echo /gazebo_target_object_pose_status
+ros2 topic echo /panda_leftfinger_contact
+ros2 topic echo /panda_rightfinger_contact
+```
+
+If `/physical_grasp_preflight_status` reports
+`reason=kinematic_attach_node_active`, stop the kinematic attach demo before
+using the physical verification launch.
 
 ## Limitations
 

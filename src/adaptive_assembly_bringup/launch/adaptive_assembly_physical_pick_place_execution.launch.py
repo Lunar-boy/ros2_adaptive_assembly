@@ -1,7 +1,12 @@
-"""Launch simulator-only multi-stage pick-place execution."""
+"""Launch simulator-only physical contact pick-place execution."""
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    LogInfo,
+    OpaqueFunction,
+)
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
@@ -14,6 +19,22 @@ def _typed_value(name: str, value_type):
     return ParameterValue(LaunchConfiguration(name), value_type=value_type)
 
 
+def _warn_if_non_physical_pose_topic(context, *args, **kwargs):
+    """Warn when the physical launch is pointed at the static visual world."""
+    del args, kwargs
+    pose_topic = LaunchConfiguration('pose_info_topic').perform(context)
+    if 'adaptive_assembly_physical_workcell' in pose_topic:
+        return []
+    return [LogInfo(msg=(
+        'WARNING: adaptive_assembly_physical_pick_place_execution.launch.py '
+        'is configured with pose_info_topic=' + pose_topic + '. Physical '
+        'grasp verification must use '
+        '/world/adaptive_assembly_physical_workcell/pose/info from '
+        'adaptive_assembly_physical_workcell.sdf, not the static visual '
+        'adaptive_assembly_workcell.sdf.'
+    ))]
+
+
 def generate_launch_description() -> LaunchDescription:
     """Start the PR65 planner, PR63 bridge, and PR66 executor as requested."""
     stage_names = LaunchConfiguration('stage_names')
@@ -23,6 +44,9 @@ def generate_launch_description() -> LaunchDescription:
     launch_contact_status_node = LaunchConfiguration('launch_contact_status_node')
     launch_grasp_verifier = LaunchConfiguration('launch_grasp_verifier')
     launch_object_pose_observer = LaunchConfiguration('launch_object_pose_observer')
+    launch_physical_grasp_preflight = LaunchConfiguration(
+        'launch_physical_grasp_preflight'
+    )
 
     reachable_sequence_launch = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_bringup'),
@@ -57,6 +81,9 @@ def generate_launch_description() -> LaunchDescription:
         'contact_status_topic': '/grasp_contact_status',
         'object_pose_topic': '/gazebo_target_object_pose',
         'object_pose_available_topic': '/gazebo_target_object_pose_available',
+        'physical_grasp_preflight_status_topic': (
+            '/physical_grasp_preflight_status'
+        ),
         'grasp_verification_request_topic': '/grasp_verification_request',
         'grasp_verification_status_topic': '/grasp_verification_status',
         'grasp_verified_topic': '/grasp_verified',
@@ -80,6 +107,8 @@ def generate_launch_description() -> LaunchDescription:
         'launch_contact_status_node': 'true',
         'launch_grasp_verifier': 'true',
         'launch_object_pose_observer': 'true',
+        'launch_physical_grasp_preflight': 'true',
+        'require_physical_grasp_preflight': 'true',
         'require_grasp_verification': 'true',
         'require_lift_verification': 'true',
         'require_both_contacts': 'true',
@@ -93,6 +122,7 @@ def generate_launch_description() -> LaunchDescription:
         'gripper_command_timeout_sec': '5.0',
         'contact_stale_timeout_sec': '0.5',
         'verification_timeout_sec': '5.0',
+        'physical_grasp_preflight_timeout_sec': '5.0',
         'min_lift_delta_m': '0.02',
         'max_slip_distance_m': '0.025',
         'pose_stale_timeout_sec': '1.0',
@@ -123,6 +153,7 @@ def generate_launch_description() -> LaunchDescription:
         'grasp_verification_status_topic',
         'grasp_verified_topic',
         'lift_verified_topic',
+        'physical_grasp_preflight_status_topic',
         'close_after_stage',
         'open_after_stage',
     )
@@ -139,6 +170,7 @@ def generate_launch_description() -> LaunchDescription:
             'launch_contact_status_node',
             'launch_grasp_verifier',
             'launch_object_pose_observer',
+            'launch_physical_grasp_preflight',
             'require_both_contacts',
             'require_gripper_closed',
             'require_object_pose',
@@ -154,6 +186,24 @@ def generate_launch_description() -> LaunchDescription:
             'pose_stale_timeout_sec',
         )
     })
+
+    preflight_parameters = {
+        'pose_info_topic': LaunchConfiguration('pose_info_topic'),
+        'object_pose_available_topic': LaunchConfiguration(
+            'object_pose_available_topic'
+        ),
+        'kinematic_attach_status_topic': '/gazebo_attach_detach_status',
+        'left_contact_topic': LaunchConfiguration('left_contact_topic'),
+        'right_contact_topic': LaunchConfiguration('right_contact_topic'),
+        'contact_status_topic': LaunchConfiguration('contact_status_topic'),
+        'status_topic': LaunchConfiguration(
+            'physical_grasp_preflight_status_topic'
+        ),
+        'timeout_sec': _typed_value(
+            'physical_grasp_preflight_timeout_sec', float
+        ),
+        'simulated_only': _typed_value('simulated_execution_only', bool),
+    }
 
     contact_status_parameters = {
         name: LaunchConfiguration(name)
@@ -209,10 +259,16 @@ def generate_launch_description() -> LaunchDescription:
     return LaunchDescription(declarations + [
         LogInfo(msg=(
             'Launching simulator-only physical pick-place execution. '
+            'This launch must be paired with '
+            'adaptive_assembly_physical_workcell.sdf and '
+            'pose_info_topic=/world/adaptive_assembly_physical_workcell/pose/info. '
+            'Do not use adaptive_assembly_workcell.sdf for physical grasp '
+            'verification. '
             'Gazebo contact status and grasp/lift verification launch '
             'according to launch_contact_status_node and '
             'launch_grasp_verifier. Real hardware execution is unsupported.'
         )),
+        OpaqueFunction(function=_warn_if_non_physical_pose_topic),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(reachable_sequence_launch),
             condition=IfCondition(launch_reachable_sequence),
@@ -324,6 +380,14 @@ def generate_launch_description() -> LaunchDescription:
             output='screen',
             condition=IfCondition(launch_grasp_verifier),
             parameters=[verifier_parameters],
+        ),
+        Node(
+            package='adaptive_assembly_execution',
+            executable='physical_grasp_preflight_node',
+            name='physical_grasp_preflight_node',
+            output='screen',
+            condition=IfCondition(launch_physical_grasp_preflight),
+            parameters=[preflight_parameters],
         ),
         Node(
             package='adaptive_assembly_execution',

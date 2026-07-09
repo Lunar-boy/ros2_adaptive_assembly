@@ -28,6 +28,12 @@ def main() -> int:
         'simulated_execution_only',
         'launch_reachable_sequence',
         'launch_gripper_bridge',
+        'launch_physical_grasp_preflight',
+        'require_physical_grasp_preflight',
+        'physical_grasp_preflight_timeout_sec',
+        '/physical_grasp_preflight_status',
+        '/world/adaptive_assembly_physical_workcell/pose/info',
+        'adaptive_assembly_physical_workcell.sdf',
     ]
     for token in required:
         if token not in text:
@@ -38,7 +44,6 @@ def main() -> int:
         'real_hardware:=true',
         'hardware_driver',
         'camera',
-        'contact_sensor',
     ]
     for token in forbidden:
         if token in text:

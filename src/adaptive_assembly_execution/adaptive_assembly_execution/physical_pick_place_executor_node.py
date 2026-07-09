@@ -92,6 +92,12 @@ class PhysicalPickPlaceExecutorNode(Node):
         self.declare_parameter('gripper_command_timeout_sec', 5.0)
         self.declare_parameter('require_grasp_verification', True)
         self.declare_parameter('require_lift_verification', True)
+        self.declare_parameter('require_physical_grasp_preflight', True)
+        self.declare_parameter(
+            'physical_grasp_preflight_status_topic',
+            '/physical_grasp_preflight_status',
+        )
+        self.declare_parameter('physical_grasp_preflight_timeout_sec', 5.0)
         self.declare_parameter(
             'grasp_verification_request_topic',
             '/grasp_verification_request',
@@ -162,6 +168,19 @@ class PhysicalPickPlaceExecutorNode(Node):
         )
         self._require_lift_verification = bool(
             self.get_parameter('require_lift_verification').value
+        )
+        self._require_physical_grasp_preflight = bool(
+            self.get_parameter('require_physical_grasp_preflight').value
+        )
+        self._physical_grasp_preflight_status_topic = str(
+            self.get_parameter(
+                'physical_grasp_preflight_status_topic'
+            ).value
+        )
+        self._physical_grasp_preflight_timeout_sec = float(
+            self.get_parameter(
+                'physical_grasp_preflight_timeout_sec'
+            ).value
         )
         self._grasp_verification_request_topic = str(
             self.get_parameter('grasp_verification_request_topic').value
@@ -273,6 +292,12 @@ class PhysicalPickPlaceExecutorNode(Node):
             retained_qos,
         )
         self.create_subscription(
+            String,
+            self._physical_grasp_preflight_status_topic,
+            self._physical_grasp_preflight_status_callback,
+            retained_qos,
+        )
+        self.create_subscription(
             JointState, self._joint_state_topic, self._joint_state_callback, 10
         )
         self._trajectory_subscriptions = [
@@ -309,6 +334,10 @@ class PhysicalPickPlaceExecutorNode(Node):
         self._verification_deadline: Optional[float] = None
         self._active_verification: Optional[str] = None
         self._active_verification_stage = ''
+        self._preflight_success = not self._require_physical_grasp_preflight
+        self._preflight_failure = False
+        self._preflight_failure_reason = ''
+        self._preflight_deadline: Optional[float] = None
         self._timer = self.create_timer(0.1, self._timer_callback)
 
         self.get_logger().info(
@@ -319,6 +348,8 @@ class PhysicalPickPlaceExecutorNode(Node):
             f"gripper_status_topic='{self._gripper_status_topic}', "
             f'send_arm_goals={self._send_arm_goals}, '
             f'send_gripper_commands={self._send_gripper_commands}, '
+            'require_physical_grasp_preflight='
+            f'{self._require_physical_grasp_preflight}, '
             f'require_grasp_verification={self._require_grasp_verification}, '
             f'require_lift_verification={self._require_lift_verification}, '
             'simulated_execution_only=true, real_hardware=false.'
@@ -351,6 +382,10 @@ class PhysicalPickPlaceExecutorNode(Node):
             raise ValueError('gripper_command_timeout_sec must be greater than zero')
         if self._verification_timeout_sec <= 0.0:
             raise ValueError('verification_timeout_sec must be greater than zero')
+        if self._physical_grasp_preflight_timeout_sec <= 0.0:
+            raise ValueError(
+                'physical_grasp_preflight_timeout_sec must be greater than zero'
+            )
         if self._require_panda_joints and not self._expected_joint_prefix:
             raise ValueError(
                 'expected_joint_prefix must not be empty when '
@@ -431,6 +466,26 @@ class PhysicalPickPlaceExecutorNode(Node):
         if event == 'failure':
             self._finish_verification(False, fields.get('reason', 'failure'))
 
+    def _physical_grasp_preflight_status_callback(
+        self, message: String
+    ) -> None:
+        """Record preflight success or fail before arm execution starts."""
+        if self._completed or not self._require_physical_grasp_preflight:
+            return
+        fields = parse_status(message.data)
+        if fields.get('mode') != 'physical_grasp_preflight':
+            return
+        event = fields.get('event', '')
+        if event == 'success':
+            self._preflight_success = True
+            self._try_start_sequence()
+            return
+        if event == 'failure':
+            self._preflight_failure = True
+            self._preflight_failure_reason = fields.get('reason', 'failure')
+            if self._normal_prerequisites_ready():
+                self._publish_preflight_failure()
+
     def _grasp_verified_callback(self, message: Bool) -> None:
         """Accept Bool grasp results while a grasp verification is pending."""
         if self._active_verification != 'grasp':
@@ -468,14 +523,46 @@ class PhysicalPickPlaceExecutorNode(Node):
                 self._active_verification_stage or verification,
                 reason,
             )
+        if (
+            self._state == 'WAIT_PREFLIGHT'
+            and self._preflight_deadline is not None
+            and time.monotonic() >= self._preflight_deadline
+        ):
+            self._publish_failure('preflight', 'physical_grasp_preflight_timeout')
+
+    def _normal_prerequisites_ready(self) -> bool:
+        """Return whether trajectories and joint state are ready."""
+        if not all(stage in self._trajectories for stage in self._stage_names):
+            return False
+        if self._require_joint_state and not self._joint_state_received:
+            return False
+        return True
 
     def _try_start_sequence(self) -> None:
         """Start once all configured trajectories and joint state are present."""
         if self._started or self._completed:
             return
-        if not all(stage in self._trajectories for stage in self._stage_names):
+        if not self._normal_prerequisites_ready():
             return
-        if self._require_joint_state and not self._joint_state_received:
+        if (
+            self._require_physical_grasp_preflight
+            and not self._preflight_success
+        ):
+            if self._preflight_failure:
+                self._publish_preflight_failure()
+                return
+            self._state = 'WAIT_PREFLIGHT'
+            if self._preflight_deadline is None:
+                self._preflight_deadline = (
+                    time.monotonic()
+                    + self._physical_grasp_preflight_timeout_sec
+                )
+                self._publish_stage_status(
+                    f'event=waiting;mode={MODE};stage=preflight;'
+                    'action=physical_grasp_preflight;'
+                    'reason=waiting_for_physical_grasp_preflight;'
+                    'simulated_execution_only=true;real_hardware=false'
+                )
             return
 
         self._started = True
@@ -495,6 +582,16 @@ class PhysicalPickPlaceExecutorNode(Node):
 
         self._log_start_state_difference(self._trajectories[self._stage_names[0]])
         self._send_current_arm_stage()
+
+    def _publish_preflight_failure(self) -> None:
+        """Fail startup when the physical grasp preflight reports failure."""
+        self._publish_stage_status(
+            f'event=failure;mode={MODE};stage=preflight;'
+            'action=physical_grasp_preflight;'
+            f'preflight_reason={self._preflight_failure_reason};'
+            'simulated_execution_only=true;real_hardware=false'
+        )
+        self._publish_failure('preflight', 'physical_grasp_preflight_failed')
 
     def _validate_trajectory(
         self, trajectory: RobotTrajectory
@@ -848,6 +945,7 @@ class PhysicalPickPlaceExecutorNode(Node):
         self._state = 'SUCCESS' if success else 'FAILURE'
         self._cancel_arm_result_timer()
         self._verification_deadline = None
+        self._preflight_deadline = None
         self._active_verification = None
         self._completed = True
 

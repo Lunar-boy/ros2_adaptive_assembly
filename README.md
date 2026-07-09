@@ -256,6 +256,13 @@ The deterministic evaluator compares the desired final object pose on
 `/gazebo_target_object_pose`. `/panda_assembly_pose` remains the Panda hand
 planning target and is not used as the evaluator target.
 
+The physical Gazebo pick-place path is separate from the kinematic attach
+visual demo. Use
+`adaptive_assembly_full_physical_pick_place_demo.launch.py` or pair
+`adaptive_assembly_physical_pick_place_execution.launch.py` with
+`adaptive_assembly_physical_workcell.sdf`; the physical executor waits for
+`/physical_grasp_preflight_status` before arm execution by default.
+
 The deterministic executor also waits for `/gazebo_target_sync_status` to report
 `event=success` before sending its first ros2_control trajectory. This prevents
 execution from starting before Gazebo mirrors the planned source pose. The
