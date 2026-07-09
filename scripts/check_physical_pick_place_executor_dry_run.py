@@ -76,6 +76,8 @@ def main() -> int:
         '--ros-args',
         '-p', 'send_arm_goals:=false',
         '-p', 'send_gripper_commands:=false',
+        '-p', 'require_grasp_verification:=false',
+        '-p', 'require_lift_verification:=false',
         '-p', 'require_joint_state:=true',
     ]
     process = subprocess.Popen(command)

@@ -21,6 +21,16 @@ from std_msgs.msg import Bool, Float64, String
 DEFAULT_STAGE_NAMES = 'pre_grasp,grasp,lift,pre_place,place,retreat'
 MODE = 'physical_pick_place'
 MODE_STATUS_TOKEN = 'mode=physical_pick_place'
+VERIFICATION_TERMINAL_REASONS = (
+    'grasp_verification_failed',
+    'grasp_verification_timeout',
+    'lift_verification_failed',
+    'lift_verification_timeout',
+)
+VERIFICATION_SKIP_REASONS = (
+    'require_grasp_verification_false',
+    'require_lift_verification_false',
+)
 DEFAULT_TRAJECTORY_TOPICS = {
     'pre_grasp': '/pre_grasp_trajectory',
     'grasp': '/grasp_trajectory',
@@ -80,6 +90,19 @@ class PhysicalPickPlaceExecutorNode(Node):
         self.declare_parameter('send_gripper_commands', True)
         self.declare_parameter('require_gripper_success', True)
         self.declare_parameter('gripper_command_timeout_sec', 5.0)
+        self.declare_parameter('require_grasp_verification', True)
+        self.declare_parameter('require_lift_verification', True)
+        self.declare_parameter(
+            'grasp_verification_request_topic',
+            '/grasp_verification_request',
+        )
+        self.declare_parameter(
+            'grasp_verification_status_topic',
+            '/grasp_verification_status',
+        )
+        self.declare_parameter('grasp_verified_topic', '/grasp_verified')
+        self.declare_parameter('lift_verified_topic', '/lift_verified')
+        self.declare_parameter('verification_timeout_sec', 5.0)
         self.declare_parameter('close_after_stage', 'grasp')
         self.declare_parameter('open_after_stage', 'place')
         self.declare_parameter('require_non_empty_trajectory', True)
@@ -133,6 +156,27 @@ class PhysicalPickPlaceExecutorNode(Node):
         )
         self._gripper_command_timeout_sec = float(
             self.get_parameter('gripper_command_timeout_sec').value
+        )
+        self._require_grasp_verification = bool(
+            self.get_parameter('require_grasp_verification').value
+        )
+        self._require_lift_verification = bool(
+            self.get_parameter('require_lift_verification').value
+        )
+        self._grasp_verification_request_topic = str(
+            self.get_parameter('grasp_verification_request_topic').value
+        )
+        self._grasp_verification_status_topic = str(
+            self.get_parameter('grasp_verification_status_topic').value
+        )
+        self._grasp_verified_topic = str(
+            self.get_parameter('grasp_verified_topic').value
+        )
+        self._lift_verified_topic = str(
+            self.get_parameter('lift_verified_topic').value
+        )
+        self._verification_timeout_sec = float(
+            self.get_parameter('verification_timeout_sec').value
         )
         self._close_after_stage = str(
             self.get_parameter('close_after_stage').value
@@ -193,6 +237,9 @@ class PhysicalPickPlaceExecutorNode(Node):
         self._gripper_command_publisher = self.create_publisher(
             String, self._gripper_command_topic, 10
         )
+        self._verification_request_publisher = self.create_publisher(
+            String, self._grasp_verification_request_topic, 10
+        )
         self.create_subscription(
             String,
             self._gripper_status_topic,
@@ -205,6 +252,24 @@ class PhysicalPickPlaceExecutorNode(Node):
         )
         self.create_subscription(
             Bool, self._gripper_closed_topic, self._gripper_closed_callback,
+            retained_qos,
+        )
+        self.create_subscription(
+            String,
+            self._grasp_verification_status_topic,
+            self._verification_status_callback,
+            retained_qos,
+        )
+        self.create_subscription(
+            Bool,
+            self._grasp_verified_topic,
+            self._grasp_verified_callback,
+            retained_qos,
+        )
+        self.create_subscription(
+            Bool,
+            self._lift_verified_topic,
+            self._lift_verified_callback,
             retained_qos,
         )
         self.create_subscription(
@@ -241,6 +306,9 @@ class PhysicalPickPlaceExecutorNode(Node):
         self._active_gripper_command: Optional[str] = None
         self._active_gripper_stage = ''
         self._gripper_command_count = 0
+        self._verification_deadline: Optional[float] = None
+        self._active_verification: Optional[str] = None
+        self._active_verification_stage = ''
         self._timer = self.create_timer(0.1, self._timer_callback)
 
         self.get_logger().info(
@@ -251,6 +319,8 @@ class PhysicalPickPlaceExecutorNode(Node):
             f"gripper_status_topic='{self._gripper_status_topic}', "
             f'send_arm_goals={self._send_arm_goals}, '
             f'send_gripper_commands={self._send_gripper_commands}, '
+            f'require_grasp_verification={self._require_grasp_verification}, '
+            f'require_lift_verification={self._require_lift_verification}, '
             'simulated_execution_only=true, real_hardware=false.'
         )
 
@@ -279,6 +349,8 @@ class PhysicalPickPlaceExecutorNode(Node):
             raise ValueError('arm_result_timeout_sec must be greater than zero')
         if self._gripper_command_timeout_sec <= 0.0:
             raise ValueError('gripper_command_timeout_sec must be greater than zero')
+        if self._verification_timeout_sec <= 0.0:
+            raise ValueError('verification_timeout_sec must be greater than zero')
         if self._require_panda_joints and not self._expected_joint_prefix:
             raise ValueError(
                 'expected_joint_prefix must not be empty when '
@@ -343,6 +415,34 @@ class PhysicalPickPlaceExecutorNode(Node):
     def _gripper_closed_callback(self, _: Bool) -> None:
         """Subscribe for validation visibility; status strings drive state."""
 
+    def _verification_status_callback(self, message: String) -> None:
+        """Advance or fail when the verifier publishes a matching result."""
+        if self._completed or self._active_verification is None:
+            return
+        fields = parse_status(message.data)
+        if fields.get('mode') != 'grasp_verifier':
+            return
+        if fields.get('verification') != self._active_verification:
+            return
+        event = fields.get('event', '')
+        if event == 'success':
+            self._finish_verification(True, '')
+            return
+        if event == 'failure':
+            self._finish_verification(False, fields.get('reason', 'failure'))
+
+    def _grasp_verified_callback(self, message: Bool) -> None:
+        """Accept Bool grasp results while a grasp verification is pending."""
+        if self._active_verification != 'grasp':
+            return
+        self._finish_verification(bool(message.data), 'grasp_verifier_bool_false')
+
+    def _lift_verified_callback(self, message: Bool) -> None:
+        """Accept Bool lift results while a lift verification is pending."""
+        if self._active_verification != 'lift':
+            return
+        self._finish_verification(bool(message.data), 'lift_verifier_bool_false')
+
     def _timer_callback(self) -> None:
         """Run deadline checks without sleeps."""
         if self._completed:
@@ -356,6 +456,17 @@ class PhysicalPickPlaceExecutorNode(Node):
             self._publish_failure(
                 self._active_gripper_stage or 'gripper_command',
                 'gripper_result_timeout',
+            )
+        if (
+            self._state == 'WAIT_VERIFICATION_RESULT'
+            and self._verification_deadline is not None
+            and time.monotonic() >= self._verification_deadline
+        ):
+            verification = self._active_verification or 'verification'
+            reason = f'{verification}_verification_timeout'
+            self._publish_failure(
+                self._active_verification_stage or verification,
+                reason,
             )
 
     def _try_start_sequence(self) -> None:
@@ -560,6 +671,9 @@ class PhysicalPickPlaceExecutorNode(Node):
         if stage == self._close_after_stage:
             self._send_gripper_command(stage, 'close')
             return
+        if stage == 'lift':
+            self._request_verification(stage, 'lift')
+            return
         if stage == self._open_after_stage:
             self._send_gripper_command(stage, 'open')
             return
@@ -611,16 +725,74 @@ class PhysicalPickPlaceExecutorNode(Node):
                 f'command={command};real_hardware=false'
             )
         if command == 'close':
-            self._publish_verification_skipped()
+            self._request_verification(stage, 'grasp')
+            return
         self._advance_to_next_arm_stage()
 
-    def _publish_verification_skipped(self) -> None:
-        """Publish the PR67 contact/lift/slip verification hook."""
-        self._state = 'PUBLISH_VERIFICATION_SKIPPED'
-        self._publish_stage_status(
-            f'event=verification_skipped;mode={MODE};'
-            'verification=contact_lift_slip;reason=pr67_out_of_scope;'
+    def _request_verification(self, stage: str, verification: str) -> None:
+        """Request grasp or lift verification, or publish an explicit skip."""
+        required = (
+            self._require_grasp_verification
+            if verification == 'grasp'
+            else self._require_lift_verification
+        )
+        if not required:
+            self._publish_verification_skipped(stage, verification)
+            self._advance_to_next_arm_stage()
+            return
+
+        self._state = 'WAIT_VERIFICATION_RESULT'
+        self._active_verification = verification
+        self._active_verification_stage = stage
+        self._verification_deadline = time.monotonic() + self._verification_timeout_sec
+        message = String()
+        message.data = (
+            f'event=request;verification={verification};stage={stage};'
+            'source=physical_pick_place_executor;simulated=true;'
             'real_hardware=false'
+        )
+        self._publish_stage_status(
+            f'event=request;mode={MODE};stage={stage};'
+            f'verification={verification};action=verification;'
+            'simulated=true;real_hardware=false'
+        )
+        self._verification_request_publisher.publish(message)
+
+    def _finish_verification(self, success: bool, verifier_reason: str) -> None:
+        """Advance or fail after a verifier result."""
+        if self._completed or self._active_verification is None:
+            return
+        verification = self._active_verification
+        stage = self._active_verification_stage
+        self._verification_deadline = None
+        self._active_verification = None
+        self._active_verification_stage = ''
+        if success:
+            self._publish_stage_status(
+                f'event=success;mode={MODE};stage={stage};'
+                f'verification={verification};action=verification;'
+                'simulated=true;real_hardware=false'
+            )
+            self._advance_to_next_arm_stage()
+            return
+
+        self._publish_stage_status(
+            f'event=failure;mode={MODE};stage={stage};'
+            f'verification={verification};action=verification;'
+            f'verifier_reason={verifier_reason};'
+            'simulated=true;real_hardware=false'
+        )
+        self._publish_failure(stage, f'{verification}_verification_failed')
+
+    def _publish_verification_skipped(
+        self, stage: str, verification: str
+    ) -> None:
+        """Publish an explicit simulator-only verification skip."""
+        self._publish_stage_status(
+            f'event=verification_skipped;mode={MODE};stage={stage};'
+            f'verification={verification};'
+            f'reason=require_{verification}_verification_false;'
+            'simulated=true;real_hardware=false'
         )
 
     def _advance_to_next_arm_stage(self) -> None:
@@ -675,6 +847,8 @@ class PhysicalPickPlaceExecutorNode(Node):
             return
         self._state = 'SUCCESS' if success else 'FAILURE'
         self._cancel_arm_result_timer()
+        self._verification_deadline = None
+        self._active_verification = None
         self._completed = True
 
         status_message = String()

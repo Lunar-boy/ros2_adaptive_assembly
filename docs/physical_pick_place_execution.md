@@ -2,13 +2,15 @@
 
 PR66 adds `physical_pick_place_executor_node`, a simulator-only executor that
 consumes the PR65 multi-stage arm trajectory exports and interleaves PR63
-gripper bridge commands.
+gripper bridge commands. PR67 adds optional simulator-only contact, lift, and
+slip verification after gripper close and after the lift stage.
 
 The default sequence is:
 
 ```text
-pre_grasp -> grasp -> close gripper -> verification_skipped
-          -> lift -> pre_place -> place -> open gripper -> retreat
+pre_grasp -> grasp -> close gripper -> grasp verification
+          -> lift -> lift/slip verification
+          -> pre_place -> place -> open gripper -> retreat
 ```
 
 It subscribes to `moveit_msgs/msg/RobotTrajectory` stages on:
@@ -46,6 +48,26 @@ The executor waits for `/physical_gripper_command_status` from
 `require_gripper_success=true`, `event=failure;command=<active_command>` fails
 the run. Retained gripper statuses are ignored unless a command is active.
 
+After a successful close command, the executor publishes:
+
+```text
+event=request;verification=grasp;stage=grasp;source=physical_pick_place_executor;simulated=true;real_hardware=false
+```
+
+After the lift arm stage succeeds, it publishes:
+
+```text
+event=request;verification=lift;stage=lift;source=physical_pick_place_executor;simulated=true;real_hardware=false
+```
+
+The executor waits up to `verification_timeout_sec` for
+`/grasp_verification_status`, `/grasp_verified`, or `/lift_verified`. Required
+verification failures terminate with `grasp_verification_failed`,
+`grasp_verification_timeout`, `lift_verification_failed`, or
+`lift_verification_timeout`. Set `require_grasp_verification=false` and
+`require_lift_verification=false` for message-only dry runs that do not depend
+on Gazebo contact or pose topics.
+
 Published executor topics:
 
 - `/physical_pick_place_execution_status` (`std_msgs/msg/String`, retained)
@@ -72,14 +94,7 @@ the validation script:
 python3 scripts/check_physical_pick_place_executor_dry_run.py
 ```
 
-This feature does not prove physical grasp success. The verification event after
-gripper close is intentionally:
-
-```text
-event=verification_skipped;mode=physical_pick_place;verification=contact_lift_slip;reason=pr67_out_of_scope;real_hardware=false
-```
-
-Contact sensing, lift/slip verification, physical grasp verification, force
-control, tactile feedback, camera perception, MoveIt Servo, Gazebo contact
-plugins, and real hardware execution are out of scope for PR66. Contact,
-lift, and slip verification belong to PR67.
+See `docs/gazebo_contact_grasp_verification.md` for the Gazebo contact sensor
+plumbing and verifier status schemas. This remains simulator-only. It does not
+add force control, tactile feedback, camera perception, MoveIt Servo, learned
+grasping, kinematic-attachment success claims, or real hardware execution.

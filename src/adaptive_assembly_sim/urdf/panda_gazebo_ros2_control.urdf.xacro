@@ -134,7 +134,7 @@
       <material name="panda_finger_dark"/>
     </visual>
     <xacro:if value="${arm_collisions}">
-      <collision>
+      <collision name="panda_leftfinger_collision">
         <origin xyz="0.045 0 -0.05" rpy="0 0 0"/>
         <geometry>
           <box size="0.025 0.018 0.10"/>
@@ -153,7 +153,7 @@
       <material name="panda_finger_dark"/>
     </visual>
     <xacro:if value="${arm_collisions}">
-      <collision>
+      <collision name="panda_rightfinger_collision">
         <origin xyz="0.045 0 -0.05" rpy="0 0 0"/>
         <geometry>
           <box size="0.025 0.018 0.10"/>
@@ -247,6 +247,14 @@
     <kd>10.0</kd>
     <minDepth>0.001</minDepth>
     <maxVel>0.1</maxVel>
+    <sensor name="panda_leftfinger_contact_sensor" type="contact">
+      <always_on>true</always_on>
+      <update_rate>50</update_rate>
+      <topic>/panda_leftfinger_contact</topic>
+      <contact>
+        <collision>panda_leftfinger_collision</collision>
+      </contact>
+    </sensor>
   </gazebo>
   <gazebo reference="panda_rightfinger">
     <mu1>1.0</mu1>
@@ -255,6 +263,14 @@
     <kd>10.0</kd>
     <minDepth>0.001</minDepth>
     <maxVel>0.1</maxVel>
+    <sensor name="panda_rightfinger_contact_sensor" type="contact">
+      <always_on>true</always_on>
+      <update_rate>50</update_rate>
+      <topic>/panda_rightfinger_contact</topic>
+      <contact>
+        <collision>panda_rightfinger_collision</collision>
+      </contact>
+    </sensor>
   </gazebo>
 
   <ros2_control name="GazeboSystem" type="system">
