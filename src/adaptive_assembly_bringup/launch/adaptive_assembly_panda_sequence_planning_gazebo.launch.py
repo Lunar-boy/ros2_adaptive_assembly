@@ -22,6 +22,9 @@ def generate_launch_description() -> LaunchDescription:
     require_grasp_pose = LaunchConfiguration('require_grasp_pose')
     require_place_sequence = LaunchConfiguration('require_place_sequence')
     stage_names = LaunchConfiguration('stage_names')
+    planning_scene_audit_expected_object_ids = LaunchConfiguration(
+        'planning_scene_audit_expected_object_ids'
+    )
     pipeline_launch = PathJoinSubstitution([
         bringup_share,
         'launch',
@@ -104,6 +107,11 @@ def generate_launch_description() -> LaunchDescription:
                 'require_grasp_pose/require_place_sequence compatibility.'
             ),
         ),
+        DeclareLaunchArgument(
+            'planning_scene_audit_expected_object_ids',
+            default_value='work_table,target_support',
+            description='Comma-separated object IDs expected by the audit.',
+        ),
         LogInfo(msg=(
             'Launching Gazebo-compatible plan-only Panda sequence planning. '
             'move_group consumes Gazebo joint states; no mock ros2_control '
@@ -167,5 +175,10 @@ def generate_launch_description() -> LaunchDescription:
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(planning_scene_audit_launch),
+            launch_arguments={
+                'expected_object_ids': (
+                    planning_scene_audit_expected_object_ids
+                ),
+            }.items(),
         ),
     ])

@@ -150,6 +150,10 @@ source install/setup.bash
 ros2 launch adaptive_assembly_bringup adaptive_assembly_full_physical_pick_place_demo.launch.py
 ```
 
+This full physical demo remains simulator-only. It uses Gazebo
+`gz_ros2_control` as the only controller provider and starts MoveIt planning
+without the standard Panda fake-control demo.
+
 To save terminal output from each full physical pick-place simulation attempt,
 use the manual run logging wrapper:
 

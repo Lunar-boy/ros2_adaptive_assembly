@@ -20,6 +20,11 @@ The default expected object ids are:
 They are configured through the `expected_object_ids` parameter as a
 comma-separated string.
 
+Launch files can override the expected list with
+`planning_scene_audit_expected_object_ids`. Profiles that disable
+`use_dynamic_target_scene` should omit `target_object_dynamic`; the
+known-reachable sequence profile expects `work_table,target_support`.
+
 ## Node and topics
 
 `planning_scene_audit_node` is provided by `adaptive_assembly_planning`.
@@ -81,6 +86,9 @@ bash scripts/check_planning_scene_audit_ready.sh
 `/planning_scene_audit_ready` is `true` when all expected objects are present.
 With the default Panda planning demo, this means the static table/support and
 dynamic target object have all been observed in the MoveIt2 PlanningScene.
+When `use_dynamic_target_scene:=false`, pass
+`planning_scene_audit_expected_object_ids:=work_table,target_support` or use a
+profile that already does this, such as the known-reachable sequence launch.
 
 ## Scope
 
