@@ -107,6 +107,14 @@ ros2 launch adaptive_assembly_bringup \
   adaptive_assembly_full_physical_pick_place_demo.launch.py
 ```
 
+The full physical launch composes Gazebo, `gz_ros2_control`, MoveIt planning,
+contact bridges, pose observation, preflight, grasp verification, and the
+physical executor. In this path, Gazebo is the only `/controller_manager`
+provider. The nested Panda planning launch is run with
+`use_standard_panda_demo:=false`, so it starts `move_group` directly and does
+not include `moveit_resources_panda_moveit_config/launch/demo.launch.py`, the
+MoveIt resources fake `ros2_control_node`, or fake Panda controller spawners.
+
 For a message-only executor dry run, provide trajectories and joint states with
 the validation script:
 

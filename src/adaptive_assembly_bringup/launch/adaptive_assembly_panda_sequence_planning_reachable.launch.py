@@ -27,6 +27,7 @@ def generate_launch_description() -> LaunchDescription:
     pre_grasp_trajectory_topic = LaunchConfiguration(
         'pre_grasp_trajectory_topic'
     )
+    use_standard_panda_demo = LaunchConfiguration('use_standard_panda_demo')
     assembly_trajectory_topic = LaunchConfiguration(
         'assembly_trajectory_topic'
     )
@@ -46,6 +47,14 @@ def generate_launch_description() -> LaunchDescription:
             description='Topic for successful assembly trajectories.',
         ),
         DeclareLaunchArgument(
+            'use_standard_panda_demo',
+            default_value='true',
+            description=(
+                'Whether the nested Panda planning demo uses the standard '
+                'fake-control MoveIt demo.'
+            ),
+        ),
+        DeclareLaunchArgument(
             'use_planning_scene_audit',
             default_value='true',
             description='Whether to include the read-only scene audit.',
@@ -59,7 +68,11 @@ def generate_launch_description() -> LaunchDescription:
             PythonLaunchDescriptionSource(sequence_demo),
             launch_arguments={
                 'params_file': reachable_params,
+                'use_standard_panda_demo': use_standard_panda_demo,
                 'use_dynamic_target_scene': 'false',
+                'planning_scene_audit_expected_object_ids': (
+                    'work_table,target_support'
+                ),
                 'start_state_mode': 'fixed',
                 'planning_time_sec': '5.0',
                 'num_planning_attempts': '1',

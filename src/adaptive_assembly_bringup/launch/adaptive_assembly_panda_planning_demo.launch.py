@@ -24,8 +24,12 @@ def generate_launch_description() -> LaunchDescription:
         'adaptive_assembly_params.yaml',
     ])
     params_file = LaunchConfiguration('params_file')
+    use_standard_panda_demo = LaunchConfiguration('use_standard_panda_demo')
     use_dynamic_target_scene = LaunchConfiguration('use_dynamic_target_scene')
     use_planning_scene_audit = LaunchConfiguration('use_planning_scene_audit')
+    planning_scene_audit_expected_object_ids = LaunchConfiguration(
+        'planning_scene_audit_expected_object_ids'
+    )
     use_pre_grasp_planning = LaunchConfiguration('use_pre_grasp_planning')
     planner_id = LaunchConfiguration('planner_id')
     num_planning_attempts = LaunchConfiguration('num_planning_attempts')
@@ -82,9 +86,22 @@ def generate_launch_description() -> LaunchDescription:
             ),
         ),
         DeclareLaunchArgument(
+            'use_standard_panda_demo',
+            default_value='true',
+            description=(
+                'Whether to include the standard Panda MoveIt demo with fake '
+                'ros2_control. Physical Gazebo demos set this false.'
+            ),
+        ),
+        DeclareLaunchArgument(
             'use_planning_scene_audit',
             default_value='true',
             description='Whether to include the read-only PlanningScene audit node.',
+        ),
+        DeclareLaunchArgument(
+            'planning_scene_audit_expected_object_ids',
+            default_value='work_table,target_support,target_object_dynamic',
+            description='Comma-separated object IDs expected by the audit.',
         ),
         DeclareLaunchArgument(
             'use_pre_grasp_planning',
@@ -158,7 +175,7 @@ def generate_launch_description() -> LaunchDescription:
         ),
         LogInfo(
             msg='Launching adaptive assembly Panda planning demo: fake '
-            'perception, task pose generation, standard Panda MoveIt2 demo, '
+            'perception, task pose generation, Panda MoveIt2 planning, '
             'static PlanningScene collision objects, Panda pre-grasp pose '
             'adapter, dynamic target collision object, read-only PlanningScene '
             'audit, and plan-only planning bridge. use_dynamic_target_scene '
@@ -174,7 +191,10 @@ def generate_launch_description() -> LaunchDescription:
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(panda_demo_launch),
-            launch_arguments={'params_file': params_file}.items(),
+            launch_arguments={
+                'params_file': params_file,
+                'use_standard_panda_demo': use_standard_panda_demo,
+            }.items(),
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(static_planning_scene_launch),
@@ -189,6 +209,11 @@ def generate_launch_description() -> LaunchDescription:
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(planning_scene_audit_launch),
             condition=IfCondition(use_planning_scene_audit),
+            launch_arguments={
+                'expected_object_ids': (
+                    planning_scene_audit_expected_object_ids
+                ),
+            }.items(),
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(pre_grasp_planning_launch),

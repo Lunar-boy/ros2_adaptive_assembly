@@ -47,6 +47,7 @@ def generate_launch_description() -> LaunchDescription:
     launch_physical_grasp_preflight = LaunchConfiguration(
         'launch_physical_grasp_preflight'
     )
+    use_standard_panda_demo = LaunchConfiguration('use_standard_panda_demo')
 
     reachable_sequence_launch = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_bringup'),
@@ -108,6 +109,7 @@ def generate_launch_description() -> LaunchDescription:
         'launch_grasp_verifier': 'true',
         'launch_object_pose_observer': 'true',
         'launch_physical_grasp_preflight': 'true',
+        'use_standard_panda_demo': 'false',
         'require_physical_grasp_preflight': 'true',
         'require_grasp_verification': 'true',
         'require_lift_verification': 'true',
@@ -171,6 +173,7 @@ def generate_launch_description() -> LaunchDescription:
             'launch_grasp_verifier',
             'launch_object_pose_observer',
             'launch_physical_grasp_preflight',
+            'use_standard_panda_demo',
             'require_both_contacts',
             'require_gripper_closed',
             'require_object_pose',
@@ -292,6 +295,7 @@ def generate_launch_description() -> LaunchDescription:
                 'retreat_trajectory_topic': LaunchConfiguration(
                     'retreat_trajectory_topic'
                 ),
+                'use_standard_panda_demo': use_standard_panda_demo,
             }.items(),
         ),
         Node(

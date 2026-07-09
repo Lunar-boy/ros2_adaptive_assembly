@@ -59,5 +59,8 @@ def generate_launch_description() -> LaunchDescription:
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(execution_launch),
+            launch_arguments={
+                'use_standard_panda_demo': 'false',
+            }.items(),
         ),
     ])
