@@ -70,6 +70,20 @@ ros2 launch adaptive_assembly_bringup \
 It publishes logical open/close and attach/detach state only. It does not
 physically control a gripper or attach an object in Gazebo.
 
+The PR66 physical pick-place execution launch composes PR65 multi-stage
+trajectory export with the PR63 simulator-only gripper bridge and the new
+executor:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_physical_pick_place_execution.launch.py
+```
+
+It executes the configured arm stages and interleaves gripper close/open
+commands after `grasp` and `place`. It publishes `real_hardware=false` and does
+not include contact sensing, lift/slip verification, physical grasp success
+proof, force control, camera perception, or real hardware support.
+
 The PR39 Gazebo grasp attachment demo composes full Gazebo Panda execution, the
 logical lifecycle, and kinematic target-object following:
 

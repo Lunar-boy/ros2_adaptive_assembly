@@ -34,6 +34,9 @@ setup(
             'ros2_control_sequence_executor_node = '
             'adaptive_assembly_execution.'
             'ros2_control_sequence_executor_node:main',
+            'physical_pick_place_executor_node = '
+            'adaptive_assembly_execution.'
+            'physical_pick_place_executor_node:main',
             'simulated_follow_joint_trajectory_server_node = '
             'adaptive_assembly_execution.'
             'simulated_follow_joint_trajectory_server_node:main',

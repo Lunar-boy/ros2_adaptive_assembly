@@ -34,6 +34,8 @@ This repository builds a lightweight adaptive manipulation pipeline that convert
 - Simulator-only Gazebo Panda arm execution through ros2_control
 - Simulator-only Panda gripper links and finger joints in the Gazebo model
 - Simulator-only gripper trajectory controller and logical command action bridge
+- Simulator-only multi-stage pick-place executor with gripper close/open
+  interleaving
 - Simulator-only Gazebo target object synchronization from `/target_pose`
 
 ---
@@ -67,7 +69,7 @@ MoveIt2 sequence planner
     └── diagnostics / benchmark CSV
               │
               ▼
-dry-run execution / simulator-only ros2_control execution
+dry-run execution / simulator-only ros2_control or physical pick-place execution
               │
               ▼
 contact-lite insertion evaluator
