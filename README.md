@@ -36,6 +36,7 @@ This repository builds a lightweight adaptive manipulation pipeline that convert
 - Simulator-only gripper trajectory controller and logical command action bridge
 - Simulator-only multi-stage pick-place executor with gripper close/open
   interleaving
+- Simulator-only Gazebo finger contact sensing and grasp/lift/slip verification
 - Simulator-only Gazebo target object synchronization from `/target_pose`
 
 ---

@@ -37,6 +37,11 @@ setup(
             'physical_pick_place_executor_node = '
             'adaptive_assembly_execution.'
             'physical_pick_place_executor_node:main',
+            'gazebo_grasp_contact_status_node = '
+            'adaptive_assembly_execution.'
+            'gazebo_grasp_contact_status_node:main',
+            'grasp_verifier_node = '
+            'adaptive_assembly_execution.grasp_verifier_node:main',
             'simulated_follow_joint_trajectory_server_node = '
             'adaptive_assembly_execution.'
             'simulated_follow_joint_trajectory_server_node:main',

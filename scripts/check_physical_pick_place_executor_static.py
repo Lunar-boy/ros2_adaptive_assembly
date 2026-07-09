@@ -38,7 +38,8 @@ def main() -> int:
         'real_hardware=false',
         'simulated_execution_only',
         'raise ValueError',
-        'pr67_out_of_scope',
+        'require_grasp_verification',
+        'require_lift_verification',
         'verification_skipped',
     ]
     for token in required_tokens:
@@ -46,8 +47,6 @@ def main() -> int:
             failures.append(f'missing executor token: {token}')
 
     forbidden_tokens = [
-        'contact_sensor',
-        'gazebo_contact',
         'force_control',
         'tactile',
         'MoveItServo',
