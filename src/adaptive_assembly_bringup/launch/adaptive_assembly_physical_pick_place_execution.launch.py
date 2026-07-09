@@ -124,7 +124,7 @@ def generate_launch_description() -> LaunchDescription:
         'gripper_command_timeout_sec': '5.0',
         'contact_stale_timeout_sec': '0.5',
         'verification_timeout_sec': '5.0',
-        'physical_grasp_preflight_timeout_sec': '5.0',
+        'physical_grasp_preflight_timeout_sec': '20.0',
         'min_lift_delta_m': '0.02',
         'max_slip_distance_m': '0.025',
         'pose_stale_timeout_sec': '1.0',

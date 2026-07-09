@@ -51,9 +51,15 @@ class PhysicalGraspPreflightNode(Node):
             ('right_contact_topic', '/panda_rightfinger_contact'),
             ('contact_status_topic', '/grasp_contact_status'),
             ('status_topic', '/physical_grasp_preflight_status'),
-            ('timeout_sec', 5.0),
+            ('timeout_sec', 20.0),
             ('publish_period_sec', 0.1),
             ('simulated_only', True),
+                # New: preflight should check infrastructure, not require grasp contact.
+            ('require_physical_world', True),
+            ('require_object_pose_available', True),
+            ('require_no_kinematic_attach', True),
+            ('require_contact_topics_observed', False),
+            ('require_contact_status_observed', False),
         )
         for name, default in defaults:
             self.declare_parameter(name, default)
@@ -141,6 +147,21 @@ class PhysicalGraspPreflightNode(Node):
             f'timeout_sec={self._timeout_sec:.3f}, '
             'simulated_only=true, real_hardware=false.'
         )
+        self._require_physical_world = bool(
+            self.get_parameter('require_physical_world').value
+        )
+        self._require_object_pose_available = bool(
+            self.get_parameter('require_object_pose_available').value
+        )
+        self._require_no_kinematic_attach = bool(
+            self.get_parameter('require_no_kinematic_attach').value
+        )
+        self._require_contact_topics_observed = bool(
+            self.get_parameter('require_contact_topics_observed').value
+        )
+        self._require_contact_status_observed = bool(
+            self.get_parameter('require_contact_status_observed').value
+        )
 
     def _validate_parameters(self) -> None:
         if not self._simulated_only:
@@ -180,20 +201,37 @@ class PhysicalGraspPreflightNode(Node):
             self.get_clock().now() - self._start_time
         ).nanoseconds * 1.0e-9
 
+
     def _failure_reasons(self) -> List[str]:
         reasons = []
-        if not self._physical_world():
+
+        if self._require_physical_world and not self._physical_world():
             reasons.append('wrong_pose_info_topic')
-        if not self._object_pose_available:
+
+        if (
+            self._require_object_pose_available
+            and not self._object_pose_available
+        ):
             reasons.append('object_pose_unavailable')
-        if self._kinematic_attach_active:
+
+        if self._require_no_kinematic_attach and self._kinematic_attach_active:
             reasons.append('kinematic_attach_node_active')
-        if not self._left_contact_observed:
-            reasons.append('left_contact_topic_unobserved')
-        if not self._right_contact_observed:
-            reasons.append('right_contact_topic_unobserved')
-        if not self._contact_status_observed:
+
+        # These are diagnostics only by default. Requiring actual contact before
+        # the arm moves creates a startup deadlock: contact can only appear after
+        # motion and gripper closure.
+        if self._require_contact_topics_observed:
+            if not self._left_contact_observed:
+                reasons.append('left_contact_topic_unobserved')
+            if not self._right_contact_observed:
+                reasons.append('right_contact_topic_unobserved')
+
+        if (
+            self._require_contact_status_observed
+            and not self._contact_status_observed
+        ):
             reasons.append('contact_status_topic_unobserved')
+
         return reasons
 
     def _publish_status(self) -> None:
