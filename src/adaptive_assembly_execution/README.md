@@ -7,6 +7,9 @@ sequence trajectories:
   `assembly` stages using ROS 2 messages only.
 - `ros2_control_sequence_executor_node` validates the same stages and can send
   them in order to a simulated `FollowJointTrajectory` controller.
+- `physical_pick_place_executor_node` consumes the PR65 multi-stage trajectory
+  topics and interleaves simulator-only PR63 gripper close/open commands after
+  `grasp` and `place`.
 - `simulated_follow_joint_trajectory_server_node` provides deterministic
   success, rejection, failure, and timeout modes for local action-level checks.
 - `wait_for_gazebo_controller_ready_node` publishes retained readiness only
@@ -18,6 +21,12 @@ Gazebo robot, or support real hardware. See
 [`docs/dry_run_execution.md`](../../docs/dry_run_execution.md) and
 [`docs/gazebo_ros2_control_execution.md`](../../docs/gazebo_ros2_control_execution.md)
 for launch and validation instructions.
+
+The physical pick-place executor is simulator-only and publishes
+`real_hardware=false` in every status. It does not prove physical grasp success;
+contact, lift, and slip verification are intentionally left for PR67. See
+[`docs/physical_pick_place_execution.md`](../../docs/physical_pick_place_execution.md)
+for parameters, topics, launch usage, and validation commands.
 
 Initial execution can optionally be gated by retained target-sync status with
 `require_target_sync_success:=true`. The executor then waits until all
