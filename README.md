@@ -38,15 +38,18 @@ This repository builds a lightweight adaptive manipulation pipeline that convert
   interleaving
 - Simulator-only Gazebo finger contact sensing and grasp/lift/slip verification
 - Simulator-only Gazebo target object synchronization from `/target_pose`
+- Gazebo-observed target pose adaptation for the full physical demo
 
 ---
 
 ## System architecture
 
 ```text
-fake_object_pose_node
-    ├── /target_pose
-    └── TF: world -> target_object
+ordinary demos: fake_object_pose_node ────────────────┐
+physical demo: Gazebo target_object pose observer     │
+               -> Z/frame-label adapter ──────────────┤
+                                                      ▼
+                                                /target_pose
               │
               ▼
 assembly_task_node
@@ -159,6 +162,14 @@ strict by default. This full Gazebo entry point defaults to
 `use_sim_time:=true`: MoveIt, sequence planning, pose generation, and the
 physical stale-data checks use Gazebo's bridged `/clock` time domain. Ordinary
 plan-only and fake-perception launches retain their wall-time defaults.
+
+Unlike ordinary demos, the full physical launch disables
+`fake_object_pose_node`. It adapts the observed
+`/gazebo_target_object_pose` into `/target_pose`, preserving XY and orientation
+and adding `target_reference_z_offset:=0.05` to convert the `0.10 m` cylinder's
+model-center pose to the task reference. `output_frame_id:=world` is a label
+override only; no TF transformation is performed. The adapter publishes
+nothing before Gazebo provides a valid pose.
 
 To inspect the pose and preflight gates:
 

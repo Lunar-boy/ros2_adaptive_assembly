@@ -9,6 +9,11 @@ This package connects:
 - `adaptive_assembly_task`, which subscribes to `/target_pose` and publishes
   `/pre_grasp_pose` and `/assembly_pose`
 
+Ordinary and plan-only demos default to `launch_fake_object_pose_node:=true`.
+The full physical Gazebo demo sets it to `false`, keeps
+`assembly_task_node` active, and supplies `/target_pose` through the
+simulator-specific Gazebo target-pose adapter instead.
+
 This is intentionally the non-MoveIt pipeline launch. It does not start Gazebo,
 RViz, a robot model, ros2_control, or MoveIt2.
 
@@ -44,6 +49,13 @@ the existing exported two-stage sequence to the simulated controller. It does
 not add gripper control, object attachment, contact-rich insertion, force
 control, perception-driven Gazebo object sync, real robot drivers, or hardware
 execution.
+
+The full physical pick-place entry point is different: it observes Gazebo's
+dynamic `target_object` on `/gazebo_target_object_pose`, adds the configurable
+`target_reference_z_offset` (default `0.05 m`), and publishes the result on
+`/target_pose`. Fake perception and the Gazebo adapter use inverse launch
+conditions, preventing two intended `/target_pose` publishers. The configured
+output frame is a label override, not a TF transform.
 
 The PR35 local success fixture is:
 

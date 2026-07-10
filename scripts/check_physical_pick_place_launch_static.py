@@ -63,6 +63,13 @@ def main() -> int:
         'use_standard_panda_demo',
         "'use_standard_panda_demo': 'false'",
         "'require_target_entity_exact_match': 'false'",
+        "'launch_fake_object_pose_node': launch_fake_object_pose_node",
+        "default_value='false'",
+        'gazebo_target_pose_adapter.launch.py',
+        "'input_pose_topic': '/gazebo_target_object_pose'",
+        "'output_pose_topic': '/target_pose'",
+        'target_reference_z_offset',
+        'UnlessCondition(launch_fake_object_pose_node)',
         "'require_model_name_match': _typed_value(",
         "'require_target_entity_exact_match', bool",
     ]

@@ -29,6 +29,28 @@ Launch the achieved object pose observer independently:
 ros2 launch adaptive_assembly_sim gazebo_entity_pose_observer.launch.py
 ```
 
+Adapt that observed model-center pose into the task pipeline independently:
+
+```bash
+ros2 launch adaptive_assembly_sim gazebo_target_pose_adapter.launch.py
+```
+
+`gazebo_target_pose_adapter_node` subscribes to
+`/gazebo_target_object_pose` and publishes `/target_pose` only after a valid
+observation arrives. Its parameters are:
+
+| Parameter | Default | Meaning |
+| --- | --- | --- |
+| `input_pose_topic` | `/gazebo_target_object_pose` | Observed Gazebo model pose |
+| `output_pose_topic` | `/target_pose` | Task-compatible target pose |
+| `target_reference_z_offset` | `0.05` | Offset from model center to task reference |
+| `output_frame_id` | `world` | Output frame label |
+
+The physical workcell target is a `0.10 m` cylinder whose Gazebo model pose is
+at its center, so the `0.05 m` default selects its top/reference pose. XY and
+orientation are preserved. `output_frame_id` replaces the frame label only;
+the adapter does not perform a TF coordinate transform.
+
 The launches require Gazebo and ros2_control integration packages. On ROS 2
 Jazzy they can be installed with:
 
@@ -88,6 +110,8 @@ python3 scripts/check_target_pose_to_gazebo_entity_consistency.py
 bash scripts/check_gazebo_entity_pose_observer_available.sh
 python3 scripts/check_gazebo_entity_pose_observer_synthetic.py
 python3 scripts/check_gazebo_entity_pose_observer_stale.py
+python3 -m pytest \
+  src/adaptive_assembly_sim/test/test_gazebo_target_pose_adapter.py
 python3 scripts/check_panda_gripper_urdf_contains_fingers.py
 python3 scripts/check_gripper_controller_config.py
 ```

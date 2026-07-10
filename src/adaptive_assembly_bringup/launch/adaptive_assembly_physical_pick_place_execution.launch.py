@@ -49,6 +49,9 @@ def generate_launch_description() -> LaunchDescription:
     )
     use_standard_panda_demo = LaunchConfiguration('use_standard_panda_demo')
     use_sim_time = LaunchConfiguration('use_sim_time')
+    launch_fake_object_pose_node = LaunchConfiguration(
+        'launch_fake_object_pose_node'
+    )
 
     reachable_sequence_launch = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_bringup'),
@@ -140,6 +143,13 @@ def generate_launch_description() -> LaunchDescription:
             **string_arguments, **bool_arguments, **float_arguments
         }.items()
     ]
+    declarations.append(DeclareLaunchArgument(
+        'launch_fake_object_pose_node',
+        default_value='true',
+        description=(
+            'Whether the nested adaptive pipeline starts fake perception.'
+        ),
+    ))
 
     executor_string_names = (
         'stage_names',
@@ -305,6 +315,7 @@ def generate_launch_description() -> LaunchDescription:
                 ),
                 'use_standard_panda_demo': use_standard_panda_demo,
                 'use_sim_time': use_sim_time,
+                'launch_fake_object_pose_node': launch_fake_object_pose_node,
             }.items(),
         ),
         Node(
