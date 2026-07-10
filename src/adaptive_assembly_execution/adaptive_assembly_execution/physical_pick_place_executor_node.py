@@ -591,7 +591,11 @@ class PhysicalPickPlaceExecutorNode(Node):
             f'preflight_reason={self._preflight_failure_reason};'
             'simulated_execution_only=true;real_hardware=false'
         )
-        self._publish_failure('preflight', 'physical_grasp_preflight_failed')
+        self._publish_failure(
+            'preflight',
+            'physical_grasp_preflight_failed',
+            preflight_reason=self._preflight_failure_reason,
+        )
 
     def _validate_trajectory(
         self, trajectory: RobotTrajectory
@@ -899,20 +903,34 @@ class PhysicalPickPlaceExecutorNode(Node):
             return
         self._send_current_arm_stage()
 
-    def _publish_failure(self, stage: str, reason: str) -> None:
+    def _publish_failure(
+        self,
+        stage: str,
+        reason: str,
+        *,
+        preflight_reason: Optional[str] = None,
+    ) -> None:
         """Publish one retained terminal failure."""
         if self._sequence_start == 0.0:
             self._sequence_start = time.monotonic()
         duration_ms = (time.monotonic() - self._sequence_start) * 1000.0
         status = (
             f'event=failure;mode={MODE};stage={stage};reason={reason};'
+        )
+        if preflight_reason is not None:
+            status += f'preflight_reason={preflight_reason};'
+        status += (
             'execution=false;simulated_execution_only=true;'
             'real_hardware=false'
         )
         self._publish_final_result(False, status, duration_ms)
+        detail = (
+            f', preflight_reason={preflight_reason}'
+            if preflight_reason is not None else ''
+        )
         self.get_logger().warning(
             f'Physical pick-place execution failed: stage={stage}, '
-            f'reason={reason}.'
+            f'reason={reason}{detail}.'
         )
 
     def _publish_success(self) -> None:

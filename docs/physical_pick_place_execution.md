@@ -84,8 +84,25 @@ All status strings include `mode=physical_pick_place` and
 When preflight is required and fails, the terminal execution status uses:
 
 ```text
-event=failure;mode=physical_pick_place;stage=preflight;reason=physical_grasp_preflight_failed;execution=false;simulated_execution_only=true;real_hardware=false
+event=failure;mode=physical_pick_place;stage=preflight;reason=physical_grasp_preflight_failed;preflight_reason=object_pose_unavailable;execution=false;simulated_execution_only=true;real_hardware=false
 ```
+
+`physical_grasp_preflight_failed` remains the stable executor-level reason.
+The `preflight_reason` field preserves the concrete reason received from
+`/physical_grasp_preflight_status`, and both the preflight node and executor
+log that detail on terminal failure. Inspect the observer and preflight gates
+with:
+
+```bash
+ros2 topic echo /gazebo_target_object_pose_status --once
+ros2 topic echo /gazebo_target_object_pose_available --once
+ros2 topic echo /physical_grasp_preflight_status --once
+```
+
+The physical launch argument `require_target_entity_exact_match` defaults to
+`false` so Gazebo scoped target names are accepted. This is passed as a typed
+boolean to the observer; the observer's standalone strict-match default is
+unchanged.
 
 If trajectories and joint state are ready but no preflight success arrives
 within the configured timeout, the reason is

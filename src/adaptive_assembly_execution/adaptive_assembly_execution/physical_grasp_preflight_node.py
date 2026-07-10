@@ -54,7 +54,7 @@ class PhysicalGraspPreflightNode(Node):
             ('timeout_sec', 20.0),
             ('publish_period_sec', 0.1),
             ('simulated_only', True),
-                # New: preflight should check infrastructure, not require grasp contact.
+            # Preflight checks infrastructure, not contact before arm motion.
             ('require_physical_world', True),
             ('require_object_pose_available', True),
             ('require_no_kinematic_attach', True),
@@ -201,7 +201,6 @@ class PhysicalGraspPreflightNode(Node):
             self.get_clock().now() - self._start_time
         ).nanoseconds * 1.0e-9
 
-
     def _failure_reasons(self) -> List[str]:
         reasons = []
 
@@ -235,17 +234,32 @@ class PhysicalGraspPreflightNode(Node):
         return reasons
 
     def _publish_status(self) -> None:
+        terminal_transition = False
         if not self._terminal_event:
             reasons = self._failure_reasons()
             if not reasons:
                 self._terminal_event = 'success'
                 self._terminal_reason = 'ok'
+                terminal_transition = True
             elif self._kinematic_attach_active:
                 self._terminal_event = 'failure'
                 self._terminal_reason = 'kinematic_attach_node_active'
+                terminal_transition = True
             elif self._elapsed_sec() >= self._timeout_sec:
                 self._terminal_event = 'failure'
                 self._terminal_reason = ','.join(reasons)
+                terminal_transition = True
+
+        if terminal_transition:
+            if self._terminal_event == 'failure':
+                self.get_logger().error(
+                    'Physical grasp preflight failed: '
+                    f'{self._terminal_reason}'
+                )
+            else:
+                self.get_logger().info(
+                    'Physical grasp preflight succeeded: ok'
+                )
 
         event = self._terminal_event or 'waiting'
         reason = self._terminal_reason or 'waiting_for_physical_grasp_inputs'

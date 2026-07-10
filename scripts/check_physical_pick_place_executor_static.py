@@ -45,6 +45,7 @@ def main() -> int:
         'physical_grasp_preflight_timeout_sec',
         '/physical_grasp_preflight_status',
         'physical_grasp_preflight_failed',
+        'preflight_reason=',
         'physical_grasp_preflight_timeout',
         'verification_skipped',
     ]

@@ -117,6 +117,7 @@ def generate_launch_description() -> LaunchDescription:
         'require_gripper_closed': 'true',
         'require_object_pose': 'true',
         'require_target_object_contact': 'true',
+        'require_target_entity_exact_match': 'false',
     }
     float_arguments = {
         'wait_for_arm_controller_sec': '5.0',
@@ -178,6 +179,7 @@ def generate_launch_description() -> LaunchDescription:
             'require_gripper_closed',
             'require_object_pose',
             'require_target_object_contact',
+            'require_target_entity_exact_match',
         )
     })
     executor_parameters.update({
@@ -363,7 +365,9 @@ def generate_launch_description() -> LaunchDescription:
                     'pose_stale_timeout_sec', float
                 ),
                 'publish_period_sec': 0.1,
-                'require_model_name_match': True,
+                'require_model_name_match': _typed_value(
+                    'require_target_entity_exact_match', bool
+                ),
                 'simulated_only': _typed_value(
                     'simulated_execution_only', bool
                 ),

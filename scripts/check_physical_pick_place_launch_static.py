@@ -62,6 +62,9 @@ def main() -> int:
         'adaptive_assembly_physical_workcell.sdf',
         'use_standard_panda_demo',
         "'use_standard_panda_demo': 'false'",
+        "'require_target_entity_exact_match': 'false'",
+        "'require_model_name_match': _typed_value(",
+        "'require_target_entity_exact_match', bool",
     ]
     for token in required:
         if token not in text and token not in full_text:
@@ -93,6 +96,7 @@ def main() -> int:
         'real_hardware:=true',
         'hardware_driver',
         'camera',
+        "'require_model_name_match': True",
     ]
     for token in forbidden:
         if token in text or token in full_text:

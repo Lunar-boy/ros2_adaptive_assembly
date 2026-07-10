@@ -1,5 +1,6 @@
 """Publish one Gazebo entity pose as a ROS ``PoseStamped``."""
 
+import re
 from typing import Any, Optional, Tuple, Type
 
 from geometry_msgs.msg import Pose, PoseStamped
@@ -20,11 +21,72 @@ except ImportError:
     INPUT_MESSAGE_NAME = 'tf2_msgs/msg/TFMessage'
 
 
+DIAGNOSTIC_NAME_LIMIT = 5
+DIAGNOSTIC_NAME_LENGTH = 96
+
+
+def _scope_components(name: str) -> Tuple[str, ...]:
+    """Split Gazebo ``::`` scopes and path-style scopes into components."""
+    return tuple(
+        component
+        for component in re.split(r'::|/', name.strip())
+        if component
+    )
+
+
 def _entity_matches(name: str, target: str, exact: bool) -> bool:
-    """Match exact names, or scoped Gazebo names when explicitly allowed."""
+    """Match exact names, or a complete scoped-name suffix when allowed."""
     if name == target:
         return True
-    return not exact and name.replace('/', '::').split('::')[-1] == target
+    if exact:
+        return False
+    name_components = _scope_components(name)
+    target_components = _scope_components(target)
+    return (
+        bool(name_components)
+        and bool(target_components)
+        and len(name_components) >= len(target_components)
+        and name_components[-len(target_components):] == target_components
+    )
+
+
+def candidate_entity_names(
+    message: Any,
+    limit: int = DIAGNOSTIC_NAME_LIMIT,
+) -> Tuple[str, ...]:
+    """Return a bounded set of names from either supported message shape."""
+    candidates = getattr(message, 'pose', None)
+    attribute = 'name'
+    if candidates is None:
+        candidates = getattr(message, 'transforms', None)
+        attribute = 'child_frame_id'
+    if candidates is None or limit <= 0:
+        return ()
+
+    names = []
+    for candidate in candidates:
+        name = str(getattr(candidate, attribute, ''))
+        if not name or name in names:
+            continue
+        name = name.replace('\n', r'\n').replace('\r', r'\r')
+        if len(name) > DIAGNOSTIC_NAME_LENGTH:
+            name = name[:DIAGNOSTIC_NAME_LENGTH - 3] + '...'
+        names.append(name)
+        if len(names) >= limit:
+            break
+    return tuple(names)
+
+
+def _not_found_reason(candidates: Any, name_attribute: str) -> str:
+    """Distinguish an absent target from a bridge that omitted all names."""
+    found_candidate = False
+    for candidate in candidates:
+        found_candidate = True
+        if str(getattr(candidate, name_attribute, '')).strip():
+            return 'entity_not_found'
+    if found_candidate:
+        return 'entity_names_unavailable'
+    return 'entity_not_found'
 
 
 def extract_entity_pose(
@@ -45,7 +107,7 @@ def extract_entity_pose(
             pose.position = position
             pose.orientation = orientation
             return pose, None
-        return None, 'entity_not_found'
+        return None, _not_found_reason(poses, 'name')
 
     transforms = getattr(message, 'transforms', None)
     if transforms is not None:
@@ -66,7 +128,7 @@ def extract_entity_pose(
             pose.position.z = translation.z
             pose.orientation = rotation
             return pose, None
-        return None, 'entity_not_found'
+        return None, _not_found_reason(transforms, 'child_frame_id')
 
     return None, 'unsupported_pose_structure'
 
@@ -131,7 +193,8 @@ class GazeboEntityPoseObserverNode(Node):
             'Gazebo entity pose observer configured: '
             f'entity={self._entity}, source={self._source_topic}, '
             f'input_type={INPUT_MESSAGE_NAME}, output={self._output_topic}, '
-            f'world_frame={self._world_frame}, simulated_only=true, '
+            f'world_frame={self._world_frame}, '
+            f'exact_match={self._exact_match}, simulated_only=true, '
             'real_hardware=false')
 
     def _validate_parameters(self) -> None:
@@ -159,7 +222,15 @@ class GazeboEntityPoseObserverNode(Node):
             message, self._entity, self._exact_match)
         if pose is None:
             self._latest_pose = None
-            self._publish_skipped(reason or 'unsupported_pose_structure')
+            failure_reason = reason or 'unsupported_pose_structure'
+            names = candidate_entity_names(message)
+            self.get_logger().warning(
+                'Gazebo entity pose extraction skipped: '
+                f'reason={failure_reason}, entity={self._entity}, '
+                f'source={self._source_topic}, candidate_names={names}.',
+                throttle_duration_sec=5.0,
+            )
+            self._publish_skipped(failure_reason)
             return
         self._latest_pose = pose
         self._publish_pose()

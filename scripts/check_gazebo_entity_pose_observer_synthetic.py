@@ -10,6 +10,7 @@ import rclpy
 from geometry_msgs.msg import PoseStamped
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Bool, String
 
@@ -48,7 +49,9 @@ class Fixture(Node):
         message = INPUT_MESSAGE_TYPE()
         if hasattr(message, 'pose'):
             candidate = message.pose.add()
-            candidate.name = 'target_object'
+            candidate.name = (
+                'world::adaptive_assembly_physical_workcell::target_object'
+            )
             candidate.position.x = 0.41
             candidate.position.y = -0.12
             candidate.position.z = 0.73
@@ -57,7 +60,9 @@ class Fixture(Node):
         else:
             from geometry_msgs.msg import TransformStamped
             candidate = TransformStamped()
-            candidate.child_frame_id = 'target_object'
+            candidate.child_frame_id = (
+                'world/adaptive_assembly_physical_workcell/model/target_object'
+            )
             candidate.transform.translation.x = 0.41
             candidate.transform.translation.y = -0.12
             candidate.transform.translation.z = 0.73
@@ -69,7 +74,9 @@ class Fixture(Node):
 
 def main() -> int:
     rclpy.init()
-    observer = GazeboEntityPoseObserverNode()
+    observer = GazeboEntityPoseObserverNode(parameter_overrides=[
+        Parameter('require_model_name_match', value=False),
+    ])
     fixture = Fixture()
     executor = SingleThreadedExecutor()
     executor.add_node(observer)
@@ -110,7 +117,10 @@ def main() -> int:
             for actual, expected_value in zip(values, wanted)):
         print(f'FAIL: output pose does not match synthetic input: {pose}')
         return 1
-    print('PASS: synthetic Gazebo entity pose produced matching observer output')
+    print(
+        'PASS: scoped synthetic Gazebo entity pose produced matching '
+        'observer output'
+    )
     return 0
 
 

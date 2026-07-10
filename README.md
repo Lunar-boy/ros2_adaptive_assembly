@@ -152,7 +152,21 @@ ros2 launch adaptive_assembly_bringup adaptive_assembly_full_physical_pick_place
 
 This full physical demo remains simulator-only. It uses Gazebo
 `gz_ros2_control` as the only controller provider and starts MoveIt planning
-without the standard Panda fake-control demo.
+without the standard Panda fake-control demo. Its target-pose observer accepts
+Gazebo scoped entity names through the physical-launch default
+`require_target_entity_exact_match:=false`; the standalone observer remains
+strict by default.
+
+To inspect the pose and preflight gates:
+
+```bash
+ros2 topic echo /gazebo_target_object_pose_status --once
+ros2 topic echo /gazebo_target_object_pose_available --once
+ros2 topic echo /physical_grasp_preflight_status --once
+```
+
+Executor failures retain `reason=physical_grasp_preflight_failed` and add the
+concrete cause as `preflight_reason=<reason>`.
 
 To save terminal output from each full physical pick-place simulation attempt,
 use the manual run logging wrapper:
