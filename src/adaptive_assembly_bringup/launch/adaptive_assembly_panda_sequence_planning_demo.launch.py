@@ -20,6 +20,9 @@ def generate_launch_description() -> LaunchDescription:
     params_file = LaunchConfiguration('params_file')
     use_standard_panda_demo = LaunchConfiguration('use_standard_panda_demo')
     use_sim_time = LaunchConfiguration('use_sim_time')
+    launch_fake_object_pose_node = LaunchConfiguration(
+        'launch_fake_object_pose_node'
+    )
     use_dynamic_target_scene = LaunchConfiguration('use_dynamic_target_scene')
     use_planning_scene_audit = LaunchConfiguration('use_planning_scene_audit')
     planning_scene_audit_expected_object_ids = LaunchConfiguration(
@@ -108,6 +111,13 @@ def generate_launch_description() -> LaunchDescription:
             description='Use simulation time when an upstream simulator provides /clock.',
         ),
         DeclareLaunchArgument(
+            'launch_fake_object_pose_node',
+            default_value='true',
+            description=(
+                'Whether the adaptive pipeline starts fake perception.'
+            ),
+        ),
+        DeclareLaunchArgument(
             'use_planning_scene_audit',
             default_value='true',
             description='Whether to include the read-only PlanningScene audit.',
@@ -185,6 +195,7 @@ def generate_launch_description() -> LaunchDescription:
                 'params_file': params_file,
                 'use_standard_panda_demo': use_standard_panda_demo,
                 'use_sim_time': use_sim_time,
+                'launch_fake_object_pose_node': launch_fake_object_pose_node,
                 'use_dynamic_target_scene': use_dynamic_target_scene,
                 'use_planning_scene_audit': use_planning_scene_audit,
                 'planning_scene_audit_expected_object_ids': (

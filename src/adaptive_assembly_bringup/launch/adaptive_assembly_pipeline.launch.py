@@ -8,6 +8,7 @@ benchmark parameter profiles.
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.actions import LogInfo
+from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch.substitutions import PathJoinSubstitution
 from launch_ros.actions import Node
@@ -24,6 +25,9 @@ def generate_launch_description() -> LaunchDescription:
     ])
     params_file = LaunchConfiguration('params_file')
     use_sim_time = LaunchConfiguration('use_sim_time')
+    launch_fake_object_pose_node = LaunchConfiguration(
+        'launch_fake_object_pose_node'
+    )
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -36,15 +40,24 @@ def generate_launch_description() -> LaunchDescription:
             default_value='false',
             description='Use simulation time when an upstream simulator provides /clock.',
         ),
+        DeclareLaunchArgument(
+            'launch_fake_object_pose_node',
+            default_value='true',
+            description=(
+                'Start deterministic fake perception. Disable only when an '
+                'external source publishes /target_pose.'
+            ),
+        ),
         LogInfo(
             msg='Launching non-MoveIt adaptive assembly pipeline: '
-            'fake perception + task pose generation.'
+            'optional fake perception + task pose generation.'
         ),
         Node(
             package='adaptive_assembly_perception',
             executable='fake_object_pose_node',
             name='fake_object_pose_node',
             output='screen',
+            condition=IfCondition(launch_fake_object_pose_node),
             parameters=[
                 params_file,
                 {'use_sim_time': ParameterValue(use_sim_time, value_type=bool)},

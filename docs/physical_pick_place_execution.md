@@ -132,6 +132,33 @@ provider. The nested Panda planning launch is run with
 not include `moveit_resources_panda_moveit_config/launch/demo.launch.py`, the
 MoveIt resources fake `ros2_control_node`, or fake Panda controller spawners.
 
+It also sets `launch_fake_object_pose_node:=false`. The retained
+`gazebo_entity_pose_observer_node` publishes the real dynamic `target_object`
+model-center pose on `/gazebo_target_object_pose`, and
+`gazebo_target_pose_adapter_node` publishes the task input on `/target_pose`.
+The adapter preserves XY and orientation and adds
+`target_reference_z_offset:=0.05` to Z. This documented default converts the
+center of the `0.10 m` Gazebo cylinder to its top/reference pose. The adapter
+does not synthesize a target before an observation arrives. Its
+`output_frame_id:=world` setting overrides only the frame label and does not
+perform a TF transform.
+
+Ordinary and plan-only demos retain `launch_fake_object_pose_node:=true` and
+therefore keep their existing deterministic fake-perception behavior. In the
+full physical launch, inverse fake-source and adapter conditions ensure that
+only one intended publisher supplies `/target_pose`.
+
+For a running full physical demo, inspect the source relationship with:
+
+```bash
+ros2 topic info -v /target_pose
+ros2 topic echo /gazebo_target_object_pose --once
+ros2 topic echo /target_pose --once
+```
+
+The expected relationship is equal X/Y and
+`target_pose.z = gazebo_target_object_pose.z + target_reference_z_offset`.
+
 The full entry point defaults to `use_sim_time:=true` and expects the `/clock`
 bridge from Gazebo. This typed Boolean value is propagated to the direct
 `move_group`, sequence planner, timestamped-pose pipeline, pose adapters, and

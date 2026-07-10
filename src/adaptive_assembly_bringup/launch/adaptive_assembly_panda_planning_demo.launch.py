@@ -26,6 +26,9 @@ def generate_launch_description() -> LaunchDescription:
     params_file = LaunchConfiguration('params_file')
     use_standard_panda_demo = LaunchConfiguration('use_standard_panda_demo')
     use_sim_time = LaunchConfiguration('use_sim_time')
+    launch_fake_object_pose_node = LaunchConfiguration(
+        'launch_fake_object_pose_node'
+    )
     use_dynamic_target_scene = LaunchConfiguration('use_dynamic_target_scene')
     use_planning_scene_audit = LaunchConfiguration('use_planning_scene_audit')
     planning_scene_audit_expected_object_ids = LaunchConfiguration(
@@ -98,6 +101,13 @@ def generate_launch_description() -> LaunchDescription:
             'use_sim_time',
             default_value='false',
             description='Use simulation time when an upstream simulator provides /clock.',
+        ),
+        DeclareLaunchArgument(
+            'launch_fake_object_pose_node',
+            default_value='true',
+            description=(
+                'Whether the adaptive pipeline starts fake perception.'
+            ),
         ),
         DeclareLaunchArgument(
             'use_planning_scene_audit',
@@ -180,8 +190,8 @@ def generate_launch_description() -> LaunchDescription:
             description='Minimum allowed quaternion norm when guard is enabled.',
         ),
         LogInfo(
-            msg='Launching adaptive assembly Panda planning demo: fake '
-            'perception, task pose generation, Panda MoveIt2 planning, '
+            msg='Launching adaptive assembly Panda planning demo: configurable '
+            'target pose source, task pose generation, Panda MoveIt2 planning, '
             'static PlanningScene collision objects, Panda pre-grasp pose '
             'adapter, dynamic target collision object, read-only PlanningScene '
             'audit, and plan-only planning bridge. use_dynamic_target_scene '
@@ -201,6 +211,7 @@ def generate_launch_description() -> LaunchDescription:
                 'params_file': params_file,
                 'use_standard_panda_demo': use_standard_panda_demo,
                 'use_sim_time': use_sim_time,
+                'launch_fake_object_pose_node': launch_fake_object_pose_node,
             }.items(),
         ),
         IncludeLaunchDescription(

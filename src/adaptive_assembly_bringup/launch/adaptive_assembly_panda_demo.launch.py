@@ -29,6 +29,9 @@ def generate_launch_description() -> LaunchDescription:
     params_file = LaunchConfiguration('params_file')
     use_standard_panda_demo = LaunchConfiguration('use_standard_panda_demo')
     use_sim_time = LaunchConfiguration('use_sim_time')
+    launch_fake_object_pose_node = LaunchConfiguration(
+        'launch_fake_object_pose_node'
+    )
     panda_demo_launch = PathJoinSubstitution([
         FindPackageShare('moveit_resources_panda_moveit_config'),
         'launch',
@@ -118,15 +121,23 @@ def generate_launch_description() -> LaunchDescription:
                 'The standard fake-control demo remains wall-time by default.'
             ),
         ),
+        DeclareLaunchArgument(
+            'launch_fake_object_pose_node',
+            default_value='true',
+            description=(
+                'Whether the adaptive pipeline starts fake perception.'
+            ),
+        ),
         LogInfo(
-            msg='Launching adaptive assembly Panda demo: fake perception, '
-            'task pose generation, and Panda MoveIt2 planning.'
+            msg='Launching adaptive assembly Panda demo: configurable target '
+            'pose source, task pose generation, and Panda MoveIt2 planning.'
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(adaptive_pipeline_launch),
             launch_arguments={
                 'params_file': params_file,
                 'use_sim_time': use_sim_time,
+                'launch_fake_object_pose_node': launch_fake_object_pose_node,
             }.items(),
         ),
         IncludeLaunchDescription(
