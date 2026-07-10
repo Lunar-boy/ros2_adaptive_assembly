@@ -43,6 +43,7 @@ def main() -> int:
         'right_contact_topic_unobserved',
         'contact_status_topic_unobserved',
         'event={event};mode={MODE}',
+        'Physical grasp preflight failed:',
         'simulated_only=true;real_hardware=false',
     ]
     for token in required_source_tokens:

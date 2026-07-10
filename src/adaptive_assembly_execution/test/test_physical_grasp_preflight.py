@@ -1,6 +1,7 @@
 """Tests for physical grasp preflight parsing and executor gating."""
 
 import time
+from unittest.mock import patch
 
 from adaptive_assembly_execution.physical_grasp_preflight_node import (
     bool_text,
@@ -96,15 +97,45 @@ def test_executor_fails_on_physical_grasp_preflight_failure():
         message = String()
         message.data = (
             'event=failure;mode=physical_grasp_preflight;'
-            'reason=kinematic_attach_node_active;'
+            'reason=object_pose_unavailable;'
             'simulated_only=true;real_hardware=false'
         )
-        node._physical_grasp_preflight_status_callback(message)
+        with patch.object(
+            node,
+            '_publish_final_result',
+            wraps=node._publish_final_result,
+        ) as publish_result:
+            node._physical_grasp_preflight_status_callback(message)
 
         assert node._started is False
         assert node._completed is True
         assert node._state == 'FAILURE'
-        assert node._preflight_failure_reason == 'kinematic_attach_node_active'
+        assert node._preflight_failure_reason == 'object_pose_unavailable'
+        terminal_fields = parse_status(publish_result.call_args.args[1])
+        assert terminal_fields['reason'] == 'physical_grasp_preflight_failed'
+        assert terminal_fields['preflight_reason'] == 'object_pose_unavailable'
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+def test_executor_starts_after_physical_grasp_preflight_success():
+    """Allow normal sequence startup after all prerequisites are ready."""
+    node = _make_executor(require_preflight=True)
+    try:
+        _ready_executor(node)
+        node._try_start_sequence()
+        message = String()
+        message.data = (
+            'event=success;mode=physical_grasp_preflight;reason=ok;'
+            'simulated_only=true;real_hardware=false'
+        )
+        node._physical_grasp_preflight_status_callback(message)
+
+        assert node._preflight_success is True
+        assert node._started is True
+        assert node._completed is True
+        assert node._state == 'SUCCESS'
     finally:
         node.destroy_node()
         rclpy.shutdown()

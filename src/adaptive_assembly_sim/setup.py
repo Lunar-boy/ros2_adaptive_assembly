@@ -38,6 +38,11 @@ setup(
     maintainer_email='chunzhi.wu@mailbox.tu-dresden.de',
     description='Gazebo workcell assets and launch files for adaptive assembly.',
     license='Apache-2.0',
+    extras_require={
+        'test': [
+            'pytest',
+        ],
+    },
     entry_points={
         'console_scripts': [
             'gazebo_target_pose_sync_node = '
