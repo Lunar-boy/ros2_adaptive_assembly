@@ -27,6 +27,7 @@ def generate_launch_description() -> LaunchDescription:
     require_place_sequence = LaunchConfiguration('require_place_sequence')
     trajectory_status_topic = LaunchConfiguration('trajectory_status_topic')
     start_state_mode = LaunchConfiguration('start_state_mode')
+    use_sim_time = LaunchConfiguration('use_sim_time')
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -122,6 +123,11 @@ def generate_launch_description() -> LaunchDescription:
                 "Pre-grasp start state source: 'current' or deterministic 'fixed'."
             ),
         ),
+        DeclareLaunchArgument(
+            'use_sim_time',
+            default_value='false',
+            description='Use simulation time when an upstream simulator provides /clock.',
+        ),
         Node(
             package='adaptive_assembly_planning',
             executable='assembly_sequence_planning_node',
@@ -185,6 +191,7 @@ def generate_launch_description() -> LaunchDescription:
                     value_type=float,
                 ),
                 'start_state_mode': start_state_mode,
+                'use_sim_time': ParameterValue(use_sim_time, value_type=bool),
             }],
         ),
     ])

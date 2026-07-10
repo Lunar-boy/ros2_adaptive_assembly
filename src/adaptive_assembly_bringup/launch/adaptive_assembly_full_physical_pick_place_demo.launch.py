@@ -27,6 +27,7 @@ def generate_launch_description() -> LaunchDescription:
 
     world = LaunchConfiguration('world')
     enable_arm_collisions = LaunchConfiguration('enable_arm_collisions')
+    use_sim_time = LaunchConfiguration('use_sim_time')
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -42,12 +43,21 @@ def generate_launch_description() -> LaunchDescription:
                 'finger contact path.'
             ),
         ),
+        DeclareLaunchArgument(
+            'use_sim_time',
+            default_value='true',
+            description=(
+                'Use the Gazebo /clock time domain for the physical demo. '
+                'The Gazebo clock bridge is required.'
+            ),
+        ),
         LogInfo(msg=(
             'Launching simulator-only full physical pick-place demo with '
             'adaptive_assembly_physical_workcell.sdf, '
             'world_name=adaptive_assembly_physical_workcell, and '
             'enable_arm_collisions=true by default. This path is separate '
-            'from the kinematic attach visual demo.'
+            'from the kinematic attach visual demo. Simulation time is '
+            'enabled by default; /clock is expected from Gazebo.'
         )),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(sim_launch),
@@ -61,6 +71,7 @@ def generate_launch_description() -> LaunchDescription:
             PythonLaunchDescriptionSource(execution_launch),
             launch_arguments={
                 'use_standard_panda_demo': 'false',
+                'use_sim_time': use_sim_time,
             }.items(),
         ),
     ])
