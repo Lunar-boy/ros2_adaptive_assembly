@@ -9,6 +9,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch.substitutions import PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 from moveit_configs_utils import MoveItConfigsBuilder
 
@@ -27,6 +28,7 @@ def generate_launch_description() -> LaunchDescription:
     ])
     params_file = LaunchConfiguration('params_file')
     use_standard_panda_demo = LaunchConfiguration('use_standard_panda_demo')
+    use_sim_time = LaunchConfiguration('use_sim_time')
     panda_demo_launch = PathJoinSubstitution([
         FindPackageShare('moveit_resources_panda_moveit_config'),
         'launch',
@@ -108,13 +110,24 @@ def generate_launch_description() -> LaunchDescription:
                 '/controller_manager through gz_ros2_control.'
             ),
         ),
+        DeclareLaunchArgument(
+            'use_sim_time',
+            default_value='false',
+            description=(
+                'Use ROS simulation time for the direct Gazebo MoveIt path. '
+                'The standard fake-control demo remains wall-time by default.'
+            ),
+        ),
         LogInfo(
             msg='Launching adaptive assembly Panda demo: fake perception, '
             'task pose generation, and Panda MoveIt2 planning.'
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(adaptive_pipeline_launch),
-            launch_arguments={'params_file': params_file}.items(),
+            launch_arguments={
+                'params_file': params_file,
+                'use_sim_time': use_sim_time,
+            }.items(),
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(panda_demo_launch),
@@ -129,6 +142,7 @@ def generate_launch_description() -> LaunchDescription:
             parameters=[
                 moveit_config.to_dict(),
                 gazebo_controller_parameters,
+                {'use_sim_time': ParameterValue(use_sim_time, value_type=bool)},
             ],
             arguments=['--ros-args', '--log-level', 'info'],
         ),

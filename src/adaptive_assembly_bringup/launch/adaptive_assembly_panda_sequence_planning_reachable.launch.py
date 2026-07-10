@@ -28,6 +28,7 @@ def generate_launch_description() -> LaunchDescription:
         'pre_grasp_trajectory_topic'
     )
     use_standard_panda_demo = LaunchConfiguration('use_standard_panda_demo')
+    use_sim_time = LaunchConfiguration('use_sim_time')
     assembly_trajectory_topic = LaunchConfiguration(
         'assembly_trajectory_topic'
     )
@@ -55,6 +56,11 @@ def generate_launch_description() -> LaunchDescription:
             ),
         ),
         DeclareLaunchArgument(
+            'use_sim_time',
+            default_value='false',
+            description='Use simulation time when an upstream simulator provides /clock.',
+        ),
+        DeclareLaunchArgument(
             'use_planning_scene_audit',
             default_value='true',
             description='Whether to include the read-only scene audit.',
@@ -69,6 +75,7 @@ def generate_launch_description() -> LaunchDescription:
             launch_arguments={
                 'params_file': reachable_params,
                 'use_standard_panda_demo': use_standard_panda_demo,
+                'use_sim_time': use_sim_time,
                 'use_dynamic_target_scene': 'false',
                 'planning_scene_audit_expected_object_ids': (
                     'work_table,target_support'

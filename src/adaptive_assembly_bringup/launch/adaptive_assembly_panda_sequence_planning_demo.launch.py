@@ -19,6 +19,7 @@ def generate_launch_description() -> LaunchDescription:
     ])
     params_file = LaunchConfiguration('params_file')
     use_standard_panda_demo = LaunchConfiguration('use_standard_panda_demo')
+    use_sim_time = LaunchConfiguration('use_sim_time')
     use_dynamic_target_scene = LaunchConfiguration('use_dynamic_target_scene')
     use_planning_scene_audit = LaunchConfiguration('use_planning_scene_audit')
     planning_scene_audit_expected_object_ids = LaunchConfiguration(
@@ -54,15 +55,15 @@ def generate_launch_description() -> LaunchDescription:
         'assembly_sequence_planning.launch.py',
     ])
     grasp_adapter = PathJoinSubstitution([
-    FindPackageShare('adaptive_assembly_planning'),
-    'launch',
-    'panda_grasp_pose_adapter.launch.py',
+        FindPackageShare('adaptive_assembly_planning'),
+        'launch',
+        'panda_grasp_pose_adapter.launch.py',
     ])
 
     lift_adapter = PathJoinSubstitution([
-    FindPackageShare('adaptive_assembly_planning'),
-    'launch',
-    'panda_lift_pose_adapter.launch.py',
+        FindPackageShare('adaptive_assembly_planning'),
+        'launch',
+        'panda_lift_pose_adapter.launch.py',
     ])
 
     pre_place_adapter = PathJoinSubstitution([
@@ -82,8 +83,6 @@ def generate_launch_description() -> LaunchDescription:
         'launch',
         'panda_retreat_pose_adapter.launch.py',
     ])
-
-
     return LaunchDescription([
         DeclareLaunchArgument(
             'params_file',
@@ -102,6 +101,11 @@ def generate_launch_description() -> LaunchDescription:
                 'Whether the nested Panda planning demo uses the standard '
                 'fake-control MoveIt demo.'
             ),
+        ),
+        DeclareLaunchArgument(
+            'use_sim_time',
+            default_value='false',
+            description='Use simulation time when an upstream simulator provides /clock.',
         ),
         DeclareLaunchArgument(
             'use_planning_scene_audit',
@@ -180,6 +184,7 @@ def generate_launch_description() -> LaunchDescription:
             launch_arguments={
                 'params_file': params_file,
                 'use_standard_panda_demo': use_standard_panda_demo,
+                'use_sim_time': use_sim_time,
                 'use_dynamic_target_scene': use_dynamic_target_scene,
                 'use_planning_scene_audit': use_planning_scene_audit,
                 'planning_scene_audit_expected_object_ids': (
@@ -192,6 +197,7 @@ def generate_launch_description() -> LaunchDescription:
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(assembly_adapter),
+            launch_arguments={'use_sim_time': use_sim_time}.items(),
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(sequence_planner),
@@ -207,11 +213,27 @@ def generate_launch_description() -> LaunchDescription:
                 'assembly_trajectory_topic': assembly_trajectory_topic,
                 'trajectory_status_topic': trajectory_status_topic,
                 'start_state_mode': start_state_mode,
+                'use_sim_time': use_sim_time,
             }.items(),
         ),
-        IncludeLaunchDescription(PythonLaunchDescriptionSource(grasp_adapter)),
-        IncludeLaunchDescription(PythonLaunchDescriptionSource(lift_adapter)),
-        IncludeLaunchDescription(PythonLaunchDescriptionSource(pre_place_adapter)),
-        IncludeLaunchDescription(PythonLaunchDescriptionSource(place_adapter)),
-        IncludeLaunchDescription(PythonLaunchDescriptionSource(retreat_adapter)),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(grasp_adapter),
+            launch_arguments={'use_sim_time': use_sim_time}.items(),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(lift_adapter),
+            launch_arguments={'use_sim_time': use_sim_time}.items(),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(pre_place_adapter),
+            launch_arguments={'use_sim_time': use_sim_time}.items(),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(place_adapter),
+            launch_arguments={'use_sim_time': use_sim_time}.items(),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(retreat_adapter),
+            launch_arguments={'use_sim_time': use_sim_time}.items(),
+        ),
     ])

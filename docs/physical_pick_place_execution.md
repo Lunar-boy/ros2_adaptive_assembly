@@ -132,6 +132,24 @@ provider. The nested Panda planning launch is run with
 not include `moveit_resources_panda_moveit_config/launch/demo.launch.py`, the
 MoveIt resources fake `ros2_control_node`, or fake Panda controller spawners.
 
+The full entry point defaults to `use_sim_time:=true` and expects the `/clock`
+bridge from Gazebo. This typed Boolean value is propagated to the direct
+`move_group`, sequence planner, timestamped-pose pipeline, pose adapters, and
+physical execution, observation, contact, preflight, and verification nodes.
+This keeps MoveIt's current-state freshness checks in the same time domain as
+Gazebo `/joint_states`. Reusable plan-only launches keep `use_sim_time:=false`
+by default and therefore do not require a `/clock` publisher.
+
+For a running full physical demo, confirm the shared time domain with:
+
+```bash
+ros2 topic echo /clock --once
+ros2 param get /move_group use_sim_time
+ros2 param get /assembly_sequence_planning_node use_sim_time
+ros2 param get /physical_pick_place_executor_node use_sim_time
+ros2 param get /physical_target_object_pose_observer use_sim_time
+```
+
 For a message-only executor dry run, provide trajectories and joint states with
 the validation script:
 

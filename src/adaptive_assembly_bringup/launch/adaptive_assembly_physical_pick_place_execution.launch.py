@@ -48,6 +48,7 @@ def generate_launch_description() -> LaunchDescription:
         'launch_physical_grasp_preflight'
     )
     use_standard_panda_demo = LaunchConfiguration('use_standard_panda_demo')
+    use_sim_time = LaunchConfiguration('use_sim_time')
 
     reachable_sequence_launch = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_bringup'),
@@ -110,6 +111,7 @@ def generate_launch_description() -> LaunchDescription:
         'launch_object_pose_observer': 'true',
         'launch_physical_grasp_preflight': 'true',
         'use_standard_panda_demo': 'false',
+        'use_sim_time': 'false',
         'require_physical_grasp_preflight': 'true',
         'require_grasp_verification': 'true',
         'require_lift_verification': 'true',
@@ -191,8 +193,10 @@ def generate_launch_description() -> LaunchDescription:
             'pose_stale_timeout_sec',
         )
     })
+    executor_parameters['use_sim_time'] = _typed_value('use_sim_time', bool)
 
     preflight_parameters = {
+        'use_sim_time': _typed_value('use_sim_time', bool),
         'pose_info_topic': LaunchConfiguration('pose_info_topic'),
         'object_pose_available_topic': LaunchConfiguration(
             'object_pose_available_topic'
@@ -225,6 +229,7 @@ def generate_launch_description() -> LaunchDescription:
         )
     }
     contact_status_parameters.update({
+        'use_sim_time': _typed_value('use_sim_time', bool),
         'contact_stale_timeout_sec': _typed_value(
             'contact_stale_timeout_sec', float
         ),
@@ -252,6 +257,7 @@ def generate_launch_description() -> LaunchDescription:
         )
     }
     verifier_parameters.update({
+        'use_sim_time': _typed_value('use_sim_time', bool),
         'require_both_contacts': _typed_value('require_both_contacts', bool),
         'require_gripper_closed': _typed_value('require_gripper_closed', bool),
         'require_object_pose': _typed_value('require_object_pose', bool),
@@ -298,6 +304,7 @@ def generate_launch_description() -> LaunchDescription:
                     'retreat_trajectory_topic'
                 ),
                 'use_standard_panda_demo': use_standard_panda_demo,
+                'use_sim_time': use_sim_time,
             }.items(),
         ),
         Node(
@@ -307,6 +314,7 @@ def generate_launch_description() -> LaunchDescription:
             output='screen',
             condition=IfCondition(launch_gripper_bridge),
             parameters=[{
+                'use_sim_time': _typed_value('use_sim_time', bool),
                 'command_topic': LaunchConfiguration('gripper_command_topic'),
                 'status_topic': LaunchConfiguration('gripper_status_topic'),
                 'success_topic': LaunchConfiguration('gripper_success_topic'),
@@ -352,6 +360,7 @@ def generate_launch_description() -> LaunchDescription:
             output='screen',
             condition=IfCondition(launch_object_pose_observer),
             parameters=[{
+                'use_sim_time': _typed_value('use_sim_time', bool),
                 'pose_info_topic': LaunchConfiguration('pose_info_topic'),
                 'target_entity_name': LaunchConfiguration('target_object_name'),
                 'world_frame': 'world',
