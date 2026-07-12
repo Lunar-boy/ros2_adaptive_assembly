@@ -58,6 +58,12 @@ def generate_launch_description() -> LaunchDescription:
         'launch',
         'adaptive_assembly_panda_sequence_planning_reachable.launch.py',
     ])
+    physical_params_file = PathJoinSubstitution([
+        FindPackageShare('adaptive_assembly_bringup'),
+        'config',
+        'adaptive_assembly_physical_pick_place_params.yaml',
+    ])
+    params_file = LaunchConfiguration('params_file')
 
     string_arguments = {
         'stage_names': 'pre_grasp,grasp,lift,pre_place,place,retreat',
@@ -148,6 +154,14 @@ def generate_launch_description() -> LaunchDescription:
         default_value='true',
         description=(
             'Whether the nested adaptive pipeline starts fake perception.'
+        ),
+    ))
+    declarations.append(DeclareLaunchArgument(
+        'params_file',
+        default_value=physical_params_file,
+        description=(
+            'Task parameter YAML for physical pick-place placement at the '
+            'Gazebo assembly socket.'
         ),
     ))
 
@@ -316,6 +330,7 @@ def generate_launch_description() -> LaunchDescription:
                 'use_standard_panda_demo': use_standard_panda_demo,
                 'use_sim_time': use_sim_time,
                 'launch_fake_object_pose_node': launch_fake_object_pose_node,
+                'params_file': params_file,
             }.items(),
         ),
         Node(

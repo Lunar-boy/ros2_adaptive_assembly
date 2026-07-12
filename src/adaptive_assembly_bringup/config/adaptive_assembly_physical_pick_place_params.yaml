@@ -1,0 +1,33 @@
+# Physical Gazebo pick-place profile. The socket fixture in
+# adaptive_assembly_physical_workcell.sdf is centered at (0.62, -0.18, 0.0).
+fake_object_pose_node:
+  ros__parameters:
+    publish_period_sec: 5.0
+    x_min: 0.442
+    x_max: 0.442
+    y_min: 0.148
+    y_max: 0.148
+    z: 0.15
+    random_seed: 42
+    frame_id: world
+    target_frame_id: target_object
+    yaw_min: 0.0
+    yaw_max: 0.0
+    publish_immediately: true
+
+assembly_task_node:
+  ros__parameters:
+    pre_grasp_height_offset: 0.20
+    grasp_height_offset: 0.05
+    lift_height_offset: 0.20
+    assembly_height_offset: 0.05
+    replan_distance_threshold: 0.03
+    pre_place_height_offset: 0.20
+    place_height_offset: 0.00
+    retreat_height_offset: 0.20
+    assembly_pose_mode: fixed_socket
+    socket_x: 0.62
+    socket_y: -0.18
+    socket_z: 0.10
+    socket_yaw: 0.0
+    socket_frame_id: world

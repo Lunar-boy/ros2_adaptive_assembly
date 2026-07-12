@@ -30,8 +30,14 @@ def generate_launch_description() -> LaunchDescription:
         'launch',
         'gazebo_target_pose_adapter.launch.py',
     ])
+    physical_params_file = PathJoinSubstitution([
+        FindPackageShare('adaptive_assembly_bringup'),
+        'config',
+        'adaptive_assembly_physical_pick_place_params.yaml',
+    ])
 
     world = LaunchConfiguration('world')
+    params_file = LaunchConfiguration('params_file')
     enable_arm_collisions = LaunchConfiguration('enable_arm_collisions')
     use_sim_time = LaunchConfiguration('use_sim_time')
     launch_fake_object_pose_node = LaunchConfiguration(
@@ -49,6 +55,14 @@ def generate_launch_description() -> LaunchDescription:
             'world',
             default_value=default_world,
             description='Physical Gazebo SDF workcell for contact verification.',
+        ),
+        DeclareLaunchArgument(
+            'params_file',
+            default_value=physical_params_file,
+            description=(
+                'Task parameter YAML for the physical pick-place demo. The '
+                'default places objects at the physical Gazebo socket.'
+            ),
         ),
         DeclareLaunchArgument(
             'enable_arm_collisions',
@@ -125,6 +139,7 @@ def generate_launch_description() -> LaunchDescription:
                 'use_standard_panda_demo': 'false',
                 'use_sim_time': use_sim_time,
                 'launch_fake_object_pose_node': launch_fake_object_pose_node,
+                'params_file': params_file,
             }.items(),
         ),
     ])
