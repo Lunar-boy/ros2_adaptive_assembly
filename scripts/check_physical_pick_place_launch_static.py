@@ -63,6 +63,7 @@ def main() -> int:
         'use_standard_panda_demo',
         "'use_standard_panda_demo': 'false'",
         "'require_target_entity_exact_match': 'false'",
+        "'send_arm_goals': 'true'",
         "'launch_fake_object_pose_node': launch_fake_object_pose_node",
         "default_value='false'",
         'gazebo_target_pose_adapter.launch.py',
@@ -72,6 +73,10 @@ def main() -> int:
         'UnlessCondition(launch_fake_object_pose_node)',
         "'require_model_name_match': _typed_value(",
         "'require_target_entity_exact_match', bool",
+        "'target_object_gazebo_pose_topic': '/model/target_object/pose'",
+        "'target_object_raw_pose_topic': (",
+        "'object_pose_topic': '/gazebo_target_object_pose'",
+        "'launch_object_pose_observer': launch_object_pose_observer",
     ]
     for token in required:
         if token not in text and token not in full_text:
@@ -108,6 +113,18 @@ def main() -> int:
     for token in forbidden:
         if token in text or token in full_text:
             failures.append(f'forbidden launch token present: {token}')
+
+    if "@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V" in text:
+        failures.append('physical SceneBroadcaster Pose_V bridge is present')
+    if text.count("'@geometry_msgs/msg/PoseStamped[gz.msgs.Pose'") != 1:
+        failures.append('expected exactly one dedicated target Pose bridge')
+    output_pose_source = (
+        "'output_pose_topic': LaunchConfiguration('object_pose_topic')"
+    )
+    if text.count(output_pose_source) != 1:
+        failures.append(
+            'expected exactly one /gazebo_target_object_pose observer source'
+        )
 
     if failures:
         print('FAIL physical pick-place launch static check')

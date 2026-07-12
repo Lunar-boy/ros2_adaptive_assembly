@@ -19,8 +19,8 @@ def _typed_value(name: str, value_type):
     return ParameterValue(LaunchConfiguration(name), value_type=value_type)
 
 
-def _warn_if_non_physical_pose_topic(context, *args, **kwargs):
-    """Warn when the physical launch is pointed at the static visual world."""
+def _warn_if_non_physical_world_marker(context, *args, **kwargs):
+    """Warn when preflight is not configured for the physical Gazebo world."""
     del args, kwargs
     pose_topic = LaunchConfiguration('pose_info_topic').perform(context)
     if 'adaptive_assembly_physical_workcell' in pose_topic:
@@ -28,10 +28,9 @@ def _warn_if_non_physical_pose_topic(context, *args, **kwargs):
     return [LogInfo(msg=(
         'WARNING: adaptive_assembly_physical_pick_place_execution.launch.py '
         'is configured with pose_info_topic=' + pose_topic + '. Physical '
-        'grasp verification must use '
-        '/world/adaptive_assembly_physical_workcell/pose/info from '
-        'adaptive_assembly_physical_workcell.sdf, not the static visual '
-        'adaptive_assembly_workcell.sdf.'
+        'preflight uses this value only as the physical-world identity '
+        'marker. Target-object pose transport comes exclusively from the '
+        'dedicated /model/target_object/pose bridge.'
     ))]
 
 
@@ -318,7 +317,7 @@ def generate_launch_description() -> LaunchDescription:
             'according to launch_contact_status_node and '
             'launch_grasp_verifier. Real hardware execution is unsupported.'
         )),
-        OpaqueFunction(function=_warn_if_non_physical_pose_topic),
+        OpaqueFunction(function=_warn_if_non_physical_world_marker),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(reachable_sequence_launch),
             condition=IfCondition(launch_reachable_sequence),

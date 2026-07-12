@@ -70,6 +70,12 @@ retreat poses use the assembly socket fixture at `(0.62, -0.18, 0.10)` from
 `adaptive_assembly_physical_workcell.sdf`. Other demos can continue using the
 default `target_offset` task mode.
 
+The physical profile keeps its `place` end-effector target `0.10 m` above the
+socket object target so the enabled Panda hand/finger collision geometry stays
+clear of the `0.095 m` socket walls during six-stage planning. This is a
+pre-insertion clearance pose for proving arm execution starts; it is not a
+claim that placement or insertion succeeds.
+
 For this full physical demo only, static MoveIt collision geometry is loaded
 from `config/physical_workcell_planning_scene.yaml`. Its table, target support,
 and socket boxes are derived from

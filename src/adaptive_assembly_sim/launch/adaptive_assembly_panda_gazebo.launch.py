@@ -79,6 +79,7 @@ def _launch_setup(context, *args, **kwargs):
     spawn_z = LaunchConfiguration('spawn_z')
     spawn_yaw = LaunchConfiguration('spawn_yaw')
     enable_arm_collisions = LaunchConfiguration('enable_arm_collisions')
+    use_sim_time = LaunchConfiguration('use_sim_time')
     controller_manager_name = LaunchConfiguration('controller_manager_name')
     world_name = LaunchConfiguration('world_name')
     controllers_file = os.path.join(
@@ -197,7 +198,9 @@ def _launch_setup(context, *args, **kwargs):
             output='screen',
             parameters=[{
                 'robot_description': robot_description,
-                'use_sim_time': True,
+                'use_sim_time': ParameterValue(
+                    use_sim_time, value_type=bool
+                ),
             }],
             remappings=[
                 ('/robot_description', '/gazebo_panda/robot_description'),
@@ -270,6 +273,11 @@ def generate_launch_description() -> LaunchDescription:
                 'Enable simplified Gazebo arm collision geometry. MoveIt '
                 'collision checking is configured separately.'
             ),
+        ),
+        DeclareLaunchArgument(
+            'use_sim_time',
+            default_value='true',
+            description='Use the bridged Gazebo clock for ROS nodes.',
         ),
         DeclareLaunchArgument(
             'world_name',

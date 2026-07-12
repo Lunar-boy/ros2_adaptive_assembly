@@ -85,6 +85,12 @@ def test_full_physical_launch_defaults_to_simulation_time():
         and 'use_sim_time' in arguments
         for arguments in include_arguments
     )
+    assert any(
+        arguments.get('world_name')
+        == 'adaptive_assembly_physical_workcell'
+        and 'use_sim_time' in arguments
+        for arguments in include_arguments
+    )
 
 
 def test_simulation_time_propagates_to_physical_execution_and_sequence():

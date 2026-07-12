@@ -714,6 +714,11 @@ class PhysicalPickPlaceExecutorNode(Node):
             return
 
         self._current_goal_handle = goal_handle
+        self._publish_stage_status(
+            f'event=accepted;mode={MODE};stage={stage};'
+            f'stage_index={self._current_stage_index};action=arm;'
+            'controller_goal_accepted=true;real_hardware=false'
+        )
         self._state = 'WAIT_ARM_RESULT'
         result_future = goal_handle.get_result_async()
         result_future.add_done_callback(

@@ -1,7 +1,11 @@
 """Launch the simulator-only full physical pick-place demo."""
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    LogInfo,
+)
 from launch.conditions import UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
@@ -42,11 +46,15 @@ def generate_launch_description() -> LaunchDescription:
     ])
 
     world = LaunchConfiguration('world')
+    gz_args = LaunchConfiguration('gz_args')
     params_file = LaunchConfiguration('params_file')
     enable_arm_collisions = LaunchConfiguration('enable_arm_collisions')
     use_sim_time = LaunchConfiguration('use_sim_time')
     launch_fake_object_pose_node = LaunchConfiguration(
         'launch_fake_object_pose_node'
+    )
+    launch_object_pose_observer = LaunchConfiguration(
+        'launch_object_pose_observer'
     )
     target_reference_z_offset = LaunchConfiguration(
         'target_reference_z_offset'
@@ -62,7 +70,17 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             'world',
             default_value=default_world,
-            description='Physical Gazebo SDF workcell for contact verification.',
+            description=(
+                'Physical Gazebo SDF workcell for contact verification.'
+            ),
+        ),
+        DeclareLaunchArgument(
+            'gz_args',
+            default_value=[world],
+            description=(
+                'Arguments passed to Gazebo Sim. Use "-s <world>" for a '
+                'server-only headless run.'
+            ),
         ),
         DeclareLaunchArgument(
             'params_file',
@@ -107,6 +125,14 @@ def generate_launch_description() -> LaunchDescription:
             ),
         ),
         DeclareLaunchArgument(
+            'launch_object_pose_observer',
+            default_value='true',
+            description=(
+                'Launch the one dedicated Gazebo target-object Pose bridge '
+                'and observer. Keep true for the full physical demo.'
+            ),
+        ),
+        DeclareLaunchArgument(
             'target_reference_z_offset',
             default_value='0.05',
             description=(
@@ -136,8 +162,10 @@ def generate_launch_description() -> LaunchDescription:
             PythonLaunchDescriptionSource(sim_launch),
             launch_arguments={
                 'world': world,
+                'gz_args': gz_args,
                 'world_name': 'adaptive_assembly_physical_workcell',
                 'enable_arm_collisions': enable_arm_collisions,
+                'use_sim_time': use_sim_time,
             }.items(),
         ),
         IncludeLaunchDescription(
@@ -157,6 +185,15 @@ def generate_launch_description() -> LaunchDescription:
                 'use_standard_panda_demo': 'false',
                 'use_sim_time': use_sim_time,
                 'launch_fake_object_pose_node': launch_fake_object_pose_node,
+                'launch_object_pose_observer': launch_object_pose_observer,
+                'target_object_gazebo_pose_topic': '/model/target_object/pose',
+                'target_object_raw_pose_topic': (
+                    '/gazebo_target_object_pose_raw'
+                ),
+                'object_pose_topic': '/gazebo_target_object_pose',
+                'object_pose_available_topic': (
+                    '/gazebo_target_object_pose_available'
+                ),
                 'params_file': params_file,
                 'static_planning_scene_params_file': (
                     static_planning_scene_params_file
