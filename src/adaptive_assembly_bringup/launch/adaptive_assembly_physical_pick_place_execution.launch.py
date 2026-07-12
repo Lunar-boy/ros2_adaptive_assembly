@@ -104,6 +104,8 @@ def generate_launch_description() -> LaunchDescription:
         'lift_verified_topic': '/lift_verified',
         'slip_distance_mm_topic': '/grasp_slip_distance_mm',
         'pose_info_topic': '/world/adaptive_assembly_physical_workcell/pose/info',
+        'target_object_gazebo_pose_topic': '/model/target_object/pose',
+        'target_object_raw_pose_topic': '/gazebo_target_object_pose_raw',
         'close_after_stage': 'grasp',
         'open_after_stage': 'place',
     }
@@ -308,6 +310,8 @@ def generate_launch_description() -> LaunchDescription:
             'This launch must be paired with '
             'adaptive_assembly_physical_workcell.sdf and '
             'pose_info_topic=/world/adaptive_assembly_physical_workcell/pose/info. '
+            'Target pose transport uses /model/target_object/pose as one '
+            'gz.msgs.Pose bridged to /gazebo_target_object_pose_raw. '
             'Do not use adaptive_assembly_workcell.sdf for physical grasp '
             'verification. '
             'Gazebo contact status and grasp/lift verification launch '
@@ -385,13 +389,17 @@ def generate_launch_description() -> LaunchDescription:
         Node(
             package='ros_gz_bridge',
             executable='parameter_bridge',
-            name='physical_workcell_pose_info_bridge',
+            name='physical_target_object_pose_bridge',
             output='screen',
             condition=IfCondition(launch_object_pose_observer),
             arguments=[[
-                LaunchConfiguration('pose_info_topic'),
-                '@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V',
+                LaunchConfiguration('target_object_gazebo_pose_topic'),
+                '@geometry_msgs/msg/PoseStamped[gz.msgs.Pose',
             ]],
+            remappings=[(
+                LaunchConfiguration('target_object_gazebo_pose_topic'),
+                LaunchConfiguration('target_object_raw_pose_topic'),
+            )],
         ),
         Node(
             package='adaptive_assembly_sim',
@@ -401,7 +409,10 @@ def generate_launch_description() -> LaunchDescription:
             condition=IfCondition(launch_object_pose_observer),
             parameters=[{
                 'use_sim_time': _typed_value('use_sim_time', bool),
-                'pose_info_topic': LaunchConfiguration('pose_info_topic'),
+                'pose_info_topic': LaunchConfiguration(
+                    'target_object_raw_pose_topic'
+                ),
+                'input_message_type': 'pose_stamped',
                 'target_entity_name': LaunchConfiguration('target_object_name'),
                 'world_frame': 'world',
                 'output_pose_topic': LaunchConfiguration('object_pose_topic'),

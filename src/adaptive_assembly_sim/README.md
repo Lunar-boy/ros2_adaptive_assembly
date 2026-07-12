@@ -29,6 +29,13 @@ Launch the achieved object pose observer independently:
 ros2 launch adaptive_assembly_sim gazebo_entity_pose_observer.launch.py
 ```
 
+The physical workcell attaches a bounded 30 Hz Gazebo `PosePublisher` directly
+to `target_object`. It publishes a single `gz.msgs.Pose` on
+`/model/target_object/pose`; the full physical launch bridges that to
+`/gazebo_target_object_pose_raw` as `geometry_msgs/msg/PoseStamped` and feeds
+the existing observer in its explicit `pose_stamped` input mode. Other demos
+keep the existing Pose_V/TFMessage name-matching mode.
+
 Adapt that observed model-center pose into the task pipeline independently:
 
 ```bash
@@ -110,8 +117,12 @@ python3 scripts/check_target_pose_to_gazebo_entity_consistency.py
 bash scripts/check_gazebo_entity_pose_observer_available.sh
 python3 scripts/check_gazebo_entity_pose_observer_synthetic.py
 python3 scripts/check_gazebo_entity_pose_observer_stale.py
+python3 scripts/check_gazebo_entity_pose_observer_pose_stamped.py
+python3 scripts/check_physical_target_object_pose_transport.py
 python3 -m pytest \
-  src/adaptive_assembly_sim/test/test_gazebo_target_pose_adapter.py
+  src/adaptive_assembly_sim/test/test_gazebo_target_pose_adapter.py \
+  src/adaptive_assembly_sim/test/test_gazebo_entity_pose_observer.py \
+  src/adaptive_assembly_sim/test/test_physical_target_pose_transport_config.py
 python3 scripts/check_panda_gripper_urdf_contains_fingers.py
 python3 scripts/check_gripper_controller_config.py
 ```

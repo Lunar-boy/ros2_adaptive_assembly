@@ -1,5 +1,6 @@
 """Publish one Gazebo entity pose as a ROS ``PoseStamped``."""
 
+import math
 import re
 from typing import Any, Optional, Tuple, Type
 
@@ -23,6 +24,9 @@ except ImportError:
 
 DIAGNOSTIC_NAME_LIMIT = 5
 DIAGNOSTIC_NAME_LENGTH = 96
+POSE_VECTOR_INPUT = 'pose_vector'
+POSE_STAMPED_INPUT = 'pose_stamped'
+SUPPORTED_INPUT_TYPES = (POSE_VECTOR_INPUT, POSE_STAMPED_INPUT)
 
 
 def _scope_components(name: str) -> Tuple[str, ...]:
@@ -57,6 +61,11 @@ def candidate_entity_names(
     """Return a bounded set of names from either supported message shape."""
     candidates = getattr(message, 'pose', None)
     attribute = 'name'
+    if candidates is not None:
+        try:
+            iter(candidates)
+        except TypeError:
+            candidates = None
     if candidates is None:
         candidates = getattr(message, 'transforms', None)
         attribute = 'child_frame_id'
@@ -133,6 +142,32 @@ def extract_entity_pose(
     return None, 'unsupported_pose_structure'
 
 
+def extract_pose_stamped(
+    message: PoseStamped,
+) -> Tuple[Optional[Pose], Optional[str]]:
+    """Copy a pose from the dedicated, already-selected model stream."""
+    pose = getattr(message, 'pose', None)
+    if pose is None:
+        return None, 'unsupported_pose_structure'
+    output = Pose()
+    output.position = pose.position
+    output.orientation = pose.orientation
+    return output, None
+
+
+def pose_is_finite(pose: Pose) -> bool:
+    """Return whether every numeric pose component is finite."""
+    return all(math.isfinite(value) for value in (
+        pose.position.x,
+        pose.position.y,
+        pose.position.z,
+        pose.orientation.x,
+        pose.orientation.y,
+        pose.orientation.z,
+        pose.orientation.w,
+    ))
+
+
 class GazeboEntityPoseObserverNode(Node):
     """Observe and periodically republish one simulator entity pose."""
 
@@ -140,6 +175,7 @@ class GazeboEntityPoseObserverNode(Node):
         super().__init__('gazebo_entity_pose_observer_node', **kwargs)
         defaults = (
             ('pose_info_topic', '/world/adaptive_assembly_workcell/pose/info'),
+            ('input_message_type', POSE_VECTOR_INPUT),
             ('target_entity_name', 'target_object'),
             ('world_frame', 'world'),
             ('output_pose_topic', '/gazebo_target_object_pose'),
@@ -155,6 +191,8 @@ class GazeboEntityPoseObserverNode(Node):
             self.declare_parameter(name, default)
 
         self._source_topic = str(self.get_parameter('pose_info_topic').value)
+        self._input_message_type = str(
+            self.get_parameter('input_message_type').value)
         self._entity = str(self.get_parameter('target_entity_name').value)
         self._world_frame = str(self.get_parameter('world_frame').value)
         self._output_topic = str(self.get_parameter('output_pose_topic').value)
@@ -182,8 +220,16 @@ class GazeboEntityPoseObserverNode(Node):
             Bool, self._available_topic, retained)
         self._age_publisher = self.create_publisher(
             Float64, self._age_topic, retained)
+        if self._input_message_type == POSE_STAMPED_INPUT:
+            subscription_type = PoseStamped
+            callback = self._on_pose_stamped
+            input_type_name = 'geometry_msgs/msg/PoseStamped'
+        else:
+            subscription_type = INPUT_MESSAGE_TYPE
+            callback = self._on_pose_vector
+            input_type_name = INPUT_MESSAGE_NAME
         self._subscription = self.create_subscription(
-            INPUT_MESSAGE_TYPE, self._source_topic, self._on_pose_vector, 10)
+            subscription_type, self._source_topic, callback, 10)
         self._started_at = self.get_clock().now()
         self._last_stream_at = None
         self._latest_pose = None
@@ -192,7 +238,8 @@ class GazeboEntityPoseObserverNode(Node):
         self.get_logger().info(
             'Gazebo entity pose observer configured: '
             f'entity={self._entity}, source={self._source_topic}, '
-            f'input_type={INPUT_MESSAGE_NAME}, output={self._output_topic}, '
+            f'input_mode={self._input_message_type}, '
+            f'input_type={input_type_name}, output={self._output_topic}, '
             f'world_frame={self._world_frame}, '
             f'exact_match={self._exact_match}, simulated_only=true, '
             'real_hardware=false')
@@ -200,6 +247,11 @@ class GazeboEntityPoseObserverNode(Node):
     def _validate_parameters(self) -> None:
         if not self._simulated_only:
             raise ValueError('simulated_only:=false is not supported')
+        if self._input_message_type not in SUPPORTED_INPUT_TYPES:
+            raise ValueError(
+                'input_message_type must be one of: '
+                + ', '.join(SUPPORTED_INPUT_TYPES)
+            )
         for name, value in (
             ('pose_info_topic', self._source_topic),
             ('target_entity_name', self._entity),
@@ -220,6 +272,23 @@ class GazeboEntityPoseObserverNode(Node):
         self._last_stream_at = self.get_clock().now()
         pose, reason = extract_entity_pose(
             message, self._entity, self._exact_match)
+        self._accept_pose(pose, reason, message)
+
+    def _on_pose_stamped(self, message: PoseStamped) -> None:
+        self._last_stream_at = self.get_clock().now()
+        pose, reason = extract_pose_stamped(message)
+        self._accept_pose(pose, reason, message)
+
+    def _accept_pose(
+        self,
+        pose: Optional[Pose],
+        reason: Optional[str],
+        message: Any,
+    ) -> None:
+        """Validate and publish a pose from either supported input mode."""
+        if pose is not None and not pose_is_finite(pose):
+            pose = None
+            reason = 'pose_non_finite'
         if pose is None:
             self._latest_pose = None
             failure_reason = reason or 'unsupported_pose_structure'

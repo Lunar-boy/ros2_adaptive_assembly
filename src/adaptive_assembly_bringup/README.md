@@ -57,6 +57,13 @@ dynamic `target_object` on `/gazebo_target_object_pose`, adds the configurable
 conditions, preventing two intended `/target_pose` publishers. The configured
 output frame is a label override, not a TF transform.
 
+For this physical path, a model-local Gazebo `PosePublisher` emits one
+`gz.msgs.Pose` on `/model/target_object/pose` at 30 Hz. The launch bridges it
+to `/gazebo_target_object_pose_raw` as `geometry_msgs/msg/PoseStamped` before
+the observer republishes the stable public outputs. It does not depend on
+SceneBroadcaster entity names. Non-physical demos retain their existing
+Pose_V/TFMessage observer path.
+
 It also uses the `fixed_socket` task profile. Pre-grasp, grasp, and lift poses
 remain based on the perceived object, while object-place, pre-place, place, and
 retreat poses use the assembly socket fixture at `(0.62, -0.18, 0.10)` from

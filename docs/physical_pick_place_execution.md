@@ -99,10 +99,10 @@ ros2 topic echo /gazebo_target_object_pose_available --once
 ros2 topic echo /physical_grasp_preflight_status --once
 ```
 
-The physical launch argument `require_target_entity_exact_match` defaults to
-`false` so Gazebo scoped target names are accepted. This is passed as a typed
-boolean to the observer; the observer's standalone strict-match default is
-unchanged.
+The compatibility launch argument `require_target_entity_exact_match` remains
+available, but it only affects Pose_V/TFMessage input. The physical launch's
+dedicated `pose_stamped` mode does not perform entity-name matching. The
+observer's standalone strict-match default is unchanged.
 
 If trajectories and joint state are ready but no preflight success arrives
 within the configured timeout, the reason is
@@ -132,9 +132,13 @@ provider. The nested Panda planning launch is run with
 not include `moveit_resources_panda_moveit_config/launch/demo.launch.py`, the
 MoveIt resources fake `ros2_control_node`, or fake Panda controller spawners.
 
-It also sets `launch_fake_object_pose_node:=false`. The retained
-`gazebo_entity_pose_observer_node` publishes the real dynamic `target_object`
-model-center pose on `/gazebo_target_object_pose`, and
+It also sets `launch_fake_object_pose_node:=false`. A model-local Gazebo
+`PosePublisher` publishes one simulator pose on `/model/target_object/pose` at
+30 Hz. `ros_gz_bridge` maps it to `/gazebo_target_object_pose_raw` as
+`geometry_msgs/msg/PoseStamped`, and the retained
+`gazebo_entity_pose_observer_node` publishes the simulated dynamic
+`target_object` model-center pose on `/gazebo_target_object_pose`. This
+dedicated path does not depend on SceneBroadcaster entity names. The
 `gazebo_target_pose_adapter_node` publishes the task input on `/target_pose`.
 The adapter preserves XY and orientation and adds
 `target_reference_z_offset:=0.05` to Z. This documented default converts the

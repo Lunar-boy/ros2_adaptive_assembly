@@ -10,8 +10,10 @@ Input from `ros_gz_bridge`:
 
 - `/world/adaptive_assembly_workcell/pose/info` (`gz.msgs.Pose_V`, represented
   as `tf2_msgs/msg/TFMessage` by the ROS 2 Jazzy bridge)
-- `/world/adaptive_assembly_physical_workcell/pose/info` for the physical
-  simulator path
+- `/gazebo_target_object_pose_raw` (`geometry_msgs/msg/PoseStamped`) for the
+  physical simulator path. Gazebo's `PosePublisher` publishes one
+  `gz.msgs.Pose` on `/model/target_object/pose`, and `ros_gz_bridge` maps it to
+  this raw ROS topic.
 
 Outputs:
 
@@ -26,13 +28,13 @@ Launch the bridge and observer:
 ros2 launch adaptive_assembly_sim gazebo_entity_pose_observer.launch.py
 ```
 
-The standalone observer keeps strict entity matching by default through
-`require_model_name_match:=true`. The physical pick-place launch sets
-`require_target_entity_exact_match:=false`, allowing Gazebo scope components
-such as `world::adaptive_assembly_physical_workcell::target_object` and
-`/world/adaptive_assembly_physical_workcell/model/target_object`. Matching is
-component-based: similarly prefixed visual, collision, and backup names are
-not accepted.
+The standalone observer keeps the existing `pose_vector` input mode and strict
+entity matching by default through `require_model_name_match:=true`. Scoped
+names are matched by complete components; similarly prefixed visual,
+collision, and backup names are not accepted. The physical pick-place launch
+uses `input_message_type:=pose_stamped` because the dedicated Gazebo publisher
+is attached directly to `target_object`; this mode never selects a Pose_V
+entry by array index.
 
 Inspect retained observer diagnostics with:
 
@@ -62,11 +64,16 @@ require_execution_success:=true
 bash scripts/check_gazebo_entity_pose_observer_available.sh
 python3 scripts/check_gazebo_entity_pose_observer_synthetic.py
 python3 scripts/check_gazebo_entity_pose_observer_stale.py
+python3 scripts/check_gazebo_entity_pose_observer_pose_stamped.py
+python3 scripts/check_physical_target_object_pose_transport.py
 ```
 
 ## Limitations
 
-This feature is simulator-only and depends on the Gazebo `pose/info` bridge.
-It observes the final model pose only. It does not command Gazebo, perform
+This feature is simulator-only. Non-physical demos retain the Gazebo
+`pose/info` bridge; the physical demo uses the dedicated model `Pose` bridge.
+The observer does not transform coordinates or verify the Gazebo entity name
+in dedicated-input mode. It observes the model pose only and rejects
+non-finite data. It does not command Gazebo, perform
 grasping, implement a full assembly episode or benchmark recorder, provide
 contact-rich insertion or force control, or support real hardware.

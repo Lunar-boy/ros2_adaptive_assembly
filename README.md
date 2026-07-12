@@ -156,9 +156,12 @@ ros2 launch adaptive_assembly_bringup adaptive_assembly_full_physical_pick_place
 This full physical demo remains simulator-only. It uses Gazebo
 `gz_ros2_control` as the only controller provider and starts MoveIt planning
 without the standard Panda fake-control demo. Its target-pose observer accepts
-Gazebo scoped entity names through the physical-launch default
-`require_target_entity_exact_match:=false`; the standalone observer remains
-strict by default. This full Gazebo entry point defaults to
+the dedicated 30 Hz `gz.msgs.Pose` stream from `target_object` on
+`/model/target_object/pose`. The launch bridges it to the raw ROS
+`/gazebo_target_object_pose_raw` `PoseStamped` input, avoiding the
+SceneBroadcaster Pose_V-to-TFMessage entity-name loss. Non-physical demos keep
+their existing named TFMessage extraction path without index-based fallback.
+This full Gazebo entry point defaults to
 `use_sim_time:=true`: MoveIt, sequence planning, pose generation, and the
 physical stale-data checks use Gazebo's bridged `/clock` time domain. Ordinary
 plan-only and fake-perception launches retain their wall-time defaults.

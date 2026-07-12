@@ -9,6 +9,7 @@ from launch_ros.actions import Node
 def generate_launch_description() -> LaunchDescription:
     arguments = [
         ('pose_info_topic', '/world/adaptive_assembly_workcell/pose/info'),
+        ('input_message_type', 'pose_vector'),
         ('target_entity_name', 'target_object'),
         ('world_frame', 'world'),
         ('output_pose_topic', '/gazebo_target_object_pose'),

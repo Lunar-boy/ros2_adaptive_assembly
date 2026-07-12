@@ -6,8 +6,10 @@ from adaptive_assembly_sim.gazebo_entity_pose_observer_node import (
     _entity_matches,
     candidate_entity_names,
     extract_entity_pose,
+    extract_pose_stamped,
+    pose_is_finite,
 )
-from geometry_msgs.msg import Point, Quaternion, TransformStamped
+from geometry_msgs.msg import Point, PoseStamped, Quaternion, TransformStamped
 import pytest
 from tf2_msgs.msg import TFMessage
 
@@ -120,6 +122,47 @@ def test_extract_pose_vector_shape():
     assert pose.orientation.w == 0.9
 
 
+def test_extract_dedicated_pose_stamped_preserves_pose():
+    """Dedicated input is already entity-selected and preserves its pose."""
+    message = PoseStamped()
+    message.header.frame_id = 'gazebo_ignored_source_frame'
+    message.pose.position.x = 0.35
+    message.pose.position.y = 0.18
+    message.pose.position.z = 0.10
+    message.pose.orientation.x = 0.1
+    message.pose.orientation.y = 0.2
+    message.pose.orientation.z = 0.3
+    message.pose.orientation.w = 0.9
+
+    pose, reason = extract_pose_stamped(message)
+
+    assert reason is None
+    assert pose is not None
+    assert (pose.position.x, pose.position.y, pose.position.z) == (
+        0.35, 0.18, 0.10
+    )
+    assert (
+        pose.orientation.x,
+        pose.orientation.y,
+        pose.orientation.z,
+        pose.orientation.w,
+    ) == (0.1, 0.2, 0.3, 0.9)
+
+
+@pytest.mark.parametrize('field', ['x', 'y', 'z'])
+def test_non_finite_pose_position_is_rejected(field):
+    """Non-finite position data cannot make the observer available."""
+    message = PoseStamped()
+    message.pose.orientation.w = 1.0
+    setattr(message.pose.position, field, float('nan'))
+
+    pose, reason = extract_pose_stamped(message)
+
+    assert reason is None
+    assert pose is not None
+    assert not pose_is_finite(pose)
+
+
 def test_extract_reports_malformed_matching_candidate():
     """Report malformed data after selecting the intended target."""
     candidate = SimpleNamespace(
@@ -178,3 +221,8 @@ def test_candidate_diagnostics_are_bounded():
 
     assert len(names) == 5
     assert all(len(name) <= 96 for name in names)
+
+
+def test_pose_stamped_has_no_vector_candidate_names():
+    """A single PoseStamped pose is not mistaken for a Pose_V array."""
+    assert candidate_entity_names(PoseStamped()) == ()
