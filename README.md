@@ -171,6 +171,12 @@ model-center pose to the task reference. `output_frame_id:=world` is a label
 override only; no TF transformation is performed. The adapter publishes
 nothing before Gazebo provides a valid pose.
 
+For the full physical launch, `adaptive_assembly_physical_workcell.sdf` is the
+source of truth for the static table, target support, and socket collision
+geometry. It loads a dedicated MoveIt PlanningScene profile while non-physical
+demos retain their existing defaults. Run
+`python3 scripts/check_physical_planning_scene_parity.py` to verify parity.
+
 To inspect the pose and preflight gates:
 
 ```bash

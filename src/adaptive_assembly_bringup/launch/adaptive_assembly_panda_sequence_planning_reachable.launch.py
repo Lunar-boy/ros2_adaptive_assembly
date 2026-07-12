@@ -39,6 +39,9 @@ def generate_launch_description() -> LaunchDescription:
     use_planning_scene_audit = LaunchConfiguration(
         'use_planning_scene_audit'
     )
+    static_planning_scene_params_file = LaunchConfiguration(
+        'static_planning_scene_params_file'
+    )
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -84,6 +87,14 @@ def generate_launch_description() -> LaunchDescription:
             default_value='true',
             description='Whether to include the read-only scene audit.',
         ),
+        DeclareLaunchArgument(
+            'static_planning_scene_params_file',
+            default_value='',
+            description=(
+                'Optional static PlanningScene parameter YAML forwarded to '
+                'the sequence planning demo.'
+            ),
+        ),
         LogInfo(
             msg='Launching the deterministic known-reachable Panda assembly '
             'sequence profile. Both stages are planned only; execution is '
@@ -108,6 +119,9 @@ def generate_launch_description() -> LaunchDescription:
                 'pre_grasp_trajectory_topic': pre_grasp_trajectory_topic,
                 'assembly_trajectory_topic': assembly_trajectory_topic,
                 'use_planning_scene_audit': use_planning_scene_audit,
+                'static_planning_scene_params_file': (
+                    static_planning_scene_params_file
+                ),
             }.items(),
         ),
     ])

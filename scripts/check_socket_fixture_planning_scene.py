@@ -61,10 +61,11 @@ def fail(message: str) -> None:
 
 node_source = " ".join(NODE.read_text(encoding="utf-8").split())
 launch_tree = ast.parse(LAUNCH.read_text(encoding="utf-8"))
-launch_dicts = [ast.literal_eval(node) for node in ast.walk(launch_tree)
-                if isinstance(node, ast.Dict)]
-launch_parameters = next((item for item in launch_dicts
-                          if "add_socket_fixture" in item), None)
+launch_parameters = next((node for node in ast.walk(launch_tree)
+                          if isinstance(node, ast.Dict) and any(
+                              isinstance(key, ast.Constant) and
+                              key.value == "add_socket_fixture"
+                              for key in node.keys)), None)
 
 if launch_parameters is None:
     fail("launch file does not pass add_socket_fixture")
@@ -80,7 +81,16 @@ for name, expected in PARAMETERS.items():
     actual_default = match.group(1) == "true" if isinstance(expected, bool) else float(match.group(1))
     if actual_default != expected:
         fail(f"node parameter default is incorrect: {name}")
-    if launch_parameters.get(name) != expected:
+    launch_value = next(
+        value for key, value in zip(
+            launch_parameters.keys, launch_parameters.values
+        ) if isinstance(key, ast.Constant) and key.value == name
+    )
+    try:
+        actual_launch_value = ast.literal_eval(launch_value)
+    except (ValueError, TypeError):
+        actual_launch_value = None
+    if actual_launch_value != expected:
         fail(f"launch parameter is missing or incorrect: {name}")
 
 for object_id, fragments in OBJECT_CALLS.items():

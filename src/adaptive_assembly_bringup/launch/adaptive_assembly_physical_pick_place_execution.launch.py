@@ -64,6 +64,9 @@ def generate_launch_description() -> LaunchDescription:
         'adaptive_assembly_physical_pick_place_params.yaml',
     ])
     params_file = LaunchConfiguration('params_file')
+    static_planning_scene_params_file = LaunchConfiguration(
+        'static_planning_scene_params_file'
+    )
 
     string_arguments = {
         'stage_names': 'pre_grasp,grasp,lift,pre_place,place,retreat',
@@ -162,6 +165,14 @@ def generate_launch_description() -> LaunchDescription:
         description=(
             'Task parameter YAML for physical pick-place placement at the '
             'Gazebo assembly socket.'
+        ),
+    ))
+    declarations.append(DeclareLaunchArgument(
+        'static_planning_scene_params_file',
+        default_value='',
+        description=(
+            'Optional static PlanningScene parameter YAML forwarded to the '
+            'nested planning launch.'
         ),
     ))
 
@@ -331,6 +342,9 @@ def generate_launch_description() -> LaunchDescription:
                 'use_sim_time': use_sim_time,
                 'launch_fake_object_pose_node': launch_fake_object_pose_node,
                 'params_file': params_file,
+                'static_planning_scene_params_file': (
+                    static_planning_scene_params_file
+                ),
             }.items(),
         ),
         Node(

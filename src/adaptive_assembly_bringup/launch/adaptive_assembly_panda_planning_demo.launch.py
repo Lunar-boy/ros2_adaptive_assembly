@@ -50,6 +50,9 @@ def generate_launch_description() -> LaunchDescription:
     workspace_min_z = LaunchConfiguration('workspace_min_z')
     workspace_max_z = LaunchConfiguration('workspace_max_z')
     min_quaternion_norm = LaunchConfiguration('min_quaternion_norm')
+    static_planning_scene_params_file = LaunchConfiguration(
+        'static_planning_scene_params_file'
+    )
     static_planning_scene_launch = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_planning'),
         'launch',
@@ -189,6 +192,14 @@ def generate_launch_description() -> LaunchDescription:
             default_value='1e-6',
             description='Minimum allowed quaternion norm when guard is enabled.',
         ),
+        DeclareLaunchArgument(
+            'static_planning_scene_params_file',
+            default_value='',
+            description=(
+                'Optional static PlanningScene parameter YAML. Empty keeps '
+                'the existing non-physical geometry defaults.'
+            ),
+        ),
         LogInfo(
             msg='Launching adaptive assembly Panda planning demo: configurable '
             'target pose source, task pose generation, Panda MoveIt2 planning, '
@@ -216,6 +227,11 @@ def generate_launch_description() -> LaunchDescription:
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(static_planning_scene_launch),
+            launch_arguments={
+                'static_planning_scene_params_file': (
+                    static_planning_scene_params_file
+                ),
+            }.items(),
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(panda_pose_adapter_launch),
