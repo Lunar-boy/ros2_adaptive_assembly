@@ -63,6 +63,19 @@ retreat poses use the assembly socket fixture at `(0.62, -0.18, 0.10)` from
 `adaptive_assembly_physical_workcell.sdf`. Other demos can continue using the
 default `target_offset` task mode.
 
+For this full physical demo only, static MoveIt collision geometry is loaded
+from `config/physical_workcell_planning_scene.yaml`. Its table, target support,
+and socket boxes are derived from
+`adaptive_assembly_sim/worlds/adaptive_assembly_physical_workcell.sdf`; the
+Panda is spawned with `world` and `panda_link0` coincident. Plan-only, visual,
+benchmark, and test launches retain their existing static PlanningScene
+defaults. Validate the SDF/YAML geometry parity with:
+
+```bash
+cd ~/ros2_adaptive_assembly_ws
+python3 scripts/check_physical_planning_scene_parity.py
+```
+
 The PR35 local success fixture is:
 
 ```bash

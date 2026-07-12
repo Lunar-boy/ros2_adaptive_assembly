@@ -35,6 +35,11 @@ def generate_launch_description() -> LaunchDescription:
         'config',
         'adaptive_assembly_physical_pick_place_params.yaml',
     ])
+    physical_planning_scene_params_file = PathJoinSubstitution([
+        FindPackageShare('adaptive_assembly_bringup'),
+        'config',
+        'physical_workcell_planning_scene.yaml',
+    ])
 
     world = LaunchConfiguration('world')
     params_file = LaunchConfiguration('params_file')
@@ -49,6 +54,9 @@ def generate_launch_description() -> LaunchDescription:
     target_pose_output_frame_id = LaunchConfiguration(
         'target_pose_output_frame_id'
     )
+    static_planning_scene_params_file = LaunchConfiguration(
+        'static_planning_scene_params_file'
+    )
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -62,6 +70,16 @@ def generate_launch_description() -> LaunchDescription:
             description=(
                 'Task parameter YAML for the physical pick-place demo. The '
                 'default places objects at the physical Gazebo socket.'
+            ),
+        ),
+        DeclareLaunchArgument(
+            'static_planning_scene_params_file',
+            default_value=physical_planning_scene_params_file,
+            description=(
+                'Physical-workcell static PlanningScene geometry. The SDF '
+                'world and panda_link0 are coincident in this demo because '
+                'the Panda spawn and world-to-base joint both use identity '
+                'transforms.'
             ),
         ),
         DeclareLaunchArgument(
@@ -140,6 +158,9 @@ def generate_launch_description() -> LaunchDescription:
                 'use_sim_time': use_sim_time,
                 'launch_fake_object_pose_node': launch_fake_object_pose_node,
                 'params_file': params_file,
+                'static_planning_scene_params_file': (
+                    static_planning_scene_params_file
+                ),
             }.items(),
         ),
     ])

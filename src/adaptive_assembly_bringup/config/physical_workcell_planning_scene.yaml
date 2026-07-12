@@ -1,0 +1,37 @@
+static_planning_scene_node:
+  ros__parameters:
+    # The full physical demo spawns panda_link0 at the Gazebo world origin.
+    planning_frame: panda_link0
+    apply_delay_sec: 1.0
+
+    add_work_table: true
+    table_x: 0.45
+    table_y: 0.0
+    table_z: -0.04
+    table_size_x: 1.20
+    table_size_y: 0.90
+    table_size_z: 0.08
+
+    add_target_support: true
+    target_support_x: 0.35
+    target_support_y: 0.18
+    target_support_z: 0.025
+    target_support_size_x: 0.18
+    target_support_size_y: 0.18
+    target_support_size_z: 0.05
+
+    add_socket_fixture: true
+    socket_x: 0.62
+    socket_y: -0.18
+    socket_z: 0.0
+    socket_base_size_x: 0.20
+    socket_base_size_y: 0.20
+    socket_base_size_z: 0.03
+    socket_wall_height: 0.08
+    socket_wall_thickness: 0.03
+    socket_side_wall_length: 0.16
+    socket_back_front_wall_length: 0.10
+    socket_side_wall_y_offset: 0.065
+    socket_back_front_wall_x_offset: 0.065
+    socket_base_center_z_offset: 0.015
+    socket_wall_center_z_offset: 0.055

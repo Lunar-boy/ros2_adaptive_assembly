@@ -41,6 +41,9 @@ def generate_launch_description() -> LaunchDescription:
     assembly_trajectory_topic = LaunchConfiguration('assembly_trajectory_topic')
     trajectory_status_topic = LaunchConfiguration('trajectory_status_topic')
     start_state_mode = LaunchConfiguration('start_state_mode')
+    static_planning_scene_params_file = LaunchConfiguration(
+        'static_planning_scene_params_file'
+    )
 
     panda_planning_demo = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_bringup'),
@@ -184,6 +187,14 @@ def generate_launch_description() -> LaunchDescription:
                 "Pre-grasp start state source: 'current' or deterministic 'fixed'."
             ),
         ),
+        DeclareLaunchArgument(
+            'static_planning_scene_params_file',
+            default_value='',
+            description=(
+                'Optional static PlanningScene parameter YAML forwarded to '
+                'the nested Panda planning demo.'
+            ),
+        ),
         LogInfo(
             msg='Launching the existing Panda plan-only demo plus the Panda '
             'assembly pose adapter and two-stage pre-grasp/assembly sequence '
@@ -204,6 +215,9 @@ def generate_launch_description() -> LaunchDescription:
                 'planner_id': planner_id,
                 'num_planning_attempts': num_planning_attempts,
                 'use_pre_grasp_planning': 'false',
+                'static_planning_scene_params_file': (
+                    static_planning_scene_params_file
+                ),
             }.items(),
         ),
         IncludeLaunchDescription(
