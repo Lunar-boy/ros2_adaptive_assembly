@@ -24,6 +24,7 @@ def generate_launch_description() -> LaunchDescription:
         'config',
         'adaptive_assembly_sequence_reachable_params.yaml',
     ])
+    params_file = LaunchConfiguration('params_file')
     pre_grasp_trajectory_topic = LaunchConfiguration(
         'pre_grasp_trajectory_topic'
     )
@@ -40,6 +41,14 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'params_file',
+            default_value=reachable_params,
+            description=(
+                'Parameter YAML for the deterministic reachable task and '
+                'perception profile.'
+            ),
+        ),
         DeclareLaunchArgument(
             'pre_grasp_trajectory_topic',
             default_value='/pre_grasp_trajectory',
@@ -83,7 +92,7 @@ def generate_launch_description() -> LaunchDescription:
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(sequence_demo),
             launch_arguments={
-                'params_file': reachable_params,
+                'params_file': params_file,
                 'use_standard_panda_demo': use_standard_panda_demo,
                 'use_sim_time': use_sim_time,
                 'launch_fake_object_pose_node': launch_fake_object_pose_node,

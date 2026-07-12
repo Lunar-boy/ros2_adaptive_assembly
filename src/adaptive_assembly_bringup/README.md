@@ -57,6 +57,12 @@ dynamic `target_object` on `/gazebo_target_object_pose`, adds the configurable
 conditions, preventing two intended `/target_pose` publishers. The configured
 output frame is a label override, not a TF transform.
 
+It also uses the `fixed_socket` task profile. Pre-grasp, grasp, and lift poses
+remain based on the perceived object, while object-place, pre-place, place, and
+retreat poses use the assembly socket fixture at `(0.62, -0.18, 0.10)` from
+`adaptive_assembly_physical_workcell.sdf`. Other demos can continue using the
+default `target_offset` task mode.
+
 The PR35 local success fixture is:
 
 ```bash
