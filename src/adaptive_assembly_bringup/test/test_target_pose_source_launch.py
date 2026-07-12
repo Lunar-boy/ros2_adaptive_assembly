@@ -88,6 +88,9 @@ def test_physical_demo_selects_gazebo_adapter_without_duplicate_source():
         'adaptive_assembly_full_physical_pick_place_demo.launch.py'
     )
     assert _default_value(_declaration(description, FAKE_SWITCH)) == 'false'
+    assert _default_value(
+        _declaration(description, 'launch_object_pose_observer')
+    ) == 'true'
 
     adapter_include = next(
         include for include in _includes(description)
@@ -102,6 +105,55 @@ def test_physical_demo_selects_gazebo_adapter_without_duplicate_source():
         FAKE_SWITCH in dict(include.launch_arguments)
         for include in _includes(description)
     )
+    execution_arguments = next(
+        dict(include.launch_arguments)
+        for include in _includes(description)
+        if dict(include.launch_arguments).get('use_standard_panda_demo')
+        == 'false'
+    )
+    assert 'launch_object_pose_observer' in execution_arguments
+    assert execution_arguments['target_object_gazebo_pose_topic'] == (
+        '/model/target_object/pose'
+    )
+    assert execution_arguments['target_object_raw_pose_topic'] == (
+        '/gazebo_target_object_pose_raw'
+    )
+    assert execution_arguments['object_pose_topic'] == (
+        '/gazebo_target_object_pose'
+    )
+
+
+def test_physical_execution_has_one_dedicated_pose_source_and_no_pose_vector():
+    """Bridge one model Pose and never identify the target through Pose_V."""
+    description = _load_launch(
+        'adaptive_assembly_physical_pick_place_execution.launch.py'
+    )
+    assert _default_value(
+        _declaration(description, 'send_arm_goals')
+    ) == 'true'
+    nodes = _nodes(description)
+    bridges = [
+        node for node in nodes if _executable(node) == 'parameter_bridge'
+    ]
+    pose_bridges = [
+        node for node in bridges
+        if node.__dict__['_Node__node_name']
+        == 'physical_target_object_pose_bridge'
+    ]
+    observers = [
+        node for node in nodes
+        if node.__dict__['_Node__node_name']
+        == 'physical_target_object_pose_observer'
+    ]
+
+    assert len(pose_bridges) == 1
+    assert len(observers) == 1
+    source = (
+        BRINGUP_LAUNCH_DIR
+        / 'adaptive_assembly_physical_pick_place_execution.launch.py'
+    ).read_text(encoding='utf-8')
+    assert '@geometry_msgs/msg/PoseStamped[gz.msgs.Pose' in source
+    assert '@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V' not in source
 
 
 def test_adapter_launch_has_expected_topics_and_reference_offset():

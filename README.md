@@ -191,6 +191,19 @@ ros2 topic echo /physical_grasp_preflight_status --once
 Executor failures retain `reason=physical_grasp_preflight_failed` and add the
 concrete cause as `preflight_reason=<reason>`.
 
+The MoveIt sequence planner is still plan-only and publishes trajectories with
+`execution=false`. In the full physical demo, the separate simulator-only
+physical executor sends them to Gazebo's `panda_arm_controller`. To run the
+bounded regression that proves the `pre_grasp` goal is accepted and at least
+one Panda arm joint starts moving:
+
+```bash
+python3 scripts/check_full_physical_pick_place_arm_motion.py
+```
+
+This is an arm-start acceptance check, not evidence of successful contact
+grasp, lift, placement, or insertion.
+
 To save terminal output from each full physical pick-place simulation attempt,
 use the manual run logging wrapper:
 

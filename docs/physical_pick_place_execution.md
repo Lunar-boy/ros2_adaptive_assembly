@@ -81,6 +81,16 @@ Published executor topics:
 All status strings include `mode=physical_pick_place` and
 `real_hardware=false`.
 
+When the simulated arm controller accepts a stage goal, the stage topic
+publishes an explicit acceptance transition:
+
+```text
+event=accepted;mode=physical_pick_place;stage=pre_grasp;stage_index=0;action=arm;controller_goal_accepted=true;real_hardware=false
+```
+
+This distinguishes an attempted send from evidence that the simulated
+`panda_arm_controller` accepted the trajectory.
+
 When preflight is required and fails, the terminal execution status uses:
 
 ```text
@@ -132,6 +142,13 @@ provider. The nested Panda planning launch is run with
 not include `moveit_resources_panda_moveit_config/launch/demo.launch.py`, the
 MoveIt resources fake `ros2_control_node`, or fake Panda controller spawners.
 
+The MoveIt planner nodes remain plan-only: their status messages retain
+`execution=false`, and they only publish six `RobotTrajectory` messages. The
+separate `physical_pick_place_executor_node` is the component that sends those
+trajectories to the simulator-only
+`/panda_arm_controller/follow_joint_trajectory` action. A planning success is
+therefore not, by itself, evidence of controller acceptance or arm motion.
+
 It also sets `launch_fake_object_pose_node:=false`. A model-local Gazebo
 `PosePublisher` publishes one simulator pose on `/model/target_object/pose` at
 30 Hz. `ros_gz_bridge` maps it to `/gazebo_target_object_pose_raw` as
@@ -146,6 +163,12 @@ center of the `0.10 m` Gazebo cylinder to its top/reference pose. The adapter
 does not synthesize a target before an observation arrives. Its
 `output_frame_id:=world` setting overrides only the frame label and does not
 perform a TF transform.
+
+The fixed socket object target remains `(0.62, -0.18, 0.10)`. For this bounded
+arm-start demo, the physical profile applies `place_height_offset:=0.10`, so
+the planned hand pose remains above the socket walls while Panda collision
+geometry is enabled. That stage is a pre-insertion clearance target and does
+not demonstrate completed placement or insertion.
 
 Ordinary and plan-only demos retain `launch_fake_object_pose_node:=true` and
 therefore keep their existing deterministic fake-perception behavior. In the
@@ -187,6 +210,25 @@ the validation script:
 ```bash
 python3 scripts/check_physical_pick_place_executor_dry_run.py
 ```
+
+For the bounded PR75 acceptance check, build and source the workspace, then
+run:
+
+```bash
+cd ~/ros2_adaptive_assembly_ws
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+python3 scripts/check_full_physical_pick_place_arm_motion.py
+```
+
+The checker launches the full demo with server-only Gazebo, requires active
+controllers, valid Panda joint states, the dedicated target pose and preflight,
+successful six-stage planning, six non-empty trajectories, the executor's
+`pre_grasp` send and acceptance transitions, and at least `0.01 rad` motion in
+one arm joint. It stops at proof of initial arm motion; it does not claim grasp,
+lift, placement, or insertion success. On failure it prints the concrete
+missing or rejected condition and writes `launch.log` plus
+`status_topics.log` under `runs/pr75_arm_motion_<timestamp>/`.
 
 See `docs/gazebo_contact_grasp_verification.md` for the Gazebo contact sensor
 plumbing and verifier status schemas. This remains simulator-only. It does not

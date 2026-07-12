@@ -48,6 +48,8 @@ def main() -> int:
         'preflight_reason=',
         'physical_grasp_preflight_timeout',
         'verification_skipped',
+        'event=accepted',
+        'controller_goal_accepted=true',
     ]
     for token in required_tokens:
         if token not in source_text:
