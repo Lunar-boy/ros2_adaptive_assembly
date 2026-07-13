@@ -204,6 +204,20 @@ python3 scripts/check_full_physical_pick_place_arm_motion.py
 This is an arm-start acceptance check, not evidence of successful contact
 grasp, lift, placement, or insertion.
 
+MoveIt planning and Gazebo execution currently use different Panda robot
+descriptions. Matching trajectory joint names therefore does not prove that
+both descriptions reach the same Cartesian tool pose. Run the diagnostic-only
+model contract and FK comparison with:
+
+```bash
+ros2 run adaptive_assembly_sim check_robot_model_parity \
+  --current-panda-models
+```
+
+The mismatch is expected until the descriptions are unified in a follow-up
+change. See [Robot model parity diagnostic](docs/robot_model_parity.md) for the
+comparison contract, JSON output, exit codes, and explicit-path invocation.
+
 To save terminal output from each full physical pick-place simulation attempt,
 use the manual run logging wrapper:
 

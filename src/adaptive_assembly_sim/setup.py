@@ -54,6 +54,8 @@ setup(
             'activate_gazebo_controllers_node = '
             'adaptive_assembly_sim.activate_gazebo_controllers_node:main',
             'fake_panda_finger_joint_state_node = adaptive_assembly_sim.fake_panda_finger_joint_state_node:main',
+            'check_robot_model_parity = '
+            'adaptive_assembly_sim.robot_model_parity:main',
         ],
     },
 )
