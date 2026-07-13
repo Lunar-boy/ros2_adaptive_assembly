@@ -62,6 +62,7 @@ def generate_launch_description() -> LaunchDescription:
     target_pose_output_frame_id = LaunchConfiguration(
         'target_pose_output_frame_id'
     )
+    end_effector_link = LaunchConfiguration('end_effector_link')
     static_planning_scene_params_file = LaunchConfiguration(
         'static_planning_scene_params_file'
     )
@@ -133,11 +134,19 @@ def generate_launch_description() -> LaunchDescription:
             ),
         ),
         DeclareLaunchArgument(
+            'end_effector_link',
+            default_value='assembly_tcp',
+            description=(
+                'Explicit MoveIt target link for every physical stage pose.'
+            ),
+        ),
+        DeclareLaunchArgument(
             'target_reference_z_offset',
-            default_value='0.05',
+            default_value='0.0',
             description=(
                 'Z offset from the Gazebo model center to the task reference '
-                'pose. The default is half the 0.10 m target cylinder length.'
+                'pose. The physical default keeps /target_pose at the 0.10 m '
+                'target cylinder geometric center.'
             ),
         ),
         DeclareLaunchArgument(
@@ -195,6 +204,7 @@ def generate_launch_description() -> LaunchDescription:
                     '/gazebo_target_object_pose_available'
                 ),
                 'params_file': params_file,
+                'end_effector_link': end_effector_link,
                 'static_planning_scene_params_file': (
                     static_planning_scene_params_file
                 ),

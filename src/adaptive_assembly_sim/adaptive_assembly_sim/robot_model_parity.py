@@ -1030,7 +1030,7 @@ def render_json(result: ParityResult) -> str:
 
 
 def resolve_current_panda_sources() -> tuple[Path, Path]:
-    """Resolve the planning and Gazebo Panda sources from installed shares."""
+    """Resolve the shared planning and Gazebo Panda sources from installed shares."""
     try:
         from ament_index_python.packages import (  # noqa: WPS433
             PackageNotFoundError,
@@ -1041,16 +1041,7 @@ def resolve_current_panda_sources() -> tuple[Path, Path]:
             'ament_index_python is unavailable; source ROS 2 Jazzy first'
         ) from error
     try:
-        reference_share = Path(get_package_share_directory(
-            'moveit_resources_panda_moveit_config'
-        ))
-    except PackageNotFoundError as error:
-        raise ParitySetupError(
-            "required package 'moveit_resources_panda_moveit_config' is not "
-            'installed; install the ROS 2 Jazzy MoveIt Panda resources'
-        ) from error
-    try:
-        candidate_share = Path(get_package_share_directory(
+        package_share = Path(get_package_share_directory(
             'adaptive_assembly_sim'
         ))
     except PackageNotFoundError as error:
@@ -1059,8 +1050,8 @@ def resolve_current_panda_sources() -> tuple[Path, Path]:
             'source ~/ros2_adaptive_assembly_ws first'
         ) from error
     return (
-        reference_share / 'config' / 'panda.urdf.xacro',
-        candidate_share / 'urdf' / 'panda_gazebo_ros2_control.urdf.xacro',
+        package_share / 'urdf' / 'panda.urdf.xacro',
+        package_share / 'urdf' / 'panda_gazebo_ros2_control.urdf.xacro',
     )
 
 
@@ -1107,7 +1098,7 @@ def _build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument('candidate_source', nargs='?')
     parser.add_argument(
         '--current-panda-models', action='store_true',
-        help='compare the installed MoveIt resources Panda and local sim model',
+        help='compare the canonical planning Panda and Gazebo wrapper model',
     )
     parser.add_argument('--base-link', default=DEFAULT_BASE_LINK)
     parser.add_argument('--reference-base-link')

@@ -1,5 +1,8 @@
 """Launch adaptive assembly topics with the standard Panda MoveIt2 demo."""
 
+from pathlib import Path
+
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
@@ -37,12 +40,14 @@ def generate_launch_description() -> LaunchDescription:
         'launch',
         'demo.launch.py',
     ])
+    canonical_panda_xacro = str(
+        Path(get_package_share_directory('adaptive_assembly_sim'))
+        / 'urdf'
+        / 'panda.urdf.xacro'
+    )
     moveit_config = (
         MoveItConfigsBuilder('moveit_resources_panda')
-        .robot_description(
-            file_path='config/panda.urdf.xacro',
-            mappings={'ros2_control_hardware_type': 'mock_components'},
-        )
+        .robot_description(file_path=canonical_panda_xacro)
         .robot_description_semantic(file_path='config/panda.srdf')
         .planning_scene_monitor(
             publish_robot_description=True,

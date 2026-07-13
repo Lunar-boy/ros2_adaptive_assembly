@@ -42,6 +42,10 @@ def generate_launch_description() -> LaunchDescription:
     static_planning_scene_params_file = LaunchConfiguration(
         'static_planning_scene_params_file'
     )
+    stage_names = LaunchConfiguration('stage_names')
+    end_effector_link = LaunchConfiguration('end_effector_link')
+    position_tolerance = LaunchConfiguration('position_tolerance')
+    orientation_tolerance = LaunchConfiguration('orientation_tolerance')
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -88,6 +92,26 @@ def generate_launch_description() -> LaunchDescription:
             description='Whether to include the read-only scene audit.',
         ),
         DeclareLaunchArgument(
+            'stage_names',
+            default_value='pre_grasp,assembly',
+            description='Comma-separated ordered sequence stages.',
+        ),
+        DeclareLaunchArgument(
+            'end_effector_link',
+            default_value='panda_link8',
+            description='Robot link whose pose each stage target specifies.',
+        ),
+        DeclareLaunchArgument(
+            'position_tolerance',
+            default_value='0.01',
+            description='MoveIt position tolerance for each sequence stage.',
+        ),
+        DeclareLaunchArgument(
+            'orientation_tolerance',
+            default_value='0.10',
+            description='MoveIt orientation tolerance for each sequence stage.',
+        ),
+        DeclareLaunchArgument(
             'static_planning_scene_params_file',
             default_value='',
             description=(
@@ -114,8 +138,10 @@ def generate_launch_description() -> LaunchDescription:
                 'start_state_mode': 'fixed',
                 'planning_time_sec': '5.0',
                 'num_planning_attempts': '1',
-                'position_tolerance': '0.01',
-                'orientation_tolerance': '0.10',
+                'position_tolerance': position_tolerance,
+                'orientation_tolerance': orientation_tolerance,
+                'stage_names': stage_names,
+                'end_effector_link': end_effector_link,
                 'pre_grasp_trajectory_topic': pre_grasp_trajectory_topic,
                 'assembly_trajectory_topic': assembly_trajectory_topic,
                 'use_planning_scene_audit': use_planning_scene_audit,

@@ -3,12 +3,16 @@
 The full physical pick-place demo plans and executes against one canonical
 Panda kinematic description:
 
-- MoveIt uses
-  `moveit_resources_panda_moveit_config/config/panda.urdf.xacro` through
-  `MoveItConfigsBuilder('moveit_resources_panda')`;
-- Gazebo expands a local wrapper that includes
-  `moveit_resources_panda_description/urdf/panda.urdf.xacro` before adding
-  simulator-only extensions and spawning the robot.
+- MoveIt expands `adaptive_assembly_sim/urdf/panda.urdf.xacro`;
+- Gazebo expands a local simulator wrapper that includes that same project
+  xacro before adding simulator-only extensions and spawning the robot.
+
+The project xacro includes the upstream Panda description and defines the
+project-owned `assembly_tcp` exactly once. Its fixed parent is `panda_hand`,
+with `xyz="0 0 0.1034"` and `rpy="0 0 0"`. The finger joint origins are at
+hand Z `0.0584 m`; the near-planar opposing collision contact pads are centered
+`0.045 m` farther along +Z. Because the fingers translate symmetrically along
+hand +/-Y, the midpoint remains fixed while the fingers move.
 
 Matching controller joint names are not enough to make those descriptions
 equivalent. A joint trajectory can be accepted and completed by
@@ -31,12 +35,19 @@ ros2 run adaptive_assembly_sim check_robot_model_parity \
   --current-panda-models
 ```
 
-The preset resolves both package shares through the ament index. It uses
+The preset resolves the installed project package share through the ament index. It uses
 `panda_link0` as both base links and `panda_link8` as both tool endpoints. It
-fails with a setup error if
-`moveit_resources_panda_moveit_config` is not installed. It never downloads a
-dependency and does not require a ROS graph, MoveIt process, Gazebo process,
-RViz, or graphical environment.
+never downloads a dependency and does not require a ROS graph, MoveIt process,
+Gazebo process, RViz, or graphical environment.
+
+Verify the explicit TCP chain and FK with the same structural tolerances:
+
+```bash
+ros2 run adaptive_assembly_sim check_robot_model_parity \
+  --current-panda-models \
+  --reference-tool-link assembly_tcp \
+  --candidate-tool-link assembly_tcp
+```
 
 Two explicit expanded URDF or xacro paths can also be supplied:
 
@@ -116,7 +127,10 @@ mock `ros2_control` systems. The wrapper therefore adds exactly one usable
 `gz_ros2_control` system while retaining canonical links, joint transforms,
 axes, limits, topology, meshes, collisions, inertials, hand, and mimic finger.
 
-Parity proves that identical arm joint values produce the same
-`panda_link0 -> panda_link8` transform. It does not establish a correct
-project-specific task TCP, grasp offset, contact grasp success, lift,
-placement, insertion, or force-control behavior.
+The default parity command proves that identical arm joint values produce the
+same `panda_link0 -> panda_link8` transform. The explicit TCP command proves
+the same structural and FK contract through `assembly_tcp`. Neither command
+proves that an executed controller goal reached its Cartesian target; that is
+the bounded runtime check documented in
+`docs/physical_pick_place_execution.md`. Model parity does not prove contact
+grasp success, lift, placement, insertion, or force-control behavior.

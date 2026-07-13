@@ -52,7 +52,7 @@ execution.
 
 The full physical pick-place entry point is different: it observes Gazebo's
 dynamic `target_object` on `/gazebo_target_object_pose`, adds the configurable
-`target_reference_z_offset` (default `0.05 m`), and publishes the result on
+`target_reference_z_offset` (physical default `0.0 m`), and publishes the result on
 `/target_pose`. Fake perception and the Gazebo adapter use inverse launch
 conditions, preventing two intended `/target_pose` publishers. The configured
 output frame is a label override, not a TF transform.
@@ -70,11 +70,11 @@ retreat poses use the assembly socket fixture at `(0.62, -0.18, 0.10)` from
 `adaptive_assembly_physical_workcell.sdf`. Other demos can continue using the
 default `target_offset` task mode.
 
-The physical profile keeps its `place` end-effector target `0.10 m` above the
-socket object target so the enabled Panda hand/finger collision geometry stays
-clear of the `0.095 m` socket walls during six-stage planning. This is a
-pre-insertion clearance pose for proving arm execution starts; it is not a
-claim that placement or insertion succeeds.
+The physical launch explicitly plans all six `/panda_*_pose` topics as desired
+`assembly_tcp` poses in `panda_link0`. The fixed TCP is a child of `panda_hand`
+at `(0, 0, 0.1034) m`. The observed cylinder center, zero physical grasp
+offset, and socket center form the physical Z contract. This does not claim
+that placement or insertion succeeds.
 
 For this full physical demo only, static MoveIt collision geometry is loaded
 from `config/physical_workcell_planning_scene.yaml`. Its table, target support,
