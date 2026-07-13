@@ -142,6 +142,41 @@ provider. The nested Panda planning launch is run with
 not include `moveit_resources_panda_moveit_config/launch/demo.launch.py`, the
 MoveIt resources fake `ros2_control_node`, or fake Panda controller spawners.
 
+## Physical TCP and pose-topic contract
+
+The full physical path explicitly propagates
+`end_effector_link:=assembly_tcp` through every nested launch. The sequence
+planner validates that this link exists, configures it as the MoveIt
+end-effector link, applies each pose target to it explicitly, and reports it in
+planning status. An invalid link fails as
+`configured_end_effector_link_invalid`; the physical path does not fall back
+to the SRDF's implicit `panda_link8` arm tip.
+
+`assembly_tcp` is fixed to `panda_hand` at translation `(0, 0, 0.1034) m` and
+identity rotation. The finger joint origins are at hand Z `0.0584 m`, and the
+opposing near-planar collision contact pads are centered `0.045 m` farther
+along +Z. Symmetric finger travel along hand +/-Y leaves the midpoint fixed
+while the fingers move. The adapters' normalized quaternion
+`(x=1, y=0, z=0, w=0)` points the TCP +Z axis downward for the vertical
+cylindrical grasp.
+
+The physical public pose meanings are:
+
+- `/target_pose`: Gazebo-observed target-cylinder geometric center in `world`;
+- `/panda_pre_grasp_pose`, `/panda_grasp_pose`, `/panda_lift_pose`,
+  `/panda_pre_place_pose`, `/panda_place_pose`, and `/panda_retreat_pose`:
+  desired `assembly_tcp` poses in `panda_link0`.
+
+The cylinder model pose is its center and its length is `0.10 m`. The full
+physical launch uses `target_reference_z_offset:=0.0`, and the physical task
+profile uses `grasp_height_offset: 0.0`, so the grasp TCP Z equals the observed
+cylinder-center Z. Pre-grasp and lift remain `0.20 m` above that center. The
+fixed socket's `socket_z: 0.10` is also an object/TCP center and its physical
+`place_height_offset` is `0.0`. Generic visual and plan-only profiles retain
+their previous defaults. The physical planning wrapper uses `0.005 m` and
+`0.03 rad` planning tolerances, below the independent `0.02 m` and `0.10 rad`
+runtime acceptance tolerances; generic planner defaults remain unchanged.
+
 The MoveIt planner nodes remain plan-only: their status messages retain
 `execution=false`, and they only publish six `RobotTrajectory` messages. The
 separate `physical_pick_place_executor_node` is the component that sends those
@@ -157,18 +192,14 @@ It also sets `launch_fake_object_pose_node:=false`. A model-local Gazebo
 `target_object` model-center pose on `/gazebo_target_object_pose`. This
 dedicated path does not depend on SceneBroadcaster entity names. The
 `gazebo_target_pose_adapter_node` publishes the task input on `/target_pose`.
-The adapter preserves XY and orientation and adds
-`target_reference_z_offset:=0.05` to Z. This documented default converts the
-center of the `0.10 m` Gazebo cylinder to its top/reference pose. The adapter
+The adapter preserves XY and orientation and adds the physical launch's
+`target_reference_z_offset:=0.0` to Z, retaining the cylinder center. The adapter
 does not synthesize a target before an observation arrives. Its
 `output_frame_id:=world` setting overrides only the frame label and does not
 perform a TF transform.
 
-The fixed socket object target remains `(0.62, -0.18, 0.10)`. For this bounded
-arm-start demo, the physical profile applies `place_height_offset:=0.10`, so
-the planned hand pose remains above the socket walls while Panda collision
-geometry is enabled. That stage is a pre-insertion clearance target and does
-not demonstrate completed placement or insertion.
+The fixed socket object/TCP center target remains `(0.62, -0.18, 0.10)`. This
+contract does not demonstrate completed placement or insertion.
 
 Ordinary and plan-only demos retain `launch_fake_object_pose_node:=true` and
 therefore keep their existing deterministic fake-perception behavior. In the
@@ -229,6 +260,27 @@ one arm joint. It stops at proof of initial arm motion; it does not claim grasp,
 lift, placement, or insertion success. On failure it prints the concrete
 missing or rejected condition and writes `launch.log` plus
 `status_topics.log` under `runs/pr75_arm_motion_<timestamp>/`.
+
+For bounded Cartesian TCP verification, run:
+
+```bash
+python3 scripts/check_full_physical_pick_place_tcp_contract.py
+```
+
+The headless checker requires active Gazebo controllers, real Gazebo joint
+states and target observation, successful physical preflight, six nonempty
+plans, accepted and successful `pre_grasp` and `grasp` arm goals, and the
+authoritative runtime TF `panda_link0 -> assembly_tcp` within `0.02 m` and
+`0.10 rad` of both targets. Orientation error is the shortest relative
+quaternion angle. It exits once grasp TCP evidence is complete, before a later
+gripper-close or contact failure can affect this bounded result. It writes
+`launch.log`, `status_topics.log`, `tcp_targets.csv`, `tcp_actual.csv`, and
+`result.json` under `runs/tcp_contract_<timestamp>/`.
+
+Model parity, joint-space controller success, and Cartesian TCP success are
+distinct evidence. This checker supplies the third by measuring runtime TF;
+it does not claim gripper closure, contact grasp, lift, placement, retreat, or
+insertion success.
 
 See `docs/gazebo_contact_grasp_verification.md` for the Gazebo contact sensor
 plumbing and verifier status schemas. This remains simulator-only. It does not

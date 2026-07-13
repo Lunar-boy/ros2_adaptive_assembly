@@ -18,15 +18,15 @@ fake_object_pose_node:
 assembly_task_node:
   ros__parameters:
     pre_grasp_height_offset: 0.20
-    grasp_height_offset: 0.05
+    # /target_pose is the cylinder center in this profile, and physical Panda
+    # stage poses target assembly_tcp, so the grasp center needs no Z offset.
+    grasp_height_offset: 0.0
     lift_height_offset: 0.20
     assembly_height_offset: 0.05
     replan_distance_threshold: 0.03
     pre_place_height_offset: 0.20
-    # Keep the hand/finger collision geometry above the 0.095 m socket-wall
-    # top for the arm-start regression. This is a pre-insertion clearance
-    # target, not evidence that placement or insertion completed.
-    place_height_offset: 0.10
+    # socket_z is the desired object/TCP center; this is not an insertion claim.
+    place_height_offset: 0.0
     retreat_height_offset: 0.20
     assembly_pose_mode: fixed_socket
     socket_x: 0.62

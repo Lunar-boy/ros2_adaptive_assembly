@@ -41,6 +41,8 @@ def generate_launch_description() -> LaunchDescription:
     assembly_trajectory_topic = LaunchConfiguration('assembly_trajectory_topic')
     trajectory_status_topic = LaunchConfiguration('trajectory_status_topic')
     start_state_mode = LaunchConfiguration('start_state_mode')
+    stage_names = LaunchConfiguration('stage_names')
+    end_effector_link = LaunchConfiguration('end_effector_link')
     static_planning_scene_params_file = LaunchConfiguration(
         'static_planning_scene_params_file'
     )
@@ -181,6 +183,16 @@ def generate_launch_description() -> LaunchDescription:
             description='Topic for trajectory publication status.',
         ),
         DeclareLaunchArgument(
+            'stage_names',
+            default_value='pre_grasp,assembly',
+            description='Comma-separated ordered sequence stages.',
+        ),
+        DeclareLaunchArgument(
+            'end_effector_link',
+            default_value='panda_link8',
+            description='Robot link whose pose each stage target specifies.',
+        ),
+        DeclareLaunchArgument(
             'start_state_mode',
             default_value='current',
             description=(
@@ -237,6 +249,8 @@ def generate_launch_description() -> LaunchDescription:
                 'pre_grasp_trajectory_topic': pre_grasp_trajectory_topic,
                 'assembly_trajectory_topic': assembly_trajectory_topic,
                 'trajectory_status_topic': trajectory_status_topic,
+                'stage_names': stage_names,
+                'end_effector_link': end_effector_link,
                 'start_state_mode': start_state_mode,
                 'use_sim_time': use_sim_time,
             }.items(),

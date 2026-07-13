@@ -74,7 +74,8 @@ sudo apt install \
 ```
 
 The Panda launch includes the installed
-`moveit_resources_panda_description/urdf/panda.urdf.xacro` model and starts
+upstream Panda model through the project-owned canonical
+`adaptive_assembly_sim/urdf/panda.urdf.xacro` and starts
 `joint_state_broadcaster`, `panda_arm_controller`, and
 `panda_gripper_controller`. Full two-stage execution is composed from
 `adaptive_assembly_bringup`.
@@ -91,8 +92,10 @@ ros2 run adaptive_assembly_sim check_robot_model_parity \
 ```
 
 The expected exit is `0`, with both endpoints set to `panda_link8` and all
-structural and FK mismatch counts equal to zero. This does not validate a
-project task TCP, contact grasp, lift, placement, or insertion. See
+structural and FK mismatch counts equal to zero. The canonical description
+also defines `assembly_tcp` once as a fixed child of `panda_hand` at
+`xyz="0 0 0.1034"`, `rpy="0 0 0"`. Its parity is checked with
+`--reference-tool-link assembly_tcp --candidate-tool-link assembly_tcp`. See
 `docs/robot_model_parity.md` from the workspace root for the full interface.
 
 Gazebo starts paused. Panda creation completes before both controllers are

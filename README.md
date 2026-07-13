@@ -169,8 +169,8 @@ plan-only and fake-perception launches retain their wall-time defaults.
 Unlike ordinary demos, the full physical launch disables
 `fake_object_pose_node`. It adapts the observed
 `/gazebo_target_object_pose` into `/target_pose`, preserving XY and orientation
-and adding `target_reference_z_offset:=0.05` to convert the `0.10 m` cylinder's
-model-center pose to the task reference. `output_frame_id:=world` is a label
+with `target_reference_z_offset:=0.0`, so the `0.10 m` cylinder's model-center
+pose is the physical task reference. `output_frame_id:=world` is a label
 override only; no TF transformation is performed. The adapter publishes
 nothing before Gazebo provides a valid pose.
 
@@ -204,6 +204,19 @@ python3 scripts/check_full_physical_pick_place_arm_motion.py
 This is an arm-start acceptance check, not evidence of successful contact
 grasp, lift, placement, or insertion.
 
+The physical planner explicitly targets `assembly_tcp`, a fixed frame at
+`panda_hand` translation `(0, 0, 0.1034) m` and identity rotation. All six
+`/panda_*_pose` topics are desired `assembly_tcp` poses in `panda_link0`. Run
+the bounded Cartesian check with:
+
+```bash
+python3 scripts/check_full_physical_pick_place_tcp_contract.py
+```
+
+It measures authoritative runtime TF after accepted and successful
+`pre_grasp` and `grasp` goals. It does not require or claim gripper closure,
+contact grasp, lift, placement, or insertion.
+
 MoveIt planning and Gazebo execution share the installed
 `moveit_resources_panda_description` kinematic model. The local Gazebo wrapper
 adds only the identity world anchor, simulator control interfaces, dynamics,
@@ -219,6 +232,15 @@ The expected exit code is `0`: both sides compare `panda_link0` to
 equivalence only; it does not prove task TCP offsets, contact grasp success,
 lift, placement, or insertion. See
 [Robot model parity diagnostic](docs/robot_model_parity.md) for details.
+
+The same diagnostic can check the complete TCP chain:
+
+```bash
+ros2 run adaptive_assembly_sim check_robot_model_parity \
+  --current-panda-models \
+  --reference-tool-link assembly_tcp \
+  --candidate-tool-link assembly_tcp
+```
 
 To save terminal output from each full physical pick-place simulation attempt,
 use the manual run logging wrapper:

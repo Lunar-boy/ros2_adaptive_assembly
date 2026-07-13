@@ -27,6 +27,7 @@ def generate_launch_description() -> LaunchDescription:
     require_place_sequence = LaunchConfiguration('require_place_sequence')
     trajectory_status_topic = LaunchConfiguration('trajectory_status_topic')
     start_state_mode = LaunchConfiguration('start_state_mode')
+    end_effector_link = LaunchConfiguration('end_effector_link')
     use_sim_time = LaunchConfiguration('use_sim_time')
 
     return LaunchDescription([
@@ -124,6 +125,11 @@ def generate_launch_description() -> LaunchDescription:
             ),
         ),
         DeclareLaunchArgument(
+            'end_effector_link',
+            default_value='panda_link8',
+            description='Robot link whose pose each stage target specifies.',
+        ),
+        DeclareLaunchArgument(
             'use_sim_time',
             default_value='false',
             description='Use simulation time when an upstream simulator provides /clock.',
@@ -173,6 +179,7 @@ def generate_launch_description() -> LaunchDescription:
                     value_type=bool,
                 ),
                 'planning_group': 'panda_arm',
+                'end_effector_link': end_effector_link,
                 'planner_id': planner_id,
                 'num_planning_attempts': ParameterValue(
                     num_planning_attempts,

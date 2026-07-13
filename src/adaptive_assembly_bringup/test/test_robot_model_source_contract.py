@@ -14,6 +14,7 @@ BRINGUP_LAUNCH = BRINGUP_DIR / 'launch'
 SIM_LAUNCH = WORKSPACE_SRC / 'adaptive_assembly_sim' / 'launch'
 SIM_PACKAGE = WORKSPACE_SRC / 'adaptive_assembly_sim'
 GAZEBO_XACRO = SIM_PACKAGE / 'urdf' / 'panda_gazebo_ros2_control.urdf.xacro'
+CANONICAL_XACRO = SIM_PACKAGE / 'urdf' / 'panda.urdf.xacro'
 PARITY_SOURCE = (
     SIM_PACKAGE / 'adaptive_assembly_sim' / 'robot_model_parity.py'
 )
@@ -92,8 +93,13 @@ def test_physical_demo_model_sources_match_the_expected_parity_contract():
     assert isinstance(builder.args[0], ast.Constant)
     assert builder.args[0].value == 'moveit_resources_panda'
     robot_description = _find_call(panda_demo, 'robot_description')
-    assert _keyword_string(robot_description, 'file_path') == (
-        'config/panda.urdf.xacro'
+    file_path = next(
+        item for item in robot_description.keywords if item.arg == 'file_path'
+    ).value
+    assert isinstance(file_path, ast.Name)
+    assert file_path.id == 'canonical_panda_xacro'
+    assert {'adaptive_assembly_sim', 'panda.urdf.xacro'}.issubset(
+        _assignment_strings(panda_demo, 'canonical_panda_xacro')
     )
 
     assert 'adaptive_assembly_sim' in _assignment_strings(
@@ -114,6 +120,14 @@ def test_gazebo_wrapper_includes_canonical_description_without_arm_chain():
     root = ET.parse(GAZEBO_XACRO).getroot()
     includes = root.findall(f'{{{XACRO_NAMESPACE}}}include')
     assert [include.get('filename') for include in includes] == [
+        '$(find adaptive_assembly_sim)/urdf/panda.urdf.xacro'
+    ]
+
+    canonical_root = ET.parse(CANONICAL_XACRO).getroot()
+    canonical_includes = canonical_root.findall(
+        f'{{{XACRO_NAMESPACE}}}include'
+    )
+    assert [include.get('filename') for include in canonical_includes] == [
         '$(find moveit_resources_panda_description)/urdf/panda.urdf.xacro'
     ]
 

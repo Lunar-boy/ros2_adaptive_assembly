@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="panda">
+  <!-- Canonical upstream Panda arm, hand, finger geometry, and kinematics. -->
+  <xacro:include filename="$(find moveit_resources_panda_description)/urdf/panda.urdf.xacro"/>
+
+  <!--
+    Fixed symmetric finger-contact midpoint. The finger joint origins are at
+    panda_hand z=0.0584 m, and the opposing near-planar collision contact pads
+    are centered 0.045 m farther along +Z. Symmetric +/-Y finger travel leaves
+    this midpoint fixed in panda_hand even while the fingers move.
+  -->
+  <link name="assembly_tcp"/>
+  <joint name="panda_hand_to_assembly_tcp" type="fixed">
+    <parent link="panda_hand"/>
+    <child link="assembly_tcp"/>
+    <origin xyz="0 0 0.1034" rpy="0 0 0"/>
+  </joint>
+</robot>

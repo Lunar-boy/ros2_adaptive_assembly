@@ -5,6 +5,7 @@
 #include <memory>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <unordered_set>
 #include <utility>
@@ -43,6 +44,7 @@ public:
     require_grasp_pose_(declare_parameter<bool>("require_grasp_pose", false)),
     require_place_sequence_(declare_parameter<bool>("require_place_sequence", false)),
     planning_group_(declare_parameter<std::string>("planning_group", "panda_arm")),
+    end_effector_link_(declare_parameter<std::string>("end_effector_link", "panda_link8")),
     planner_id_(declare_parameter<std::string>("planner_id", "")),
     num_planning_attempts_(declare_parameter<int>("num_planning_attempts", 1)),
     planning_time_sec_(declare_parameter<double>("planning_time_sec", 5.0)),
@@ -60,11 +62,12 @@ public:
     RCLCPP_INFO(
       node_->get_logger(),
       "Assembly sequence planner ready: stage_sequence='%s', planning_group='%s', "
-      "planner_id='%s', num_planning_attempts=%d, planning_time_sec=%.3f, "
+      "end_effector_link='%s', planner_id='%s', num_planning_attempts=%d, planning_time_sec=%.3f, "
       "position_tolerance=%.3f, orientation_tolerance=%.3f, start_state_mode='%s', "
       "publish_diagnostics=%s, publish_trajectories=%s. All stages are plan-only; "
       "execution is disabled.",
-      stage_sequence_.c_str(), planning_group_.c_str(), planner_id_.c_str(),
+      stage_sequence_.c_str(), planning_group_.c_str(), end_effector_link_.c_str(),
+      planner_id_.c_str(),
       num_planning_attempts_, planning_time_sec_, position_tolerance_,
       orientation_tolerance_, start_state_mode_.c_str(),
       publish_diagnostics_ ? "true" : "false",
@@ -126,6 +129,17 @@ private:
 
   void configure_move_group()
   {
+    const auto robot_model = move_group_.getRobotModel();
+    if (!robot_model || !robot_model->hasLinkModel(end_effector_link_)) {
+      throw std::invalid_argument(
+              "configured_end_effector_link_invalid: link '" + end_effector_link_ +
+              "' does not exist in the loaded robot model");
+    }
+    if (!move_group_.setEndEffectorLink(end_effector_link_)) {
+      throw std::invalid_argument(
+              "configured_end_effector_link_invalid: MoveIt rejected link '" +
+              end_effector_link_ + "' for planning group '" + planning_group_ + "'");
+    }
     move_group_.setPlanningTime(planning_time_sec_);
     move_group_.setGoalPositionTolerance(position_tolerance_);
     move_group_.setGoalOrientationTolerance(orientation_tolerance_);
@@ -332,7 +346,7 @@ private:
     if (!pose.header.frame_id.empty()) {
       move_group_.setPoseReferenceFrame(pose.header.frame_id);
     }
-    move_group_.setPoseTarget(pose);
+    move_group_.setPoseTarget(pose, end_effector_link_);
   }
 
   void set_pre_grasp_start_state()
@@ -456,7 +470,8 @@ private:
            << ";requested_stage_count=" << requested_stage_count
            << ";stage_sequence=" << stage_sequence_
            << ";total_duration_ms=" << total_duration_ms
-           << ";start_state_mode=" << start_state_mode_;
+           << ";start_state_mode=" << start_state_mode_
+           << ";end_effector_link=" << end_effector_link_;
     if (!reason.empty()) {
       status << ";reason=" << reason;
     }
@@ -487,6 +502,7 @@ private:
            << ";requested_stage_count=" << requested_stage_count
            << ";duration_ms=" << duration_ms
            << ";planning_group=" << planning_group_
+           << ";end_effector_link=" << end_effector_link_
            << ";planner_id=" << (planner_id_.empty() ? "<default>" : planner_id_)
            << ";num_planning_attempts=" << num_planning_attempts_
            << ";planning_time_sec=" << planning_time_sec_
@@ -514,6 +530,7 @@ private:
   bool require_grasp_pose_;
   bool require_place_sequence_;
   std::string planning_group_;
+  std::string end_effector_link_;
   std::string planner_id_;
   int num_planning_attempts_;
   double planning_time_sec_;
@@ -539,7 +556,14 @@ int main(int argc, char * argv[])
   auto node = std::make_shared<rclcpp::Node>(
     "assembly_sequence_planning_node",
     rclcpp::NodeOptions().automatically_declare_parameters_from_overrides(true));
-  auto planner = std::make_shared<AssemblySequencePlanningNode>(node);
+  std::shared_ptr<AssemblySequencePlanningNode> planner;
+  try {
+    planner = std::make_shared<AssemblySequencePlanningNode>(node);
+  } catch (const std::exception & exception) {
+    RCLCPP_FATAL(node->get_logger(), "%s", exception.what());
+    rclcpp::shutdown();
+    return 2;
+  }
   rclcpp::spin(node);
   planner.reset();
   rclcpp::shutdown();

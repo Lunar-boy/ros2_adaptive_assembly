@@ -68,6 +68,7 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     string_arguments = {
+        'end_effector_link': 'assembly_tcp',
         'stage_names': 'pre_grasp,grasp,lift,pre_place,place,retreat',
         'pre_grasp_trajectory_topic': '/pre_grasp_trajectory',
         'grasp_trajectory_topic': '/grasp_trajectory',
@@ -153,6 +154,22 @@ def generate_launch_description() -> LaunchDescription:
             **string_arguments, **bool_arguments, **float_arguments
         }.items()
     ]
+    declarations.append(DeclareLaunchArgument(
+        'position_tolerance',
+        default_value='0.005',
+        description=(
+            'Physical MoveIt position tolerance, kept below the runtime '
+            'assembly_tcp acceptance tolerance.'
+        ),
+    ))
+    declarations.append(DeclareLaunchArgument(
+        'orientation_tolerance',
+        default_value='0.03',
+        description=(
+            'Physical MoveIt orientation tolerance, kept below the runtime '
+            'assembly_tcp acceptance tolerance.'
+        ),
+    ))
     declarations.append(DeclareLaunchArgument(
         'launch_fake_object_pose_node',
         default_value='true',
@@ -323,6 +340,13 @@ def generate_launch_description() -> LaunchDescription:
             condition=IfCondition(launch_reachable_sequence),
             launch_arguments={
                 'stage_names': stage_names,
+                'end_effector_link': LaunchConfiguration('end_effector_link'),
+                'orientation_tolerance': LaunchConfiguration(
+                    'orientation_tolerance'
+                ),
+                'position_tolerance': LaunchConfiguration(
+                    'position_tolerance'
+                ),
                 'pre_grasp_trajectory_topic': LaunchConfiguration(
                     'pre_grasp_trajectory_topic'
                 ),
