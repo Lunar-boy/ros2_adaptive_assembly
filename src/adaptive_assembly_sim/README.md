@@ -77,6 +77,20 @@ The Panda launch spawns a lightweight Panda-compatible arm model and starts
 `panda_gripper_controller`. Full two-stage execution is composed from
 `adaptive_assembly_bringup`.
 
+The local Gazebo description is intentionally not unified with the standard
+MoveIt resources Panda in the current diagnostic PR. After building and
+sourcing the workspace, compare their kinematic contracts without launching a
+ROS graph or Gazebo:
+
+```bash
+ros2 run adaptive_assembly_sim check_robot_model_parity \
+  --current-panda-models
+```
+
+The current expected exit is `1` because the diagnostic detects structural and
+FK mismatches. See `docs/robot_model_parity.md` from the workspace root for the
+full command interface and interpretation.
+
 Gazebo starts paused. Panda creation completes before both controllers are
 configured; launch then unpauses and activates them. Only the base is anchored.
 
