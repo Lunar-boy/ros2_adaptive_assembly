@@ -1,4 +1,4 @@
-"""Expected-mismatch regression for the current planning and Gazebo models."""
+"""Expected-pass regression for the current planning and Gazebo models."""
 
 from pathlib import Path
 
@@ -39,8 +39,8 @@ def _moveit_panda_xacro():
     return source
 
 
-def test_current_moveit_and_gazebo_models_are_expected_to_mismatch_until_pr2():
-    """Prove PR 1 diagnoses the mismatch that a follow-up PR must remove."""
+def test_current_moveit_and_gazebo_models_have_kinematic_parity():
+    """Require canonical structure and FK parity at all nonzero samples."""
     result = compare_sources(
         _moveit_panda_xacro(),
         GAZEBO_XACRO,
@@ -48,17 +48,13 @@ def test_current_moveit_and_gazebo_models_are_expected_to_mismatch_until_pr2():
         reference_base_link='panda_link0',
         candidate_base_link='panda_link0',
         reference_tool_link='panda_link8',
-        candidate_tool_link='panda_hand',
+        candidate_tool_link='panda_link8',
         arm_joints=DEFAULT_ARM_JOINTS,
         samples=builtin_panda_samples(),
     )
 
-    categories = {
-        mismatch.category for mismatch in result.structural_mismatches
-    }
-    assert result.passed is False
-    assert result.structural_mismatches
-    assert 'origin_translation_mismatch' in categories
-    assert 'origin_rotation_mismatch' in categories
-    assert 'axis_mismatch' in categories
-    assert result.fk_mismatch_count >= 1
+    assert result.passed is True
+    assert result.structural_mismatches == ()
+    assert result.fk_mismatch_count == 0
+    assert len(result.fk_results) == 3
+    assert all(sample.passed for sample in result.fk_results)

@@ -1,4 +1,4 @@
-"""Launch Gazebo Harmonic with a Panda-like ros2_control arm."""
+"""Launch Gazebo Harmonic with the canonical Panda and ros2_control."""
 
 import os
 import shutil
@@ -59,6 +59,10 @@ def _launch_setup(context, *args, **kwargs):
     _required_package_share(
         'xacro',
         'Install ros-jazzy-xacro.',
+    )
+    _required_package_share(
+        'moveit_resources_panda_description',
+        'Install the ROS 2 Jazzy MoveIt Panda description resources.',
     )
     if shutil.which('gz') is None:
         raise RuntimeError(
@@ -256,7 +260,7 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             'model',
             default_value=default_model,
-            description='Panda-like URDF/xacro model to spawn.',
+            description='Canonical Panda Gazebo wrapper xacro to spawn.',
         ),
         DeclareLaunchArgument(
             'robot_name',
@@ -270,8 +274,8 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             'enable_arm_collisions', default_value='true',
             description=(
-                'Enable simplified Gazebo arm collision geometry. MoveIt '
-                'collision checking is configured separately.'
+                'Compatibility argument retained for composed launches; the '
+                'canonical Panda collision geometry is always enabled.'
             ),
         ),
         DeclareLaunchArgument(

@@ -1,14 +1,14 @@
 # Robot model parity diagnostic
 
-The full physical pick-place demo currently plans and executes against two
-different robot descriptions:
+The full physical pick-place demo plans and executes against one canonical
+Panda kinematic description:
 
 - MoveIt uses
   `moveit_resources_panda_moveit_config/config/panda.urdf.xacro` through
   `MoveItConfigsBuilder('moveit_resources_panda')`;
-- Gazebo expands
-  `adaptive_assembly_sim/urdf/panda_gazebo_ros2_control.urdf.xacro` before
-  spawning the simulator-only robot.
+- Gazebo expands a local wrapper that includes
+  `moveit_resources_panda_description/urdf/panda.urdf.xacro` before adding
+  simulator-only extensions and spawning the robot.
 
 Matching controller joint names are not enough to make those descriptions
 equivalent. A joint trajectory can be accepted and completed by
@@ -32,8 +32,8 @@ ros2 run adaptive_assembly_sim check_robot_model_parity \
 ```
 
 The preset resolves both package shares through the ament index. It uses
-`panda_link0` as both base links, `panda_link8` as the reference planning tool,
-and `panda_hand` as the candidate Gazebo tool. It fails with a setup error if
+`panda_link0` as both base links and `panda_link8` as both tool endpoints. It
+fails with a setup error if
 `moveit_resources_panda_moveit_config` is not installed. It never downloads a
 dependency and does not require a ROS graph, MoveIt process, Gazebo process,
 RViz, or graphical environment.
@@ -47,7 +47,7 @@ python3 -m adaptive_assembly_sim.robot_model_parity \
   /path/to/reference.urdf.xacro \
   src/adaptive_assembly_sim/urdf/panda_gazebo_ros2_control.urdf.xacro \
   --reference-tool-link panda_link8 \
-  --candidate-tool-link panda_hand
+  --candidate-tool-link panda_link8
 ```
 
 Xacro sources are expanded with the installed `xacro` executable using a
@@ -98,8 +98,7 @@ python3 -m adaptive_assembly_sim.robot_model_parity \
   --current-panda-models --json > /tmp/panda_model_parity.json
 ```
 
-The module form keeps redirected JSON clean when the expected mismatch returns
-exit `1`; some `ros2 run` versions append their own non-zero-exit status line.
+The module form keeps redirected JSON clean for machine validation.
 
 The schema includes `schema_version`, `passed`, `sources`, `configured_links`,
 `arm_joints`, `tolerances`, `structural_mismatches`, `fk_samples`, and
@@ -109,15 +108,15 @@ error. Output ordering is deterministic.
 
 ## Current expected result
 
-This PR intentionally produces `Robot model parity: FAIL` for the current
-pair. The diagnostic finds arm-joint origin translation differences, origin
-rotation differences, axis differences, and limit differences. All three
-default FK samples also exceed the Cartesian tolerances. The exact errors are
-reported by the command rather than frozen into documentation or tests.
+The current-model command must return exit `0` and report `Robot model parity:
+PASS`, three passing FK samples, and zero structural, FK, and total mismatches.
+The Gazebo wrapper includes the canonical lower-level Panda description instead
+of the MoveIt configuration's top-level xacro because the latter also emits
+mock `ros2_control` systems. The wrapper therefore adds exactly one usable
+`gz_ros2_control` system while retaining canonical links, joint transforms,
+axes, limits, topology, meshes, collisions, inertials, hand, and mimic finger.
 
-This is a diagnostic-only change. It does not replace either URDF, adjust a
-joint origin, change MoveIt configuration, change Gazebo spawning, or modify
-controller and execution behavior. The follow-up robot-description unification
-PR must change the clearly named expected-mismatch regression into an
-expected-pass regression (or replace it with equivalent expected-pass
-coverage).
+Parity proves that identical arm joint values produce the same
+`panda_link0 -> panda_link8` transform. It does not establish a correct
+project-specific task TCP, grasp offset, contact grasp success, lift,
+placement, insertion, or force-control behavior.

@@ -9,7 +9,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / 'src/adaptive_assembly_sim/config/panda_ros2_control.yaml'
-GRIPPER_JOINTS = {'panda_finger_joint1', 'panda_finger_joint2'}
+COMMAND_GRIPPER_JOINT = 'panda_finger_joint1'
 
 
 def main() -> int:
@@ -40,8 +40,10 @@ def main() -> int:
     gripper = data.get('panda_gripper_controller', {}).get(
         'ros__parameters', {}
     )
-    if not GRIPPER_JOINTS.issubset(set(gripper.get('joints', []))):
-        failures.append('gripper controller does not contain both finger joints')
+    if gripper.get('joints', []) != [COMMAND_GRIPPER_JOINT]:
+        failures.append(
+            'gripper controller must command only canonical primary finger joint'
+        )
     if 'position' not in gripper.get('command_interfaces', []):
         failures.append('gripper controller lacks the position command interface')
     state_interfaces = set(gripper.get('state_interfaces', []))

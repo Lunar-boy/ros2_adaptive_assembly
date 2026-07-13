@@ -1,13 +1,23 @@
-"""Static guard for the physical demo's two robot-model sources."""
+"""Guard the physical demo's unified canonical Panda model source."""
 
 import ast
 from pathlib import Path
+import subprocess
+import xml.etree.ElementTree as ET
+
+from adaptive_assembly_sim.robot_model_parity import CURRENT_PANDA_TOOL_LINK
 
 
 BRINGUP_DIR = Path(__file__).resolve().parents[1]
 WORKSPACE_SRC = BRINGUP_DIR.parent
 BRINGUP_LAUNCH = BRINGUP_DIR / 'launch'
 SIM_LAUNCH = WORKSPACE_SRC / 'adaptive_assembly_sim' / 'launch'
+SIM_PACKAGE = WORKSPACE_SRC / 'adaptive_assembly_sim'
+GAZEBO_XACRO = SIM_PACKAGE / 'urdf' / 'panda_gazebo_ros2_control.urdf.xacro'
+PARITY_SOURCE = (
+    SIM_PACKAGE / 'adaptive_assembly_sim' / 'robot_model_parity.py'
+)
+XACRO_NAMESPACE = 'http://www.ros.org/wiki/xacro'
 
 
 def _tree(path):
@@ -52,7 +62,7 @@ def _keyword_string(call, keyword_name):
 
 
 def test_physical_demo_model_sources_match_the_expected_parity_contract():
-    """Require model-source changes to update diagnostics and regressions."""
+    """Use canonical MoveIt kinematics and Gazebo controllers together."""
     full_demo = (
         BRINGUP_LAUNCH
         / 'adaptive_assembly_full_physical_pick_place_demo.launch.py'
@@ -92,3 +102,55 @@ def test_physical_demo_model_sources_match_the_expected_parity_contract():
     assert 'panda_gazebo_ros2_control.urdf.xacro' in _assignment_strings(
         gazebo_launch, 'default_model'
     )
+
+    full_demo_text = full_demo.read_text(encoding='utf-8')
+    physical_execution_text = physical_execution.read_text(encoding='utf-8')
+    assert 'adaptive_assembly_panda_demo.launch.py' not in full_demo_text
+    assert 'adaptive_assembly_panda_demo.launch.py' not in physical_execution_text
+
+
+def test_gazebo_wrapper_includes_canonical_description_without_arm_chain():
+    """Reject a second local declaration of any canonical Panda arm joint."""
+    root = ET.parse(GAZEBO_XACRO).getroot()
+    includes = root.findall(f'{{{XACRO_NAMESPACE}}}include')
+    assert [include.get('filename') for include in includes] == [
+        '$(find moveit_resources_panda_description)/urdf/panda.urdf.xacro'
+    ]
+
+    local_kinematic_joints = {
+        joint.get('name') for joint in root.findall('./joint')
+    }
+    canonical_arm_joints = {f'panda_joint{number}' for number in range(1, 8)}
+    assert local_kinematic_joints.isdisjoint(canonical_arm_joints)
+
+    expanded = subprocess.run(
+        ['xacro', str(GAZEBO_XACRO)],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    expanded_root = ET.fromstring(expanded)
+    expanded_kinematic_names = [
+        joint.get('name') for joint in expanded_root.findall('./joint')
+    ]
+    for joint_name in canonical_arm_joints:
+        assert expanded_kinematic_names.count(joint_name) == 1
+    assert len(expanded_root.findall('./ros2_control')) == 1
+
+    links = {link.get('name') for link in expanded_root.findall('./link')}
+    assert {
+        'panda_link8', 'panda_hand',
+        'panda_leftfinger', 'panda_rightfinger',
+    }.issubset(links)
+    mimic = expanded_root.find(
+        "./joint[@name='panda_finger_joint2']/mimic"
+    )
+    assert mimic is not None
+    assert mimic.get('joint') == 'panda_finger_joint1'
+
+
+def test_current_parity_preset_uses_one_canonical_tool_endpoint():
+    """Compare panda_link8 on both sides without compensating tool offsets."""
+    assert CURRENT_PANDA_TOOL_LINK == 'panda_link8'
+    parity_text = PARITY_SOURCE.read_text(encoding='utf-8')
+    assert "'panda_hand' if arguments.current_panda_models" not in parity_text

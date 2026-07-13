@@ -2,244 +2,31 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="adaptive_assembly_panda">
   <xacro:arg name="initial_positions_file" default=""/>
   <xacro:arg name="controllers_file" default=""/>
+  <!--
+    Compatibility argument retained for existing launch composition. The
+    canonical MoveIt resources Panda collision geometry is always present.
+  -->
   <xacro:arg name="enable_arm_collisions" default="true"/>
-  <xacro:property name="arm_collisions" value="$(arg enable_arm_collisions)"/>
 
-  <material name="panda_white">
-    <color rgba="0.86 0.88 0.90 1.0"/>
-  </material>
-  <material name="panda_dark">
-    <color rgba="0.12 0.13 0.14 1.0"/>
-  </material>
-  <material name="panda_joint_blue">
-    <color rgba="0.08 0.22 0.42 1.0"/>
-  </material>
-  <material name="panda_finger_dark">
-    <color rgba="0.04 0.045 0.05 1.0"/>
-  </material>
-
-  <xacro:macro name="simple_inertial" params="mass">
-    <inertial>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <mass value="${mass}"/>
-      <inertia ixx="0.01" ixy="0.0" ixz="0.0" iyy="0.01" iyz="0.0" izz="0.01"/>
-    </inertial>
-  </xacro:macro>
-
-  <xacro:macro name="box_link" params="name size xyz material">
-    <link name="${name}">
-      <xacro:simple_inertial mass="1.0"/>
-      <visual>
-        <origin xyz="${xyz}" rpy="0 0 0"/>
-        <geometry>
-          <box size="${size}"/>
-        </geometry>
-        <material name="${material}"/>
-      </visual>
-      <xacro:if value="${arm_collisions}">
-        <collision>
-          <origin xyz="${xyz}" rpy="0 0 0"/>
-          <geometry>
-            <box size="${size}"/>
-          </geometry>
-        </collision>
-      </xacro:if>
-    </link>
-  </xacro:macro>
+  <!--
+    Canonical Panda links, joints, meshes, collision geometry, inertials, and
+    limits. This lower-level description does not emit ros2_control systems.
+  -->
+  <xacro:include filename="$(find moveit_resources_panda_description)/urdf/panda.urdf.xacro"/>
 
   <link name="world"/>
-
-  <link name="panda_link0">
-    <xacro:simple_inertial mass="2.0"/>
-    <visual>
-      <origin xyz="0 0 0.12" rpy="0 0 0"/>
-      <geometry>
-        <cylinder radius="0.13" length="0.24"/>
-      </geometry>
-      <material name="panda_dark"/>
-    </visual>
-    <xacro:if value="${arm_collisions}">
-      <collision>
-        <origin xyz="0 0 0.12" rpy="0 0 0"/>
-        <geometry>
-          <cylinder radius="0.13" length="0.24"/>
-        </geometry>
-      </collision>
-    </xacro:if>
-  </link>
-
   <joint name="panda_world_joint" type="fixed">
     <parent link="world"/>
     <child link="panda_link0"/>
     <origin xyz="0 0 0" rpy="0 0 0"/>
   </joint>
 
-  <!-- Anchor only the base in Gazebo; the arm links remain dynamic. -->
+  <!-- Anchor only the base in Gazebo; the canonical arm links remain dynamic. -->
   <gazebo reference="panda_link0">
     <kinematic>true</kinematic>
   </gazebo>
 
-  <xacro:box_link name="panda_link1" size="0.14 0.16 0.32" xyz="0 0 0.16" material="panda_white"/>
-  <xacro:box_link name="panda_link2" size="0.12 0.12 0.28" xyz="0 0 0.14" material="panda_white"/>
-  <xacro:box_link name="panda_link3" size="0.36 0.10 0.10" xyz="0.18 0 0" material="panda_white"/>
-  <xacro:box_link name="panda_link4" size="0.28 0.10 0.10" xyz="0.14 0 0" material="panda_white"/>
-  <xacro:box_link name="panda_link5" size="0.12 0.12 0.22" xyz="0 0 0.11" material="panda_white"/>
-  <xacro:box_link name="panda_link6" size="0.10 0.10 0.18" xyz="0 0 0.09" material="panda_white"/>
-
-  <link name="panda_link7">
-    <xacro:simple_inertial mass="0.5"/>
-    <visual>
-      <origin xyz="0 0 0.055" rpy="0 0 0"/>
-      <geometry>
-        <cylinder radius="0.06" length="0.11"/>
-      </geometry>
-      <material name="panda_joint_blue"/>
-    </visual>
-    <xacro:if value="${arm_collisions}">
-      <collision>
-        <origin xyz="0 0 0.055" rpy="0 0 0"/>
-        <geometry>
-          <cylinder radius="0.06" length="0.11"/>
-        </geometry>
-      </collision>
-    </xacro:if>
-  </link>
-
-  <link name="panda_hand">
-    <xacro:simple_inertial mass="0.4"/>
-    <visual>
-      <origin xyz="0 0 0.06" rpy="0 0 0"/>
-      <geometry>
-        <box size="0.12 0.08 0.12"/>
-      </geometry>
-      <material name="panda_dark"/>
-    </visual>
-    <xacro:if value="${arm_collisions}">
-      <collision>
-        <origin xyz="0 0 0.06" rpy="0 0 0"/>
-        <geometry>
-          <box size="0.12 0.08 0.12"/>
-        </geometry>
-      </collision>
-    </xacro:if>
-  </link>
-
-  <link name="panda_leftfinger">
-    <xacro:simple_inertial mass="0.05"/>
-    <visual>
-      <origin xyz="0.045 0 -0.05" rpy="0 0 0"/>
-      <geometry>
-        <box size="0.025 0.018 0.10"/>
-      </geometry>
-      <material name="panda_finger_dark"/>
-    </visual>
-    <xacro:if value="${arm_collisions}">
-      <collision name="panda_leftfinger_collision">
-        <origin xyz="0.045 0 -0.05" rpy="0 0 0"/>
-        <geometry>
-          <box size="0.025 0.018 0.10"/>
-        </geometry>
-      </collision>
-    </xacro:if>
-  </link>
-
-  <link name="panda_rightfinger">
-    <xacro:simple_inertial mass="0.05"/>
-    <visual>
-      <origin xyz="0.045 0 -0.05" rpy="0 0 0"/>
-      <geometry>
-        <box size="0.025 0.018 0.10"/>
-      </geometry>
-      <material name="panda_finger_dark"/>
-    </visual>
-    <xacro:if value="${arm_collisions}">
-      <collision name="panda_rightfinger_collision">
-        <origin xyz="0.045 0 -0.05" rpy="0 0 0"/>
-        <geometry>
-          <box size="0.025 0.018 0.10"/>
-        </geometry>
-      </collision>
-    </xacro:if>
-  </link>
-
-  <joint name="panda_joint1" type="revolute">
-    <parent link="panda_link0"/>
-    <child link="panda_link1"/>
-    <origin xyz="0 0 0.18" rpy="0 0 0"/>
-    <axis xyz="0 0 1"/>
-    <limit lower="-2.8973" upper="2.8973" effort="87" velocity="2.175"/>
-    <dynamics damping="1.0" friction="0.1"/>
-  </joint>
-  <joint name="panda_joint2" type="revolute">
-    <parent link="panda_link1"/>
-    <child link="panda_link2"/>
-    <origin xyz="0 0 0.32" rpy="0 0 0"/>
-    <axis xyz="0 1 0"/>
-    <limit lower="-1.7628" upper="1.7628" effort="87" velocity="2.175"/>
-    <dynamics damping="1.0" friction="0.1"/>
-  </joint>
-  <joint name="panda_joint3" type="revolute">
-    <parent link="panda_link2"/>
-    <child link="panda_link3"/>
-    <origin xyz="0 0 0.28" rpy="0 0 0"/>
-    <axis xyz="0 0 1"/>
-    <limit lower="-2.8973" upper="2.8973" effort="87" velocity="2.175"/>
-    <dynamics damping="1.0" friction="0.1"/>
-  </joint>
-  <joint name="panda_joint4" type="revolute">
-    <parent link="panda_link3"/>
-    <child link="panda_link4"/>
-    <origin xyz="0.36 0 0" rpy="0 0 0"/>
-    <axis xyz="0 1 0"/>
-    <limit lower="-3.0718" upper="-0.0698" effort="87" velocity="2.175"/>
-    <dynamics damping="1.0" friction="0.1"/>
-  </joint>
-  <joint name="panda_joint5" type="revolute">
-    <parent link="panda_link4"/>
-    <child link="panda_link5"/>
-    <origin xyz="0.28 0 0" rpy="0 0 0"/>
-    <axis xyz="0 0 1"/>
-    <limit lower="-2.8973" upper="2.8973" effort="12" velocity="2.61"/>
-    <dynamics damping="1.0" friction="0.1"/>
-  </joint>
-  <joint name="panda_joint6" type="revolute">
-    <parent link="panda_link5"/>
-    <child link="panda_link6"/>
-    <origin xyz="0 0 0.22" rpy="0 0 0"/>
-    <axis xyz="0 1 0"/>
-    <limit lower="-0.0175" upper="3.7525" effort="12" velocity="2.61"/>
-    <dynamics damping="1.0" friction="0.1"/>
-  </joint>
-  <joint name="panda_joint7" type="revolute">
-    <parent link="panda_link6"/>
-    <child link="panda_link7"/>
-    <origin xyz="0 0 0.18" rpy="0 0 0"/>
-    <axis xyz="0 0 1"/>
-    <limit lower="-2.8973" upper="2.8973" effort="12" velocity="2.61"/>
-    <dynamics damping="1.0" friction="0.1"/>
-  </joint>
-  <joint name="panda_hand_joint" type="fixed">
-    <parent link="panda_link7"/>
-    <child link="panda_hand"/>
-    <origin xyz="0 0 0.11" rpy="0 0 0"/>
-  </joint>
-  <joint name="panda_finger_joint1" type="prismatic">
-    <parent link="panda_hand"/>
-    <child link="panda_leftfinger"/>
-    <origin xyz="0 0.012 0.02" rpy="0 0 0"/>
-    <axis xyz="0 1 0"/>
-    <limit lower="0.0" upper="0.04" effort="20" velocity="0.2"/>
-    <dynamics damping="5.0" friction="1.0"/>
-  </joint>
-  <joint name="panda_finger_joint2" type="prismatic">
-    <parent link="panda_hand"/>
-    <child link="panda_rightfinger"/>
-    <origin xyz="0 -0.012 0.02" rpy="0 0 0"/>
-    <axis xyz="0 -1 0"/>
-    <limit lower="0.0" upper="0.04" effort="20" velocity="0.2"/>
-    <dynamics damping="5.0" friction="1.0"/>
-  </joint>
-
+  <!-- Canonical finger collision names are preserved by URDF-to-SDF conversion. -->
   <gazebo reference="panda_leftfinger">
     <mu1>1.0</mu1>
     <mu2>1.0</mu2>
@@ -333,11 +120,9 @@
       </state_interface>
       <state_interface name="velocity"/>
     </joint>
+    <!-- panda_finger_joint2 mimics joint1 in the canonical Panda URDF. -->
     <joint name="panda_finger_joint2">
-      <command_interface name="position"/>
-      <state_interface name="position">
-        <param name="initial_value">0.04</param>
-      </state_interface>
+      <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
   </ros2_control>
