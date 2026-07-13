@@ -20,8 +20,7 @@ def main() -> int:
     required_source = {
         'FollowJointTrajectory import': 'from control_msgs.action import FollowJointTrajectory',
         'controller action default': '/panda_gripper_controller/follow_joint_trajectory',
-        'left finger joint': 'panda_finger_joint1',
-        'right finger joint': 'panda_finger_joint2',
+        'canonical primary finger joint': 'panda_finger_joint1',
     }
     for description, text in required_source.items():
         if text not in source_text:

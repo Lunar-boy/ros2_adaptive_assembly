@@ -3,6 +3,7 @@
 
 from pathlib import Path
 import sys
+import subprocess
 import xml.etree.ElementTree as ET
 
 
@@ -33,9 +34,15 @@ def main() -> int:
         return fail(f'missing URDF/xacro: {URDF.relative_to(ROOT)}')
 
     try:
-        root = ET.parse(URDF).getroot()
-    except ET.ParseError as exc:
-        return fail(f'URDF/xacro XML parse failed: {exc}')
+        expanded = subprocess.run(
+            ['xacro', str(URDF)],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        root = ET.fromstring(expanded)
+    except (ET.ParseError, subprocess.CalledProcessError) as exc:
+        return fail(f'URDF/xacro expansion failed: {exc}')
 
     failures: list[str] = []
     links = root.findall('.//link')
@@ -60,6 +67,13 @@ def main() -> int:
             if attr not in limit.attrib:
                 failures.append(f'{joint_name} limit is missing {attr}')
 
+    mimic_joint = find_named(joints, 'panda_finger_joint2')
+    mimic = mimic_joint.find('mimic') if mimic_joint is not None else None
+    if mimic is None or mimic.get('joint') != 'panda_finger_joint1':
+        failures.append(
+            'panda_finger_joint2 does not mimic panda_finger_joint1'
+        )
+
     ros2_control = find_named(root.findall('.//ros2_control'), 'GazeboSystem')
     if ros2_control is None:
         failures.append('missing ros2_control block named GazeboSystem')
@@ -76,9 +90,16 @@ def main() -> int:
             state_names = [
                 item.get('name') for item in control_joint.findall('state_interface')
             ]
-            if 'position' not in command_names:
+            if (
+                joint_name == 'panda_finger_joint1'
+                and 'position' not in command_names
+            ):
                 failures.append(
                     f'{joint_name} missing position command_interface'
+                )
+            if joint_name == 'panda_finger_joint2' and command_names:
+                failures.append(
+                    'mimic panda_finger_joint2 must not expose command interfaces'
                 )
             for state_name in ('position', 'velocity'):
                 if state_name not in state_names:

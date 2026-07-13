@@ -28,7 +28,7 @@ ros2 launch adaptive_assembly_bringup \
   adaptive_assembly_gazebo_grasp_attach_demo.launch.py
 ```
 
-By default this starts the Gazebo workcell and Panda-like arm, synchronizes
+By default this starts the Gazebo workcell and canonical Panda, synchronizes
 `/target_pose` to Gazebo's `target_object`, and plans and executes the grasp and
 fixed-socket place sequence. The logical lifecycle attaches after `grasp`, the
 kinematic attachment makes `target_object` follow `panda_hand` with a `0.10 m`

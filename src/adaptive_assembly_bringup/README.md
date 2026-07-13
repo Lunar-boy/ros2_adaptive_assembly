@@ -43,8 +43,8 @@ ros2 launch adaptive_assembly_bringup \
   adaptive_assembly_full_gazebo_execution_demo.launch.py
 ```
 
-It starts the Gazebo workcell, spawns a lightweight Panda-like ros2_control
-arm, activates `joint_state_broadcaster` and `panda_arm_controller`, and sends
+It starts the Gazebo workcell, spawns the canonical Panda with `ros2_control`,
+activates `joint_state_broadcaster` and `panda_arm_controller`, and sends
 the existing exported two-stage sequence to the simulated controller. It does
 not add gripper control, object attachment, contact-rich insertion, force
 control, perception-driven Gazebo object sync, real robot drivers, or hardware

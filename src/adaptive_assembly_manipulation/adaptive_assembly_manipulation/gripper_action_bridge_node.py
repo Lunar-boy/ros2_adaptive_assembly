@@ -26,7 +26,7 @@ def parse_status(status: str) -> Dict[str, str]:
 
 
 class GripperActionBridgeNode(Node):
-    """Send two-finger trajectories for logical open and close commands."""
+    """Send primary-finger trajectories for logical open and close commands."""
 
     def __init__(self) -> None:
         super().__init__('gripper_action_bridge_node')
@@ -38,9 +38,7 @@ class GripperActionBridgeNode(Node):
             'status_topic': '/physical_gripper_command_status',
             'success_topic': '/physical_gripper_command_success',
             'closed_topic': '/physical_gripper_closed',
-            'joint_names': [
-                'panda_finger_joint1', 'panda_finger_joint2'
-            ],
+            'joint_names': ['panda_finger_joint1'],
             'open_position': 0.04,
             'close_position': 0.0,
             'goal_time_sec': 1.0,
@@ -57,9 +55,9 @@ class GripperActionBridgeNode(Node):
                 'simulated_only must remain true; real hardware is not supported'
             )
         self._joint_names = list(self.get_parameter('joint_names').value)
-        if len(self._joint_names) != 2 or any(
+        if not self._joint_names or any(
                 not str(name) for name in self._joint_names):
-            raise ValueError('joint_names must contain exactly two non-empty names')
+            raise ValueError('joint_names must contain non-empty names')
         self._action_name = str(
             self.get_parameter('controller_action_name').value
         )
@@ -136,7 +134,7 @@ class GripperActionBridgeNode(Node):
         )
         position = float(self.get_parameter(position_parameter).value)
         point = JointTrajectoryPoint()
-        point.positions = [position, position]
+        point.positions = [position] * len(self._joint_names)
         goal_time = float(self.get_parameter('goal_time_sec').value)
         point.time_from_start.sec = int(goal_time)
         point.time_from_start.nanosec = int(

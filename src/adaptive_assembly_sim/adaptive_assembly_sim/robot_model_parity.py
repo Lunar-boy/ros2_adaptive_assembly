@@ -16,6 +16,7 @@ import xml.etree.ElementTree as ElementTree
 DEFAULT_ARM_JOINTS = tuple(f'panda_joint{index}' for index in range(1, 8))
 DEFAULT_BASE_LINK = 'panda_link0'
 DEFAULT_TOOL_LINK = 'panda_link8'
+CURRENT_PANDA_TOOL_LINK = DEFAULT_TOOL_LINK
 SCHEMA_VERSION = 1
 
 
@@ -1163,7 +1164,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         candidate_tool = (
             arguments.candidate_tool_link
             or arguments.tool_link
-            or ('panda_hand' if arguments.current_panda_models else DEFAULT_TOOL_LINK)
+            or (
+                CURRENT_PANDA_TOOL_LINK
+                if arguments.current_panda_models
+                else DEFAULT_TOOL_LINK
+            )
         )
         if arguments.no_fk and arguments.fk_sample:
             raise ParitySetupError('--no-fk cannot be combined with --fk-sample')

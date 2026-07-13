@@ -1,13 +1,13 @@
 # Full Gazebo Panda execution
 
-PR37 adds a self-contained simulator-only execution path that physically moves
-a Panda-like arm in Gazebo Harmonic through `ros2_control`.
+This is a self-contained simulator-only execution path that physically moves
+the canonical MoveIt resources Panda in Gazebo Harmonic through `ros2_control`.
 
 The demo composes:
 
 - the existing deterministic known-reachable sequence planning profile;
 - the existing Gazebo workcell world;
-- a lightweight Panda-like URDF/xacro model with Panda joint names;
+- the installed canonical Panda URDF/xacro wrapped with Gazebo extensions;
 - `gz_ros2_control` with `joint_state_broadcaster`;
 - `panda_arm_controller`, a `FollowJointTrajectory` controller;
 - the existing `ros2_control_sequence_executor_node`.
@@ -29,6 +29,7 @@ sudo apt install \
   ros-jazzy-controller-manager \
   ros-jazzy-joint-state-broadcaster \
   ros-jazzy-joint-trajectory-controller \
+  ros-jazzy-moveit-resources-panda-description \
   ros-jazzy-robot-state-publisher \
   ros-jazzy-ros-gz-bridge \
   ros-jazzy-xacro

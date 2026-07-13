@@ -2,8 +2,8 @@
 
 ## Purpose
 
-PR63 adds controller-level actuation for the two independent Panda finger
-joints introduced in PR62. `panda_gripper_controller` is a two-joint
+`panda_gripper_controller` commands the canonical Panda primary finger joint;
+the second finger follows through the installed model's mimic relation. It is a
 `JointTrajectoryController`. `gripper_action_bridge_node` translates the
 existing semicolon-delimited `/gripper_command` open/close interface into
 `FollowJointTrajectory` goals.
@@ -22,7 +22,9 @@ status on `/physical_gripper_command_status`, command success on
 Key parameters are `controller_action_name`, `joint_names`, `open_position`,
 `close_position`, `goal_time_sec`, `wait_for_controller_sec`,
 `result_timeout_sec`, `send_goals`, and `simulated_only`. The defaults command
-both finger joints to `0.04` for open and `0.0` for close. `send_goals=false`
+`panda_finger_joint1` to `0.04` for open and `0.0` for close.
+`panda_finger_joint2` follows through the standard Panda URDF mimic relation.
+`send_goals=false`
 provides deterministic controller-free validation. `simulated_only=false` is
 rejected because real hardware is outside this package's scope.
 

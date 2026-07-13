@@ -120,7 +120,8 @@ def generate_launch_description() -> LaunchDescription:
         ),
         LogInfo(msg=(
             'Launching full simulator-only Gazebo Panda execution. This '
-            'starts Gazebo, spawns a Panda-like ros2_control arm, plans the '
+            'starts Gazebo, spawns the canonical Panda with ros2_control, '
+            'plans the '
             'two-stage sequence, and sends both trajectories to the simulated '
             'controller. Real hardware, gripper control, object attachment, '
             'and contact-rich insertion are not enabled.'

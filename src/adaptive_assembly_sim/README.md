@@ -11,7 +11,7 @@ fixture made from primitive geometry.
 ros2 launch adaptive_assembly_sim adaptive_assembly_workcell.launch.py
 ```
 
-Launch the workcell plus Panda-like arm and ros2_control controllers:
+Launch the workcell plus canonical Panda and ros2_control controllers:
 
 ```bash
 ros2 launch adaptive_assembly_sim adaptive_assembly_panda_gazebo.launch.py
@@ -68,45 +68,49 @@ sudo apt install \
   ros-jazzy-controller-manager \
   ros-jazzy-joint-state-broadcaster \
   ros-jazzy-joint-trajectory-controller \
+  ros-jazzy-moveit-resources-panda-description \
   ros-jazzy-robot-state-publisher \
   ros-jazzy-xacro
 ```
 
-The Panda launch spawns a lightweight Panda-compatible arm model and starts
+The Panda launch includes the installed
+`moveit_resources_panda_description/urdf/panda.urdf.xacro` model and starts
 `joint_state_broadcaster`, `panda_arm_controller`, and
 `panda_gripper_controller`. Full two-stage execution is composed from
 `adaptive_assembly_bringup`.
 
-The local Gazebo description is intentionally not unified with the standard
-MoveIt resources Panda in the current diagnostic PR. After building and
-sourcing the workspace, compare their kinematic contracts without launching a
-ROS graph or Gazebo:
+The local wrapper does not redeclare the Panda arm chain. It adds the identity
+`world -> panda_link0` anchor, one `gz_ros2_control` system, the Gazebo plugin,
+finger friction/contact sensors, and controller configuration around the
+canonical model. Compare the planning and simulation kinematic contracts
+without launching a ROS graph or Gazebo:
 
 ```bash
 ros2 run adaptive_assembly_sim check_robot_model_parity \
   --current-panda-models
 ```
 
-The current expected exit is `1` because the diagnostic detects structural and
-FK mismatches. See `docs/robot_model_parity.md` from the workspace root for the
-full command interface and interpretation.
+The expected exit is `0`, with both endpoints set to `panda_link8` and all
+structural and FK mismatch counts equal to zero. This does not validate a
+project task TCP, contact grasp, lift, placement, or insertion. See
+`docs/robot_model_parity.md` from the workspace root for the full interface.
 
 Gazebo starts paused. Panda creation completes before both controllers are
 configured; launch then unpauses and activates them. Only the base is anchored.
 
 ## Panda gripper model
 
-The Gazebo Panda fixture includes simulator-only parallel gripper finger links
-and prismatic finger joints:
+The canonical Panda model includes parallel gripper finger links and prismatic
+finger joints:
 
 - `panda_leftfinger`
 - `panda_rightfinger`
 - `panda_finger_joint1`
 - `panda_finger_joint2`
 
-The finger joints are exposed through the Gazebo ros2_control hardware
-interface and controlled together by the simulator-only
-`panda_gripper_controller`, a two-joint trajectory controller. This provides
+Both finger joints expose state through Gazebo ros2_control. The simulator-only
+`panda_gripper_controller` commands `panda_finger_joint1`; the canonical
+`panda_finger_joint2` mimic relation drives the other finger. This provides
 finger-joint actuation and state visibility only. It does not verify contact,
 lift, slip, or physical grasp success, and it does not add force control,
 MoveIt Servo, real hardware support, or a physical pick-place executor.
