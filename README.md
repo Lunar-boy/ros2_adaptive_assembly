@@ -166,6 +166,15 @@ This full Gazebo entry point defaults to
 physical stale-data checks use Gazebo's bridged `/clock` time domain. Ordinary
 plan-only and fake-perception launches retain their wall-time defaults.
 
+Physical gripper close distinguishes normal controller success from an
+accepted goal-tolerance abort caused by the `0.035 m`-radius target blocking
+nominal zero closure. The latter advances only as
+`contact_limited_success` after fresh, settled contact from both finger sensors
+on the exact configured `target_object` model. Unilateral, stale, wrong-object,
+rejected, canceled, timed-out, and unrelated abort cases remain failures. This
+close evidence does not bypass grasp or lift/slip verification. See
+[Gazebo contact grasp verification](docs/gazebo_contact_grasp_verification.md).
+
 Unlike ordinary demos, the full physical launch disables
 `fake_object_pose_node`. It adapts the observed
 `/gazebo_target_object_pose` into `/target_pose`, preserving XY and orientation

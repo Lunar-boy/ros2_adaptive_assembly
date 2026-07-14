@@ -30,8 +30,11 @@ physical grasp.
 - `/physical_gripper_command_success` (`std_msgs/msg/Bool`)
 - `/physical_gripper_closed` (`std_msgs/msg/Bool`)
 
-The bridge only actuates the simulated finger joints. A successful controller
-result does not verify contact, lift, slip, object attachment, or grasp success.
+The full physical Gazebo profile enables contact-aware close classification.
+An accepted goal-tolerance abort becomes `contact_limited_success` only after
+fresh, settled, bilateral contact on the exact configured target model.
+Reusable profiles keep this disabled by default, and opening remains strict.
+Close contact does not verify lift, slip, retention, or whole-task success.
 The package does not alter contact physics or support real hardware. See
 [`docs/gripper_action_bridge.md`](../../docs/gripper_action_bridge.md) for its
 parameters, manual demo, and validation commands.

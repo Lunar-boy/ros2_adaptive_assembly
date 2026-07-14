@@ -63,6 +63,21 @@ Status strings use:
 event=success|failure|waiting|skipped;mode=gazebo_grasp_contact_status;left_contact=true|false;right_contact=true|false;both_contacts=true|false;target_object_name=target_object;reason=<reason>;simulated_only=true;real_hardware=false
 ```
 
+The collector retains left and right receipt stamps independently and reports
+sensor stamps when present, raw target/wrong-object flags, contact ages, and
+collision/entity names. A target matches only when the configured model name
+is the exact model field in `model::link::collision` (the third scope token
+from the end), or a bare normalized model name. Therefore
+`default::target_object::link::collision` matches `target_object`, while
+`target_object_backup::link::collision` and a target-named link inside a
+different model do not. The finger's own collision token is excluded from
+contacted entities. Target contact plus any additional unrelated contact is
+conservatively invalid.
+
+A fresh empty `Contacts` message clears contact. Old samples do not remain true
+after `contact_stale_timeout_sec`, and close validation also rejects samples
+received before the current close operation began.
+
 Reasons include `left_contact_stale`, `right_contact_stale`,
 `no_left_contact`, `no_right_contact`, `no_target_object_contact`,
 `unsupported_contact_message`, and `simulated_only_false`.
@@ -156,6 +171,53 @@ ros2 topic echo /gazebo_target_object_pose_status
 ros2 topic echo /panda_leftfinger_contact
 ros2 topic echo /panda_rightfinger_contact
 ```
+
+## Contact-aware close manual validation
+
+Build and start the full physical pipeline (the normal launch is already
+headless-capable through its `gz_args` argument):
+
+```bash
+cd ~/ros2_adaptive_assembly_ws
+source /opt/ros/jazzy/setup.bash
+colcon build --symlink-install
+source install/setup.bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_full_physical_pick_place_demo.launch.py
+```
+
+In another sourced terminal, observe the raw evidence and stage transitions:
+
+```bash
+ros2 topic echo /panda_leftfinger_contact
+ros2 topic echo /panda_rightfinger_contact
+ros2 topic echo /grasp_contact_status
+ros2 topic echo /physical_gripper_command_status
+ros2 topic echo /physical_pick_place_stage_status
+ros2 topic echo /grasp_verification_status
+```
+
+- Case A, `target_object` between both fingers: the goal is accepted; both raw
+  topics name the target; nominal-zero close may abort with error code `-5`;
+  the bridge reports `result=contact_limited_success`; and the executor enters
+  grasp verification before lift.
+- Case B, no object between the fingers: closure follows normal action
+  semantics. A successful action reports `result=success`; absent contacts
+  never fabricate contact-limited success.
+- Case C, position the cylinder for only one finger to contact it: the bridge
+  reports `result=unilateral_contact`, and grasp verification/lift do not start.
+- Case D, contact the table, support, fixture, or another model: the bridge
+  reports `result=wrong_object_contact` with contacted entities, and lift does
+  not start.
+
+The bounded controller/contact regression does not require Gazebo:
+
+```bash
+python3 scripts/check_contact_aware_gripper_close_integration.py
+```
+
+It runs an accepted aborted bilateral case and an accepted aborted unilateral
+case against a synthetic `FollowJointTrajectory` server.
 
 If `/physical_grasp_preflight_status` reports
 `reason=kinematic_attach_node_active`, stop the kinematic attach demo before

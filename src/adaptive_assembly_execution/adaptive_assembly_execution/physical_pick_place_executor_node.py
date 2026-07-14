@@ -90,6 +90,7 @@ class PhysicalPickPlaceExecutorNode(Node):
         self.declare_parameter('send_gripper_commands', True)
         self.declare_parameter('require_gripper_success', True)
         self.declare_parameter('gripper_command_timeout_sec', 5.0)
+        self.declare_parameter('expected_target_object', 'target_object')
         self.declare_parameter('require_grasp_verification', True)
         self.declare_parameter('require_lift_verification', True)
         self.declare_parameter('require_physical_grasp_preflight', True)
@@ -163,6 +164,9 @@ class PhysicalPickPlaceExecutorNode(Node):
         self._gripper_command_timeout_sec = float(
             self.get_parameter('gripper_command_timeout_sec').value
         )
+        self._expected_target_object = str(
+            self.get_parameter('expected_target_object').value
+        ).strip()
         self._require_grasp_verification = bool(
             self.get_parameter('require_grasp_verification').value
         )
@@ -330,6 +334,7 @@ class PhysicalPickPlaceExecutorNode(Node):
         self._gripper_deadline: Optional[float] = None
         self._active_gripper_command: Optional[str] = None
         self._active_gripper_stage = ''
+        self._active_gripper_command_id = ''
         self._gripper_command_count = 0
         self._verification_deadline: Optional[float] = None
         self._active_verification: Optional[str] = None
@@ -380,6 +385,8 @@ class PhysicalPickPlaceExecutorNode(Node):
             raise ValueError('arm_result_timeout_sec must be greater than zero')
         if self._gripper_command_timeout_sec <= 0.0:
             raise ValueError('gripper_command_timeout_sec must be greater than zero')
+        if not self._expected_target_object:
+            raise ValueError('expected_target_object must not be empty')
         if self._verification_timeout_sec <= 0.0:
             raise ValueError('verification_timeout_sec must be greater than zero')
         if self._physical_grasp_preflight_timeout_sec <= 0.0:
@@ -429,12 +436,23 @@ class PhysicalPickPlaceExecutorNode(Node):
         command = fields.get('command', '')
         if command != self._active_gripper_command:
             return
+        command_id = fields.get('command_id', '')
+        if command_id and command_id != self._active_gripper_command_id:
+            return
         event = fields.get('event', '')
         if event == 'success':
-            self._finish_gripper_command(True)
+            result = fields.get('result', 'success')
+            if result not in ('success', 'contact_limited_success'):
+                self._publish_gripper_failure(fields, 'internal_error')
+                return
+            self._finish_gripper_command(
+                True, result=result, result_fields=fields
+            )
             return
         if event == 'failure' and self._require_gripper_success:
-            self._publish_failure(self._active_gripper_stage, 'gripper_command_failed')
+            self._publish_gripper_failure(
+                fields, fields.get('result', fields.get('reason', 'internal_error'))
+            )
             return
         if event == 'failure':
             self._publish_stage_status(
@@ -442,7 +460,39 @@ class PhysicalPickPlaceExecutorNode(Node):
                 'action=gripper;reason=gripper_failure_ignored;'
                 f'command={self._active_gripper_command};real_hardware=false'
             )
-            self._finish_gripper_command(True)
+            self._finish_gripper_command(
+                True,
+                result='failure_ignored',
+                result_fields=fields,
+            )
+
+    def _publish_gripper_failure(
+        self, fields: Dict[str, str], classified_result: str
+    ) -> None:
+        """Preserve the bridge classification in stage and terminal status."""
+        stage = self._active_gripper_stage
+        command = self._active_gripper_command or 'unknown'
+        self._publish_stage_status(
+            f'event=failure;mode={MODE};stage={stage};action=gripper;'
+            f'command={command};gripper_result={classified_result};'
+            f'gripper_reason={fields.get("reason", classified_result)};'
+            f'left_contact={fields.get("left_contact", "unknown")};'
+            f'right_contact={fields.get("right_contact", "unknown")};'
+            f'action_status={fields.get("action_status", "unknown")};'
+            'real_hardware=false'
+        )
+        self.get_logger().warning(
+            'gripper close failed: '
+            f'result={classified_result} '
+            f'left_contact={fields.get("left_contact", "unknown")} '
+            f'right_contact={fields.get("right_contact", "unknown")}'
+        )
+        self._publish_failure(
+            stage,
+            'gripper_command_failed',
+            gripper_result=classified_result,
+            gripper_reason=fields.get('reason', classified_result),
+        )
 
     def _gripper_success_callback(self, _: Bool) -> None:
         """Subscribe for validation visibility; status strings drive state."""
@@ -791,6 +841,7 @@ class PhysicalPickPlaceExecutorNode(Node):
         self._active_gripper_stage = stage
         self._active_gripper_command = command
         self._gripper_command_count += 1
+        self._active_gripper_command_id = str(self._gripper_command_count)
         self._publish_stage_status(
             f'event=sending;mode={MODE};stage={stage};action=gripper;'
             f'command={command};real_hardware=false'
@@ -801,12 +852,14 @@ class PhysicalPickPlaceExecutorNode(Node):
                 f'command={command};reason=send_gripper_commands_disabled;'
                 'simulated=true;real_hardware=false'
             )
-            self._finish_gripper_command(True)
+            self._finish_gripper_command(True, result='success')
             return
 
         message = String()
         message.data = (
             f'event=command;command={command};'
+            f'command_id={self._active_gripper_command_id};'
+            f'expected_target_object={self._expected_target_object};'
             'source=physical_pick_place_executor;'
             f'stage={stage};simulated=true;real_hardware=false'
         )
@@ -816,7 +869,13 @@ class PhysicalPickPlaceExecutorNode(Node):
             time.monotonic() + self._gripper_command_timeout_sec
         )
 
-    def _finish_gripper_command(self, success: bool) -> None:
+    def _finish_gripper_command(
+        self,
+        success: bool,
+        *,
+        result: str,
+        result_fields: Optional[Dict[str, str]] = None,
+    ) -> None:
         """Publish gripper success and continue the deterministic sequence."""
         if self._completed or self._active_gripper_command is None:
             return
@@ -825,11 +884,25 @@ class PhysicalPickPlaceExecutorNode(Node):
         self._gripper_deadline = None
         self._active_gripper_command = None
         self._active_gripper_stage = ''
+        self._active_gripper_command_id = ''
         if success:
             self._publish_stage_status(
                 f'event=success;mode={MODE};stage={stage};action=gripper;'
-                f'command={command};real_hardware=false'
+                f'command={command};gripper_result={result};'
+                'real_hardware=false'
             )
+            if command == 'close':
+                fields = result_fields or {}
+                self.get_logger().info(
+                    'gripper close completed: '
+                    f'result={result} '
+                    'target='
+                    f'{fields.get("expected_target_object", self._expected_target_object)} '
+                    f'left_contact={fields.get("left_contact", "unknown")} '
+                    f'right_contact={fields.get("right_contact", "unknown")} '
+                    f'settle_sec={fields.get("settle_sec", "0.0")} '
+                    f'action_status={fields.get("action_status", "unknown")}'
+                )
         if command == 'close':
             self._request_verification(stage, 'grasp')
             return
@@ -914,6 +987,8 @@ class PhysicalPickPlaceExecutorNode(Node):
         reason: str,
         *,
         preflight_reason: Optional[str] = None,
+        gripper_result: Optional[str] = None,
+        gripper_reason: Optional[str] = None,
     ) -> None:
         """Publish one retained terminal failure."""
         if self._sequence_start == 0.0:
@@ -924,6 +999,10 @@ class PhysicalPickPlaceExecutorNode(Node):
         )
         if preflight_reason is not None:
             status += f'preflight_reason={preflight_reason};'
+        if gripper_result is not None:
+            status += f'gripper_result={gripper_result};'
+        if gripper_reason is not None:
+            status += f'gripper_reason={gripper_reason};'
         status += (
             'execution=false;simulated_execution_only=true;'
             'real_hardware=false'

@@ -32,6 +32,7 @@ setup(
         'gripper action bridge.'
     ),
     license='Apache-2.0',
+    extras_require={'test': ['pytest']},
     entry_points={
         'console_scripts': [
             'logical_grasp_lifecycle_node = '
