@@ -1,4 +1,4 @@
-"""Regression tests for physical PlanningScene launch composition."""
+"""Regression tests for the dedicated physical planning launch."""
 
 import ast
 import importlib.util
@@ -7,35 +7,13 @@ import xml.etree.ElementTree as ElementTree
 
 from ament_index_python.packages import get_package_share_directory
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch_ros.actions import Node
 import yaml
 
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
 LAUNCH_DIR = PACKAGE_DIR / 'launch'
-PLANNING_LAUNCH = (
-    PACKAGE_DIR.parents[0]
-    / 'adaptive_assembly_planning'
-    / 'launch'
-    / 'static_planning_scene.launch.py'
-)
-PLANNING_NODE = (
-    PACKAGE_DIR.parents[0]
-    / 'adaptive_assembly_planning'
-    / 'src'
-    / 'static_planning_scene_node.cpp'
-)
-PANDA_GAZEBO_LAUNCH = (
-    PACKAGE_DIR.parents[0]
-    / 'adaptive_assembly_sim'
-    / 'launch'
-    / 'adaptive_assembly_panda_gazebo.launch.py'
-)
-PANDA_MODEL = (
-    PACKAGE_DIR.parents[0]
-    / 'adaptive_assembly_sim'
-    / 'urdf'
-    / 'panda_gazebo_ros2_control.urdf.xacro'
-)
+SOURCE_ROOT = PACKAGE_DIR.parent
 PHYSICAL_CONFIGURATION = 'physical_workcell_planning_scene.yaml'
 PARAMETER_ARGUMENT = 'static_planning_scene_params_file'
 PHYSICAL_OBJECT_IDS = {
@@ -50,119 +28,100 @@ PHYSICAL_OBJECT_IDS = {
 
 
 def _load_launch(filename):
-    spec = importlib.util.spec_from_file_location(
-        filename, LAUNCH_DIR / filename
-    )
+    spec = importlib.util.spec_from_file_location(filename, LAUNCH_DIR / filename)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module.generate_launch_description()
 
 
-def _declaration(description, name):
-    return next(
-        action for action in description.entities
-        if isinstance(action, DeclareLaunchArgument) and action.name == name
+def _nodes(description):
+    return [entity for entity in description.entities if isinstance(entity, Node)]
+
+
+def _executable(node):
+    return node.__dict__['_Node__node_executable']
+
+
+def _default_text(description, name):
+    declaration = next(
+        entity for entity in description.entities
+        if isinstance(entity, DeclareLaunchArgument) and entity.name == name
     )
-
-
-def _default_text(declaration):
     return ''.join(
-        substitution.text for substitution in declaration.default_value
-        if hasattr(substitution, 'text')
+        item.text for item in declaration.default_value if hasattr(item, 'text')
     )
-
-
-def _include_argument_names(description):
-    return [
-        set(dict(action.launch_arguments))
-        for action in description.entities
-        if isinstance(action, IncludeLaunchDescription)
-    ]
-
-
-def _source_tree(path):
-    return ast.parse(path.read_text(encoding='utf-8'))
 
 
 def test_physical_configuration_is_installed_and_contains_all_objects():
-    """Install the physical profile with all static workcell collision boxes."""
     source_profile = PACKAGE_DIR / 'config' / PHYSICAL_CONFIGURATION
     installed_profile = (
         Path(get_package_share_directory('adaptive_assembly_bringup'))
-        / 'config'
-        / PHYSICAL_CONFIGURATION
+        / 'config' / PHYSICAL_CONFIGURATION
     )
     assert source_profile.is_file()
     assert installed_profile.is_file()
 
-    parameters = yaml.safe_load(source_profile.read_text())[
+    parameters = yaml.safe_load(source_profile.read_text(encoding='utf-8'))[
         'static_planning_scene_node'
     ]['ros__parameters']
     assert parameters['add_work_table'] is True
     assert parameters['add_target_support'] is True
     assert parameters['add_socket_fixture'] is True
-    node_source = PLANNING_NODE.read_text(encoding='utf-8')
+
+    node_source = (
+        SOURCE_ROOT / 'adaptive_assembly_planning' / 'src'
+        / 'static_planning_scene_node.cpp'
+    ).read_text(encoding='utf-8')
     for object_id in PHYSICAL_OBJECT_IDS:
         assert f'"{object_id}"' in node_source
 
 
-def test_only_full_physical_demo_defaults_to_the_physical_profile():
-    """Keep plan-only and reusable launch defaults on their current geometry."""
-    full = _load_launch('adaptive_assembly_full_physical_pick_place_demo.launch.py')
-    assert PARAMETER_ARGUMENT in {
-        action.name for action in full.entities
-        if isinstance(action, DeclareLaunchArgument)
-    }
+def test_dedicated_planning_launch_starts_required_nodes_directly():
+    description = _load_launch('adaptive_assembly_physical_planning.launch.py')
+    executables = [_executable(node) for node in _nodes(description)]
 
-    full_tree = _source_tree(
+    assert executables.count('assembly_task_node') == 1
+    assert executables.count('move_group') == 1
+    assert executables.count('static_planning_scene_node') == 1
+    assert executables.count('planning_scene_audit_node') == 1
+    assert executables.count('panda_pre_grasp_pose_adapter_node') == 6
+    assert executables.count('assembly_sequence_planning_node') == 1
+    assert not any(
+        isinstance(entity, IncludeLaunchDescription)
+        for entity in description.entities
+    )
+
+
+def test_full_demo_includes_dedicated_planning_and_disables_legacy_sequence():
+    source = (
         LAUNCH_DIR / 'adaptive_assembly_full_physical_pick_place_demo.launch.py'
-    )
-    assert any(
-        isinstance(node, ast.Constant) and node.value == PHYSICAL_CONFIGURATION
-        for node in ast.walk(full_tree)
-    )
-
-    nonphysical = (
-        'adaptive_assembly_panda_planning_demo.launch.py',
-        'adaptive_assembly_panda_sequence_planning_demo.launch.py',
-        'adaptive_assembly_panda_sequence_planning_reachable.launch.py',
-        'adaptive_assembly_physical_pick_place_execution.launch.py',
-    )
-    for filename in nonphysical:
-        declaration = _declaration(_load_launch(filename), PARAMETER_ARGUMENT)
-        assert _default_text(declaration) == ''
-
-
-def test_physical_parameter_file_reaches_one_static_scene_launch():
-    """Forward the profile through the physical chain without a second node."""
-    chain = (
-        'adaptive_assembly_full_physical_pick_place_demo.launch.py',
-        'adaptive_assembly_physical_pick_place_execution.launch.py',
+    ).read_text(encoding='utf-8')
+    assert 'adaptive_assembly_physical_planning.launch.py' in source
+    assert "'launch_reachable_sequence': 'false'" in source
+    for legacy in (
         'adaptive_assembly_panda_sequence_planning_reachable.launch.py',
         'adaptive_assembly_panda_sequence_planning_demo.launch.py',
         'adaptive_assembly_panda_planning_demo.launch.py',
-    )
-    for filename in chain:
-        assert any(
-            PARAMETER_ARGUMENT in names
-            for names in _include_argument_names(_load_launch(filename))
-        )
+        'adaptive_assembly_panda_demo.launch.py',
+        'adaptive_assembly_pipeline.launch.py',
+    ):
+        assert legacy not in source
 
-    planning_tree = _source_tree(PLANNING_LAUNCH)
-    node_calls = [
-        node for node in ast.walk(planning_tree)
-        if isinstance(node, ast.Call) and getattr(node.func, 'id', None) == 'Node'
-    ]
-    assert len(node_calls) == 1
-    assert any(
-        isinstance(node, ast.Constant) and node.value == PARAMETER_ARGUMENT
-        for node in ast.walk(planning_tree)
+
+def test_physical_planning_defaults_to_physical_profile():
+    description = _load_launch('adaptive_assembly_physical_planning.launch.py')
+    assert PHYSICAL_CONFIGURATION in _default_text(
+        description, PARAMETER_ARGUMENT
     )
+    assert _default_text(description, 'end_effector_link') == 'assembly_tcp'
 
 
 def test_full_physical_demo_uses_identity_world_to_panda_link0():
-    """Use SDF coordinates only because this launch keeps the frames aligned."""
-    model = ElementTree.parse(PANDA_MODEL).getroot()
+    model_path = (
+        SOURCE_ROOT / 'adaptive_assembly_sim' / 'urdf'
+        / 'panda_gazebo_ros2_control.urdf.xacro'
+    )
+    model = ElementTree.parse(model_path).getroot()
     world_joint = model.find("joint[@name='panda_world_joint']")
     assert world_joint is not None
     origin = world_joint.find('origin')
@@ -170,9 +129,13 @@ def test_full_physical_demo_uses_identity_world_to_panda_link0():
     assert origin.get('xyz') == '0 0 0'
     assert origin.get('rpy') == '0 0 0'
 
-    gazebo_tree = _source_tree(PANDA_GAZEBO_LAUNCH)
+    gazebo_launch = (
+        SOURCE_ROOT / 'adaptive_assembly_sim' / 'launch'
+        / 'adaptive_assembly_panda_gazebo.launch.py'
+    )
+    tree = ast.parse(gazebo_launch.read_text(encoding='utf-8'))
     defaults = {}
-    for node in ast.walk(gazebo_tree):
+    for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         if getattr(node.func, 'id', None) != 'DeclareLaunchArgument':
