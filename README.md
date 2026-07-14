@@ -1,139 +1,117 @@
-# ROS2 Adaptive Assembly
+# ROS 2 Adaptive Assembly: Full Physical Pick-and-Place
 
-A ROS2 Jazzy + MoveIt2 project for deterministic adaptive robotic assembly in simulation.
+A ROS 2 Jazzy, MoveIt 2, Gazebo Harmonic, and `ros2_control` project for one simulator-only task: a Franka Panda picks a dynamic cylindrical object and places it into a socket fixture.
 
-This repository builds a lightweight adaptive manipulation pipeline that converts randomized object poses into robot-aware Panda planning targets, maintains TF and PlanningScene state, performs configurable plan-only multi-stage assembly planning, exports trajectories, records planning diagnostics, and provides deterministic benchmark profiles for evaluating robustness under target-pose variation.
+The primary and supported entry point is:
 
-> **Current scope:** reproducible adaptive assembly planning plus simulator-only Gazebo Panda arm execution.
-> **Not included:** camera/image perception, marker detection, visual servoing,
-> real camera hardware, contact-rich insertion, force control, or real robot
-> hardware execution.
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_full_physical_pick_place_demo.launch.py
+```
 
----
+## Project goal
 
-## Key features
+The task is complete only when the simulated Panda:
 
-- ROS2 Jazzy workspace with modular Python packages
-- Deterministic fake target-pose node publishing sampled target object poses
-- TF2 target frame broadcasting
-- Task-level pre-grasp and assembly pose generation
-- Panda-specific pose adapters for MoveIt2 planning
-- Plan-only MoveIt2 pre-grasp planning
-- Configurable plan-only sequence planning (default: `pre_grasp -> assembly`)
-- Static PlanningScene collision objects
-- Dynamic target PlanningScene object
-- PlanningScene audit and reset workflows
-- Planning request guard and safety filter
-- Stage-level planning diagnostics
-- Trajectory export for downstream execution consumers
-- Message-only dry-run execution abstraction
-- Closed-loop recovery supervisor with deterministic recovery actions
-- Deterministic benchmark profiles and CSV/Markdown report export
-- Contact-lite geometric insertion benchmark and report export
-- Lightweight Gazebo Harmonic workcell visualization
-- Simulator-only Gazebo Panda arm execution through ros2_control
-- Simulator-only Panda gripper links and finger joints in the Gazebo model
-- Simulator-only gripper trajectory controller and logical command action bridge
-- Simulator-only multi-stage pick-place executor with gripper close/open
-  interleaving
-- Simulator-only Gazebo finger contact sensing and grasp/lift/slip verification
-- Simulator-only Gazebo target object synchronization from `/target_pose`
-- Gazebo-observed target pose adaptation for the full physical demo
+1. observes the Gazebo `target_object`;
+2. moves to pre-grasp and grasp poses;
+3. closes the gripper and verifies the grasp;
+4. lifts and transports the object;
+5. moves to the socket place pose;
+6. releases the object;
+7. retreats; and
+8. leaves the object stably inside the socket.
 
----
+The final condition must be verified from Gazebo-observed object state. Planning success, controller success, gripper success, or executor completion alone is not end-to-end task success.
 
-## System architecture
+## Current status
+
+| Capability | Status |
+|---|---|
+| Physical Gazebo workcell with Panda, support, dynamic target, and socket | Implemented |
+| Gazebo target-object pose observation | Implemented |
+| Six-stage MoveIt planning | Implemented |
+| Gazebo `ros2_control` arm execution | Implemented |
+| Simulated gripper close/open | Implemented |
+| Bilateral contact-aware close handling | Implemented |
+| Grasp verification | Implemented |
+| Lift/slip verification | Implemented |
+| Final post-release socket insertion verification | **Not yet implemented** |
+
+The current executor publishes `/physical_pick_place_execution_success`. That topic means the configured execution sequence completed; it does **not** prove that the released object remains inside the socket.
+
+## Runtime sequence
 
 ```text
-ordinary demos: fake_object_pose_node ────────────────┐
-physical demo: Gazebo target_object pose observer     │
-               -> Z/frame-label adapter ──────────────┤
-                                                      ▼
-                                                /target_pose
-              │
-              ▼
+Gazebo target-object pose
+        |
+        v
+/gazebo_target_object_pose_raw
+        |
+        v
+gazebo_entity_pose_observer_node
+        |
+        +--> /gazebo_target_object_pose
+        +--> /gazebo_target_object_pose_available
+        |
+        v
+gazebo_target_pose_adapter_node
+        |
+        v
+/target_pose
+        |
+        v
 assembly_task_node
-    ├── /grasp_candidates (deterministic string schema)
-    ├── /selected_grasp_pose (= /grasp_pose legacy alias)
-    ├── /pre_grasp_pose
-    ├── /lift_pose
-    ├── /assembly_pose (robot hand target)
-    └── /object_place_pose (desired final object pose)
-              │
-              ▼
-panda_pose_adapter_node
-    ├── /panda_pre_grasp_pose
-    └── /panda_assembly_pose
-              │
-              ▼
-MoveIt2 sequence planner
-    ├── pre-grasp plan
-    ├── assembly plan
-    ├── trajectory export
-    └── diagnostics / benchmark CSV
-              │
-              ▼
-dry-run execution / simulator-only ros2_control or physical pick-place execution
-              │
-              ▼
-contact-lite insertion evaluator
+        |
+        +--> pre_grasp
+        +--> grasp
+        +--> lift
+        +--> pre_place
+        +--> place
+        +--> retreat
+        |
+        v
+Panda pose adapters and MoveIt sequence planning
+        |
+        v
+six RobotTrajectory topics
+        |
+        v
+physical_pick_place_executor_node
+        |
+        +--> Panda arm FollowJointTrajectory action
+        +--> gripper close after grasp
+        +--> grasp verification
+        +--> lift/slip verification
+        +--> gripper open after place
+        +--> retreat
 ```
 
-The current pipeline separates target-pose generation, task-level pose generation, robot-specific pose adaptation, planning, diagnostics, and execution abstraction. This makes the system easy to test incrementally and extend toward simulator or hardware execution.
-
----
-
-## Repository layout
+The default stage order is:
 
 ```text
-ros2_adaptive_assembly/
-├── docs/                         # Design notes, feature documentation, validation workflows
-├── scripts/                      # Validation, benchmark, and utility scripts
-├── benchmark_results/            # Optional benchmark CSV/Markdown outputs
-└── src/
-    ├── adaptive_assembly_bringup/     # Launch files and integration entry points
-    ├── adaptive_assembly_benchmark/   # Contact-lite geometric benchmark nodes
-    ├── adaptive_assembly_execution/   # Dry-run and execution-bridge abstractions
-    ├── adaptive_assembly_perception/  # Deterministic fake target-pose generation
-    ├── adaptive_assembly_recovery/    # Recovery supervisor and deterministic actions
-    ├── adaptive_assembly_sim/         # Gazebo workcell assets and launch files
-    └── adaptive_assembly_task/        # Task pose generation and planning adapters
+pre_grasp -> grasp -> close -> verify grasp
+          -> lift -> verify lift/slip
+          -> pre_place -> place -> open -> retreat
 ```
-
----
 
 ## Environment
 
-Tested target environment:
+Target environment:
 
 - Ubuntu 24.04
-- ROS2 Jazzy
-- MoveIt2
+- ROS 2 Jazzy
+- MoveIt 2
 - Gazebo Harmonic / `ros_gz_sim`
+- `gz_ros2_control`
 - Python 3
-- `rclpy`
 - `colcon`
 
-Recommended optional packages:
-
-```bash
-sudo apt update
-sudo apt install \
-  ros-jazzy-moveit \
-  ros-jazzy-ros-gz-sim \
-  ros-jazzy-gz-ros2-control \
-  ros-jazzy-controller-manager \
-  ros-jazzy-joint-state-broadcaster \
-  ros-jazzy-joint-trajectory-controller \
-  ros-jazzy-robot-state-publisher \
-  ros-jazzy-xacro
-```
-
-Depending on your local MoveIt2 installation, the standard Panda demo resources may also be required for Panda planning profiles.
-
----
+This repository supports Gazebo simulation only. It does not provide real robot drivers or real-hardware execution.
 
 ## Build
+
+Use a standard colcon workspace:
 
 ```bash
 mkdir -p ~/ros2_adaptive_assembly_ws/src
@@ -142,107 +120,220 @@ git clone https://github.com/Lunar-boy/ros2_adaptive_assembly.git
 
 cd ~/ros2_adaptive_assembly_ws
 source /opt/ros/jazzy/setup.bash
+rosdep install --from-paths src --ignore-src -r -y
 colcon build --symlink-install
 source install/setup.bash
 ```
 
----
-## Launch
+The repository root is then:
 
+```text
+~/ros2_adaptive_assembly_ws/src/ros2_adaptive_assembly
 ```
-ros2 launch adaptive_assembly_bringup adaptive_assembly_full_physical_pick_place_demo.launch.py
+
+## Run
+
+From the workspace root:
+
+```bash
+cd ~/ros2_adaptive_assembly_ws
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_full_physical_pick_place_demo.launch.py
 ```
 
-This full physical demo remains simulator-only. It uses Gazebo
-`gz_ros2_control` as the only controller provider and starts MoveIt planning
-without the standard Panda fake-control demo. Its target-pose observer accepts
-the dedicated 30 Hz `gz.msgs.Pose` stream from `target_object` on
-`/model/target_object/pose`. The launch bridges it to the raw ROS
-`/gazebo_target_object_pose_raw` `PoseStamped` input, avoiding the
-SceneBroadcaster Pose_V-to-TFMessage entity-name loss. Non-physical demos keep
-their existing named TFMessage extraction path without index-based fallback.
-This full Gazebo entry point defaults to
-`use_sim_time:=true`: MoveIt, sequence planning, pose generation, and the
-physical stale-data checks use Gazebo's bridged `/clock` time domain. Ordinary
-plan-only and fake-perception launches retain their wall-time defaults.
+The launch starts:
 
-Physical gripper close distinguishes normal controller success from an
-accepted goal-tolerance abort caused by the `0.035 m`-radius target blocking
-nominal zero closure. The latter advances only as
-`contact_limited_success` after fresh, settled contact from both finger sensors
-on the exact configured `target_object` model. Unilateral, stale, wrong-object,
-rejected, canceled, timed-out, and unrelated abort cases remain failures. This
-close evidence does not bypass grasp or lift/slip verification. See
-[Gazebo contact grasp verification](docs/gazebo_contact_grasp_verification.md).
+- `adaptive_assembly_physical_workcell.sdf`;
+- the Gazebo Panda model and simulated controllers;
+- `/clock` and simulation-time consumers;
+- target-object pose bridging and observation;
+- the physical task-pose pipeline;
+- MoveIt sequence planning for `assembly_tcp`;
+- arm and gripper execution;
+- contact processing;
+- physical preflight;
+- grasp verification; and
+- lift/slip verification.
 
-Unlike ordinary demos, the full physical launch disables
-`fake_object_pose_node`. It adapts the observed
-`/gazebo_target_object_pose` into `/target_pose`, preserving XY and orientation
-with `target_reference_z_offset:=0.0`, so the `0.10 m` cylinder's model-center
-pose is the physical task reference. `output_frame_id:=world` is a label
-override only; no TF transformation is performed. The adapter publishes
-nothing before Gazebo provides a valid pose.
+Fake target-pose perception is disabled by default in this launch.
 
-For the full physical launch, `adaptive_assembly_physical_workcell.sdf` is the
-source of truth for the static table, target support, and socket collision
-geometry. It loads a dedicated MoveIt PlanningScene profile while non-physical
-demos retain their existing defaults. Run
-`python3 scripts/check_physical_planning_scene_parity.py` to verify parity.
+### Headless Gazebo
 
-To inspect the pose and preflight gates:
+Use a server-only Gazebo run with:
+
+```bash
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_full_physical_pick_place_demo.launch.py \
+  gz_args:="-s $(ros2 pkg prefix adaptive_assembly_sim)/share/adaptive_assembly_sim/worlds/adaptive_assembly_physical_workcell.sdf"
+```
+
+## Save run logs
+
+After sourcing the workspace, run the logging wrapper from the repository root:
+
+```bash
+cd ~/ros2_adaptive_assembly_ws/src/ros2_adaptive_assembly
+bash scripts/run_full_physical_pick_place_with_logs.sh
+```
+
+Optional launch arguments can be passed after the script name:
+
+```bash
+RUN_ID=physical_trial_001 \
+  bash scripts/run_full_physical_pick_place_with_logs.sh \
+  use_sim_time:=true
+```
+
+Logs are written under `runs/<RUN_ID>/`.
+
+## Observe execution
+
+Useful retained terminal topics:
+
+```bash
+ros2 topic echo /physical_pick_place_execution_status --once
+ros2 topic echo /physical_pick_place_execution_success --once
+ros2 topic echo /physical_pick_place_execution_duration_ms --once
+```
+
+Stage-level transitions:
+
+```bash
+ros2 topic echo /physical_pick_place_stage_status
+```
+
+Target observation and preflight:
 
 ```bash
 ros2 topic echo /gazebo_target_object_pose_status --once
 ros2 topic echo /gazebo_target_object_pose_available --once
+ros2 topic echo /gazebo_target_object_pose --once
+ros2 topic echo /target_pose --once
 ros2 topic echo /physical_grasp_preflight_status --once
 ```
 
-Executor failures retain `reason=physical_grasp_preflight_failed` and add the
-concrete cause as `preflight_reason=<reason>`.
+Contact and verification:
 
-The MoveIt sequence planner is still plan-only and publishes trajectories with
-`execution=false`. In the full physical demo, the separate simulator-only
-physical executor sends them to Gazebo's `panda_arm_controller`. To run the
-bounded regression that proves the `pre_grasp` goal is accepted and at least
-one Panda arm joint starts moving:
+```bash
+ros2 topic echo /grasp_contact_status
+ros2 topic echo /physical_gripper_command_status
+ros2 topic echo /grasp_verification_status
+ros2 topic echo /grasp_verified
+ros2 topic echo /lift_verified
+ros2 topic echo /grasp_slip_distance_mm
+```
+
+## Success semantics
+
+### What is already verified
+
+The current physical path can verify:
+
+- the physical simulation prerequisites are available;
+- all six planned trajectories are non-empty and controller-compatible;
+- the Panda controller accepts and completes arm stages;
+- gripper close/open results are valid;
+- gripper close has the required target-object contact evidence;
+- the object is grasped after close; and
+- the object is lifted without exceeding the configured slip limit.
+
+### What is still missing
+
+A complete task requires a final verifier that evaluates the Gazebo-observed target pose after release and retreat. It should require a fresh pose, configurable socket position/orientation tolerances, and a stable settle interval.
+
+Until that verifier exists, do not interpret:
+
+```text
+/physical_pick_place_execution_success = true
+```
+
+as proof that the object was successfully inserted into the socket.
+
+## Configuration
+
+The physical task profile is:
+
+```text
+src/adaptive_assembly_bringup/config/
+  adaptive_assembly_physical_pick_place_params.yaml
+```
+
+Important defaults include:
+
+- target source: dynamic Gazebo `target_object`;
+- end-effector target link: `assembly_tcp`;
+- stage order: `pre_grasp,grasp,lift,pre_place,place,retreat`;
+- socket center: `(0.62, -0.18, 0.10)` in `world`;
+- gripper close after `grasp`;
+- gripper open after `place`;
+- required physical preflight;
+- required grasp verification;
+- required lift verification; and
+- simulation time enabled.
+
+The Gazebo geometry source of truth is:
+
+```text
+src/adaptive_assembly_sim/worlds/
+  adaptive_assembly_physical_workcell.sdf
+```
+
+The corresponding MoveIt static collision profile is:
+
+```text
+src/adaptive_assembly_bringup/config/
+  physical_workcell_planning_scene.yaml
+```
+
+Keep both descriptions geometrically consistent.
+
+## Validation
+
+### Package tests
+
+```bash
+cd ~/ros2_adaptive_assembly_ws
+source /opt/ros/jazzy/setup.bash
+colcon build --symlink-install
+source install/setup.bash
+
+colcon test --packages-select \
+  adaptive_assembly_bringup \
+  adaptive_assembly_execution \
+  adaptive_assembly_manipulation \
+  adaptive_assembly_planning \
+  adaptive_assembly_sim \
+  adaptive_assembly_task \
+  --event-handlers console_direct+
+
+colcon test-result --verbose
+```
+
+### Physical-path static checks
+
+Run from the repository root after sourcing the workspace:
+
+```bash
+cd ~/ros2_adaptive_assembly_ws/src/ros2_adaptive_assembly
+
+python3 scripts/check_physical_pick_place_launch_static.py
+python3 scripts/check_physical_grasp_preflight_static.py
+python3 scripts/check_physical_planning_scene_parity.py
+```
+
+### Bounded runtime checks
 
 ```bash
 python3 scripts/check_full_physical_pick_place_arm_motion.py
-```
-
-This is an arm-start acceptance check, not evidence of successful contact
-grasp, lift, placement, or insertion.
-
-The physical planner explicitly targets `assembly_tcp`, a fixed frame at
-`panda_hand` translation `(0, 0, 0.1034) m` and identity rotation. All six
-`/panda_*_pose` topics are desired `assembly_tcp` poses in `panda_link0`. Run
-the bounded Cartesian check with:
-
-```bash
 python3 scripts/check_full_physical_pick_place_tcp_contract.py
 ```
 
-It measures authoritative runtime TF after accepted and successful
-`pre_grasp` and `grasp` goals. It does not require or claim gripper closure,
-contact grasp, lift, placement, or insertion.
+The arm-motion check proves initial controller acceptance and motion. The TCP check proves bounded Cartesian agreement for pre-grasp and grasp. Neither check proves contact grasp, lift, final placement, or socket insertion.
 
-MoveIt planning and Gazebo execution share the installed
-`moveit_resources_panda_description` kinematic model. The local Gazebo wrapper
-adds only the identity world anchor, simulator control interfaces, dynamics,
-and finger contact sensors. Verify their structural and FK contract with:
-
-```bash
-ros2 run adaptive_assembly_sim check_robot_model_parity \
-  --current-panda-models
-```
-
-The expected exit code is `0`: both sides compare `panda_link0` to
-`panda_link8`, with zero structural and FK mismatches. This proves kinematic
-equivalence only; it does not prove task TCP offsets, contact grasp success,
-lift, placement, or insertion. See
-[Robot model parity diagnostic](docs/robot_model_parity.md) for details.
-
-The same diagnostic can check the complete TCP chain:
+### Robot-model parity
 
 ```bash
 ros2 run adaptive_assembly_sim check_robot_model_parity \
@@ -251,29 +342,57 @@ ros2 run adaptive_assembly_sim check_robot_model_parity \
   --candidate-tool-link assembly_tcp
 ```
 
-To save terminal output from each full physical pick-place simulation attempt,
-use the manual run logging wrapper:
+This checks model and forward-kinematics parity; it does not prove task success.
 
-```bash
-bash scripts/run_full_physical_pick_place_with_logs.sh
+## Relevant repository layout
+
+```text
+ros2_adaptive_assembly/
+├── AGENTS.md
+├── README.md
+├── docs/
+│   ├── physical_pick_place_execution.md
+│   ├── gazebo_contact_grasp_verification.md
+│   └── run_logging.md
+├── scripts/
+│   ├── check_physical_*.py
+│   ├── check_full_physical_pick_place_*.py
+│   └── run_full_physical_pick_place_with_logs.sh
+└── src/
+    ├── adaptive_assembly_bringup/
+    ├── adaptive_assembly_execution/
+    ├── adaptive_assembly_manipulation/
+    ├── adaptive_assembly_planning/
+    ├── adaptive_assembly_sim/
+    └── adaptive_assembly_task/
 ```
 
-See `docs/run_logging.md` for `RUN_ID`, `RUN_DIR`, and launch-argument usage.
+The repository may temporarily retain older demos and regression fixtures, but future development and root-level documentation should remain focused on `adaptive_assembly_full_physical_pick_place_demo.launch.py` and its dependencies.
 
+## Scope and limitations
 
-### Result table
+In scope:
 
-| Profile | Events | Success | Failed | Skipped | Mean planning time |
-|---|---:|---:|---:|---:|---:|
-| baseline | TBD | TBD | TBD | TBD | TBD |
-| narrow target range | TBD | TBD | TBD | TBD | TBD |
-| wide target range | TBD | TBD | TBD | TBD | TBD |
-| fixed yaw | TBD | TBD | TBD | TBD | TBD |
-| guarded planner | TBD | TBD | TBD | TBD | TBD |
+- Gazebo physics simulation;
+- MoveIt planning;
+- simulated Panda arm and gripper control;
+- object-pose observation;
+- contact-aware grasp verification;
+- lift/slip verification;
+- final socket-placement verification; and
+- deterministic logging and validation.
 
+Out of scope unless explicitly introduced in a future project change:
 
----
+- real robot hardware;
+- real camera perception;
+- marker detection;
+- visual servoing;
+- force-controlled insertion;
+- tactile control;
+- VLA policies; and
+- Isaac Sim.
 
 ## License
 
-Apache-2.0 
+Apache-2.0
