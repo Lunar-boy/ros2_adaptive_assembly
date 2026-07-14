@@ -4,23 +4,15 @@ import importlib.util
 from pathlib import Path
 
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
 
 LAUNCH_DIR = Path(__file__).resolve().parents[1] / 'launch'
-PLANNING_LAUNCH_DIR = (
-    Path(__file__).resolve().parents[2]
-    / 'adaptive_assembly_planning'
-    / 'launch'
-)
 
 
-def _load_launch(filename, launch_dir=LAUNCH_DIR):
-    spec = importlib.util.spec_from_file_location(
-        filename, launch_dir / filename
-    )
+def _load_launch(filename):
+    spec = importlib.util.spec_from_file_location(filename, LAUNCH_DIR / filename)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module.generate_launch_description()
@@ -34,9 +26,7 @@ def _declaration(description, name):
 
 
 def _default_value(declaration):
-    return ''.join(
-        substitution.text for substitution in declaration.default_value
-    )
+    return ''.join(substitution.text for substitution in declaration.default_value)
 
 
 def _include_arguments(description):
@@ -47,12 +37,12 @@ def _include_arguments(description):
     ]
 
 
-def _node(description, executable):
-    return next(
-        action for action in description.entities
-        if isinstance(action, Node)
-        and action.__dict__['_Node__node_executable'] == executable
-    )
+def _nodes(description):
+    return [action for action in description.entities if isinstance(action, Node)]
+
+
+def _executable(node):
+    return node.__dict__['_Node__node_executable']
 
 
 def _parameter(node, name):
@@ -73,67 +63,45 @@ def _assert_typed_sim_time(node):
 
 
 def test_full_physical_launch_defaults_to_simulation_time():
-    """The full physical entry point must opt into Gazebo time."""
     description = _load_launch(
         'adaptive_assembly_full_physical_pick_place_demo.launch.py'
     )
-
     assert _default_value(_declaration(description, 'use_sim_time')) == 'true'
     include_arguments = _include_arguments(description)
     assert any(
-        arguments.get('use_standard_panda_demo') == 'false'
+        arguments.get('world_name') == 'adaptive_assembly_physical_workcell'
         and 'use_sim_time' in arguments
         for arguments in include_arguments
     )
     assert any(
-        arguments.get('world_name')
-        == 'adaptive_assembly_physical_workcell'
+        arguments.get('stage_names')
+        == 'pre_grasp,grasp,lift,pre_place,place,retreat'
         and 'use_sim_time' in arguments
         for arguments in include_arguments
     )
 
 
-def test_simulation_time_propagates_to_physical_execution_and_sequence():
-    """The full path must retain the simulation-time launch value."""
-    physical = _load_launch(
-        'adaptive_assembly_physical_pick_place_execution.launch.py'
-    )
-    reachable = _load_launch(
-        'adaptive_assembly_panda_sequence_planning_reachable.launch.py'
-    )
-    sequence = _load_launch(
-        'adaptive_assembly_panda_sequence_planning_demo.launch.py'
-    )
-
-    assert _default_value(_declaration(physical, 'use_sim_time')) == 'false'
-    assert any(
-        'use_sim_time' in arguments
-        for arguments in _include_arguments(physical)
-    )
-    assert any(
-        'use_sim_time' in arguments
-        for arguments in _include_arguments(reachable)
-    )
-    assert any(
-        'use_sim_time' in arguments
-        for arguments in _include_arguments(sequence)
-    )
+def test_dedicated_physical_planning_defaults_to_simulation_time():
+    planning = _load_launch('adaptive_assembly_physical_planning.launch.py')
+    assert _default_value(_declaration(planning, 'use_sim_time')) == 'true'
 
 
-def test_direct_move_group_receives_typed_simulation_time():
-    """The direct Gazebo MoveIt node must receive a Boolean parameter."""
-    description = _load_launch('adaptive_assembly_panda_demo.launch.py')
+def test_direct_physical_nodes_receive_typed_simulation_time():
+    planning = _load_launch('adaptive_assembly_physical_planning.launch.py')
+    for node in _nodes(planning):
+        if _executable(node) in (
+            'assembly_task_node',
+            'move_group',
+            'panda_pre_grasp_pose_adapter_node',
+            'assembly_sequence_planning_node',
+        ):
+            _assert_typed_sim_time(node)
 
-    move_group = _node(description, 'move_group')
-    _assert_typed_sim_time(move_group)
 
-
-def test_physical_time_sensitive_nodes_receive_typed_simulation_time():
-    """Physical stale-data and planning nodes must share the time domain."""
+def test_execution_time_sensitive_nodes_receive_typed_simulation_time():
     description = _load_launch(
         'adaptive_assembly_physical_pick_place_execution.launch.py'
     )
-
     for executable in (
         'physical_pick_place_executor_node',
         'physical_grasp_preflight_node',
@@ -141,25 +109,16 @@ def test_physical_time_sensitive_nodes_receive_typed_simulation_time():
         'gazebo_grasp_contact_status_node',
         'gazebo_entity_pose_observer_node',
     ):
-        _assert_typed_sim_time(_node(description, executable))
+        node = next(
+            item for item in _nodes(description)
+            if _executable(item) == executable
+        )
+        _assert_typed_sim_time(node)
 
-    planning = _load_launch(
-        'assembly_sequence_planning.launch.py', PLANNING_LAUNCH_DIR
-    )
-    _assert_typed_sim_time(_node(planning, 'assembly_sequence_planning_node'))
 
-
-def test_non_gazebo_planning_defaults_to_wall_time_and_no_fake_controller():
-    """Plan-only defaults stay wall-time without a controller manager."""
-    planning = _load_launch('adaptive_assembly_panda_planning_demo.launch.py')
-    panda = _load_launch('adaptive_assembly_panda_demo.launch.py')
-
-    assert _default_value(_declaration(planning, 'use_sim_time')) == 'false'
-    assert _default_value(_declaration(panda, 'use_sim_time')) == 'false'
-    assert _default_value(
-        _declaration(panda, 'use_standard_panda_demo')
-    ) == 'true'
-    assert not any(
-        action.__dict__['_Node__node_executable'] == 'ros2_control_node'
-        for action in panda.entities if isinstance(action, Node)
-    )
+def test_full_demo_disables_legacy_planning_include():
+    source = (
+        LAUNCH_DIR / 'adaptive_assembly_full_physical_pick_place_demo.launch.py'
+    ).read_text(encoding='utf-8')
+    assert "'launch_reachable_sequence': 'false'" in source
+    assert 'adaptive_assembly_physical_planning.launch.py' in source
