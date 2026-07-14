@@ -46,16 +46,23 @@ event=command;command=open;source=physical_pick_place_executor;stage=place;simul
 ```
 
 The executor waits for `/physical_gripper_command_status` from
-`gripper_action_bridge_node`. `event=success;command=close` and
-`event=success;command=open` advance the sequence. If
+`gripper_action_bridge_node`. `event=success` advances only when `result` is
+`success` or `contact_limited_success`. The latter is valid only for physical
+close and is logged distinctly. If
 `require_gripper_success=true`, `event=failure;command=<active_command>` fails
-the run. Retained gripper statuses are ignored unless a command is active.
+the run. Its classified `gripper_result` and `gripper_reason` are retained in
+stage and terminal diagnostics. Per-command IDs prevent retained results from
+an old close from satisfying a later operation.
 
-After a successful close command, the executor publishes:
+After either permitted close result, the executor publishes:
 
 ```text
 event=request;verification=grasp;stage=grasp;source=physical_pick_place_executor;simulated=true;real_hardware=false
 ```
+
+This is deliberately not whole-task success. `contact_limited_success` only
+permits the existing grasp verification, lift, lift/slip verification,
+placement, opening, and retreat stages to continue.
 
 After the lift arm stage succeeds, it publishes:
 

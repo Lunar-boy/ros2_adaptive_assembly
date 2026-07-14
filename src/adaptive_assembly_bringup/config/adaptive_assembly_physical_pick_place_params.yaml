@@ -34,3 +34,29 @@ assembly_task_node:
     socket_z: 0.10
     socket_yaw: 0.0
     socket_frame_id: world
+
+# Simulator-only physical close contract. The nominal zero close is expected
+# to abort with GOAL_TOLERANCE_VIOLATED when the 0.035 m-radius target is held.
+gripper_action_bridge_node:
+  ros__parameters:
+    open_position: 0.04
+    close_position: 0.0
+    result_timeout_sec: 5.0
+    contact_wait_timeout_sec: 1.0
+    contact_freshness_timeout_sec: 0.25
+    contact_settle_duration_sec: 0.20
+    allow_contact_limited_close: true
+    expected_target_object: target_object
+    contact_status_topic: /grasp_contact_status
+
+gazebo_grasp_contact_status_node:
+  ros__parameters:
+    target_object_name: target_object
+    left_finger_entity_name: panda_leftfinger
+    right_finger_entity_name: panda_rightfinger
+    contact_stale_timeout_sec: 0.25
+
+physical_pick_place_executor_node:
+  ros__parameters:
+    gripper_command_timeout_sec: 5.0
+    expected_target_object: target_object

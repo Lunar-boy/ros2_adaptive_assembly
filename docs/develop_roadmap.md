@@ -57,3 +57,4 @@ scope here and may be developed in a separate future repository.
 - PR35: ros2_control success-path execution
 - PR36: gripper abstraction and logical grasp lifecycle
 - PR37: recovery action orchestration and bounded simulated retry loop (complete)
+- PR78: bilateral contact-aware physical gripper close classification

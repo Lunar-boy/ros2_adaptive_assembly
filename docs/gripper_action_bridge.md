@@ -8,8 +8,10 @@ the second finger follows through the installed model's mimic relation. It is a
 existing semicolon-delimited `/gripper_command` open/close interface into
 `FollowJointTrajectory` goals.
 
-This is simulator-only actuation. Controller success does not establish
-contact, object attachment, lift, slip resistance, or physical grasp success.
+This is simulator-only actuation. In the physical profile, close completion
+may additionally use fresh bilateral Gazebo contact on the configured target.
+That evidence establishes only a plausible close contact; the separate grasp
+and lift verifier still determines object retention and task progress.
 
 ## Interfaces and parameters
 
@@ -28,6 +30,39 @@ Key parameters are `controller_action_name`, `joint_names`, `open_position`,
 provides deterministic controller-free validation. `simulated_only=false` is
 rejected because real hardware is outside this package's scope.
 
+The physical profile adds these bridge parameters:
+
+| Parameter | Physical default | Purpose |
+|---|---:|---|
+| `open_position` | `0.04` | Primary finger open target in metres |
+| `close_position` | `0.0` | Nominal primary finger close target |
+| `result_timeout_sec` | `5.0` | Overall accepted action deadline |
+| `contact_wait_timeout_sec` | `1.0` | Maximum post-abort evidence wait |
+| `contact_freshness_timeout_sec` | `0.25` | Maximum raw contact receipt age |
+| `contact_settle_duration_sec` | `0.20` | Continuous bilateral contact interval |
+| `allow_contact_limited_close` | `true` | Enable physical close reinterpretation |
+| `expected_target_object` | `target_object` | Exact Gazebo model scope token |
+| `contact_status_topic` | `/grasp_contact_status` | Normalized contact input |
+
+The reusable bridge default for `allow_contact_limited_close` is `false`, so
+legacy launches without contact sensing retain strict action-only behavior.
+Opening is always strict action-only behavior.
+
+Close status carries an explicit `result`. Success values are `success` and
+`contact_limited_success`. Failures distinguish `goal_rejected`,
+`action_aborted`, `action_canceled`, `action_timeout`, `contact_timeout`,
+`contact_stale`, `unilateral_contact`, `wrong_object_contact`,
+`no_target_contact`, and `internal_error`. Diagnostics include goal acceptance,
+action state and error code, expected target, per-finger contacts and ages,
+contacted entities, settling duration, and finger positions when feedback
+provides them.
+
+Only an accepted close action that ends as `ABORTED` with structured
+`FollowJointTrajectory.Result.GOAL_TOLERANCE_VIOLATED` can become
+`contact_limited_success`. Human-readable controller error text is diagnostic
+only. Other abort codes, cancellation, timeout, rejection, stale or unilateral
+contact, and wrong-object contact remain failures.
+
 ## Manual demo
 
 From `~/ros2_adaptive_assembly_ws` after building and sourcing:
@@ -45,6 +80,7 @@ python3 scripts/check_panda_gripper_urdf_contains_fingers.py
 python3 scripts/check_gripper_controller_config.py
 python3 scripts/check_gripper_action_bridge_static.py
 python3 scripts/check_gripper_action_bridge_dry_run.py
+python3 scripts/check_contact_aware_gripper_close_integration.py
 ```
 
 With the Gazebo Panda demo running, validate controller activation separately:

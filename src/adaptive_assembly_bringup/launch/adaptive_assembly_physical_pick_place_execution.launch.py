@@ -139,7 +139,7 @@ def generate_launch_description() -> LaunchDescription:
         'wait_for_arm_controller_sec': '5.0',
         'arm_result_timeout_sec': '10.0',
         'gripper_command_timeout_sec': '5.0',
-        'contact_stale_timeout_sec': '0.5',
+        'contact_stale_timeout_sec': '0.25',
         'verification_timeout_sec': '5.0',
         'physical_grasp_preflight_timeout_sec': '20.0',
         'min_lift_delta_m': '0.02',
@@ -247,6 +247,9 @@ def generate_launch_description() -> LaunchDescription:
         )
     })
     executor_parameters['use_sim_time'] = _typed_value('use_sim_time', bool)
+    executor_parameters['expected_target_object'] = LaunchConfiguration(
+        'target_object_name'
+    )
 
     preflight_parameters = {
         'use_sim_time': _typed_value('use_sim_time', bool),
@@ -380,12 +383,18 @@ def generate_launch_description() -> LaunchDescription:
             name='gripper_action_bridge_node',
             output='screen',
             condition=IfCondition(launch_gripper_bridge),
-            parameters=[{
+            parameters=[params_file, {
                 'use_sim_time': _typed_value('use_sim_time', bool),
                 'command_topic': LaunchConfiguration('gripper_command_topic'),
                 'status_topic': LaunchConfiguration('gripper_status_topic'),
                 'success_topic': LaunchConfiguration('gripper_success_topic'),
                 'closed_topic': LaunchConfiguration('gripper_closed_topic'),
+                'contact_status_topic': LaunchConfiguration(
+                    'aggregate_contact_status_topic'
+                ),
+                'expected_target_object': LaunchConfiguration(
+                    'target_object_name'
+                ),
                 'send_goals': _typed_value('send_gripper_commands', bool),
                 'simulated_only': _typed_value(
                     'simulated_execution_only', bool
@@ -462,7 +471,7 @@ def generate_launch_description() -> LaunchDescription:
             name='gazebo_grasp_contact_status_node',
             output='screen',
             condition=IfCondition(launch_contact_status_node),
-            parameters=[contact_status_parameters],
+            parameters=[params_file, contact_status_parameters],
         ),
         Node(
             package='adaptive_assembly_execution',
@@ -485,6 +494,6 @@ def generate_launch_description() -> LaunchDescription:
             executable='physical_pick_place_executor_node',
             name='physical_pick_place_executor_node',
             output='screen',
-            parameters=[executor_parameters],
+            parameters=[params_file, executor_parameters],
         ),
     ])
