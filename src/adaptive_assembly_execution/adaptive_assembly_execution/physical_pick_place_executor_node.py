@@ -120,6 +120,11 @@ class PhysicalPickPlaceExecutorNode(Node):
         self.declare_parameter('require_joint_state', True)
         self.declare_parameter('start_state_tolerance', 0.05)
         self.declare_parameter('simulated_execution_only', True)
+        self.declare_parameter('require_plan_lock', False)
+        self.declare_parameter(
+            'plan_lock_status_topic', '/assembly_sequence_plan_lock_status'
+        )
+        self.declare_parameter('plan_lock_timeout_sec', 10.0)
 
         self._stage_names = parse_stage_names(
             str(self.get_parameter('stage_names').value)
@@ -234,6 +239,15 @@ class PhysicalPickPlaceExecutorNode(Node):
         self._simulated_execution_only = bool(
             self.get_parameter('simulated_execution_only').value
         )
+        self._require_plan_lock = bool(
+            self.get_parameter('require_plan_lock').value
+        )
+        self._plan_lock_status_topic = str(
+            self.get_parameter('plan_lock_status_topic').value
+        )
+        self._plan_lock_timeout_sec = float(
+            self.get_parameter('plan_lock_timeout_sec').value
+        )
         self._expected_joints = [
             f'{self._expected_joint_prefix}{index}' for index in range(1, 8)
         ]
@@ -321,11 +335,32 @@ class PhysicalPickPlaceExecutorNode(Node):
             )
             for stage in self._stage_names
         ]
+        volatile_qos = QoSProfile(
+            depth=10,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.VOLATILE,
+        )
+        self._plan_lock_subscription = self.create_subscription(
+            String,
+            self._plan_lock_status_topic,
+            self._plan_lock_status_callback,
+            volatile_qos,
+        )
 
         self._action_client = ActionClient(
             self, FollowJointTrajectory, self._arm_controller_action_name
         )
         self._trajectories: Dict[str, RobotTrajectory] = {}
+        self._execution_trajectories: Dict[str, RobotTrajectory] = {}
+        self._trajectory_set_frozen = False
+        self._locked_plan_id: Optional[int] = None
+        self._active_planning_plan_id: Optional[int] = None
+        self._plan_lock_valid = not self._require_plan_lock
+        self._plan_lock_failure = False
+        self._plan_lock_deadline = (
+            time.monotonic() + self._plan_lock_timeout_sec
+            if self._require_plan_lock else None
+        )
         self._current_joint_positions: Dict[str, float] = {}
         self._joint_state_received = False
         self._state = 'WAIT_INPUTS'
@@ -365,6 +400,7 @@ class PhysicalPickPlaceExecutorNode(Node):
             f'{self._require_physical_grasp_preflight}, '
             f'require_grasp_verification={self._require_grasp_verification}, '
             f'require_lift_verification={self._require_lift_verification}, '
+            f'require_plan_lock={self._require_plan_lock}, '
             'simulated_execution_only=true, real_hardware=false.'
         )
 
@@ -410,14 +446,119 @@ class PhysicalPickPlaceExecutorNode(Node):
             raise ValueError(
                 'start_state_tolerance must be greater than or equal to zero'
             )
+        if self._plan_lock_timeout_sec <= 0.0:
+            raise ValueError('plan_lock_timeout_sec must be greater than zero')
 
     def _trajectory_callback(
         self, stage: str, trajectory: RobotTrajectory
     ) -> None:
-        """Store the first trajectory received for each configured stage."""
-        if self._started or self._completed or stage in self._trajectories:
+        """Buffer one trajectory per stage for the active plan generation."""
+        if self._completed:
+            return
+        if self._started or self._trajectory_set_frozen:
+            self._publish_stage_status(
+                f'event=ignored;mode={MODE};stage={stage};action=trajectory;'
+                'reason=trajectory_update_after_execution_start;execution=false;'
+                'real_hardware=false'
+            )
+            return
+        if stage in self._trajectories:
+            reason = (
+                'trajectory_update_after_plan_lock'
+                if self._plan_lock_valid else 'duplicate_trajectory'
+            )
+            self._publish_stage_status(
+                f'event=ignored;mode={MODE};stage={stage};action=trajectory;'
+                f'reason={reason};execution=false;real_hardware=false'
+            )
             return
         self._trajectories[stage] = trajectory
+        self._try_start_sequence()
+
+    def _plan_lock_status_callback(self, message: String) -> None:
+        """Track the volatile single-generation sequence-plan lock."""
+        if self._completed or not self._require_plan_lock:
+            return
+        fields = parse_status(message.data)
+        if fields.get('mode') != 'sequence_plan_lock':
+            return
+        event = fields.get('event', '')
+        try:
+            plan_id = int(fields.get('plan_id', ''))
+        except ValueError:
+            self._publish_failure('plan_lock', 'plan_lock_invalid_status')
+            return
+        if plan_id <= 0 and event != 'waiting':
+            self._publish_failure('plan_lock', 'plan_lock_invalid_status')
+            return
+        if event == 'planning_started':
+            if self._started or self._plan_lock_valid:
+                return
+            self._active_planning_plan_id = plan_id
+            self._trajectories.clear()
+            self._plan_lock_failure = False
+            self._plan_lock_deadline = (
+                time.monotonic() + self._plan_lock_timeout_sec
+            )
+            self._publish_stage_status(
+                f'event=waiting;mode={MODE};stage=plan_lock;action=plan_lock;'
+                f'plan_id={plan_id};reason=planning_started;execution=false;'
+                'real_hardware=false'
+            )
+            return
+        if event == 'failure':
+            if (
+                self._active_planning_plan_id is not None
+                and plan_id != self._active_planning_plan_id
+            ):
+                return
+            self._trajectories.clear()
+            self._plan_lock_failure = True
+            self._plan_lock_valid = False
+            self._active_planning_plan_id = None
+            self._plan_lock_deadline = (
+                time.monotonic() + self._plan_lock_timeout_sec
+            )
+            self._publish_stage_status(
+                f'event=failure;mode={MODE};stage=plan_lock;action=plan_lock;'
+                f'plan_id={plan_id};reason=plan_lock_planning_failed;'
+                'execution=false;real_hardware=false'
+            )
+            return
+        if event != 'locked':
+            return
+        if (
+            fields.get('locked') != 'true'
+            or fields.get('stage_sequence') != self._stage_sequence
+        ):
+            reason = (
+                'plan_lock_stage_sequence_mismatch'
+                if fields.get('stage_sequence') != self._stage_sequence
+                else 'plan_lock_invalid_status'
+            )
+            self._publish_failure('plan_lock', reason)
+            return
+        try:
+            planned_count = int(fields.get('planned_stage_count', ''))
+        except ValueError:
+            self._publish_failure('plan_lock', 'plan_lock_invalid_status')
+            return
+        if planned_count != len(self._stage_names):
+            self._publish_failure('plan_lock', 'locked_plan_incomplete')
+            return
+        if (
+            self._active_planning_plan_id is not None
+            and plan_id != self._active_planning_plan_id
+        ):
+            self._publish_failure('plan_lock', 'plan_lock_invalid_status')
+            return
+        self._locked_plan_id = plan_id
+        self._plan_lock_valid = True
+        self._plan_lock_deadline = (
+            None if all(
+                stage in self._trajectories for stage in self._stage_names
+            ) else time.monotonic() + self._plan_lock_timeout_sec
+        )
         self._try_start_sequence()
 
     def _joint_state_callback(self, joint_state: JointState) -> None:
@@ -575,6 +716,17 @@ class PhysicalPickPlaceExecutorNode(Node):
             return
         self._try_start_sequence()
         if (
+            self._require_plan_lock
+            and self._plan_lock_deadline is not None
+            and time.monotonic() >= self._plan_lock_deadline
+        ):
+            reason = (
+                'locked_plan_incomplete'
+                if self._plan_lock_valid else 'plan_lock_timeout'
+            )
+            self._publish_failure('plan_lock', reason)
+            return
+        if (
             self._state == 'WAIT_GRIPPER_RESULT'
             and self._gripper_deadline is not None
             and time.monotonic() >= self._gripper_deadline
@@ -605,6 +757,8 @@ class PhysicalPickPlaceExecutorNode(Node):
 
     def _normal_prerequisites_ready(self) -> bool:
         """Return whether trajectories and joint state are ready."""
+        if self._require_plan_lock and not self._plan_lock_valid:
+            return False
         if not all(stage in self._trajectories for stage in self._stage_names):
             return False
         if self._require_joint_state and not self._joint_state_received:
@@ -638,11 +792,16 @@ class PhysicalPickPlaceExecutorNode(Node):
                 )
             return
 
+        self._execution_trajectories = dict(self._trajectories)
+        self._trajectory_set_frozen = True
+        self._plan_lock_deadline = None
         self._started = True
         self._state = 'EXEC_ARM_STAGE'
         self._sequence_start = time.monotonic()
         for stage in self._stage_names:
-            valid, reason = self._validate_trajectory(self._trajectories[stage])
+            valid, reason = self._validate_trajectory(
+                self._execution_trajectories[stage]
+            )
             if not valid:
                 self._publish_failure(stage, reason)
                 return
@@ -653,7 +812,9 @@ class PhysicalPickPlaceExecutorNode(Node):
             self._publish_failure(self._stage_names[0], 'arm_controller_unavailable')
             return
 
-        self._log_start_state_difference(self._trajectories[self._stage_names[0]])
+        self._log_start_state_difference(
+            self._execution_trajectories[self._stage_names[0]]
+        )
         if self._open_gripper_before_first_arm_stage:
             self._send_gripper_command('initial_open', 'open')
         else:
@@ -747,7 +908,7 @@ class PhysicalPickPlaceExecutorNode(Node):
             self._publish_success()
             return
         stage = self._stage_names[self._current_stage_index]
-        trajectory = self._trajectories[stage]
+        trajectory = self._execution_trajectories[stage]
         self._current_stage = stage
         self._stage_start = time.monotonic()
         self._state = 'EXEC_ARM_STAGE'
@@ -1070,6 +1231,8 @@ class PhysicalPickPlaceExecutorNode(Node):
         )
 
     def _publish_stage_status(self, status: str) -> None:
+        if self._locked_plan_id is not None and 'plan_id=' not in status:
+            status = status.rstrip(';') + f';plan_id={self._locked_plan_id}'
         message = String()
         message.data = status
         self._stage_status_publisher.publish(message)
@@ -1087,6 +1250,8 @@ class PhysicalPickPlaceExecutorNode(Node):
         self._active_verification = None
         self._completed = True
 
+        if self._locked_plan_id is not None and 'plan_id=' not in status:
+            status = status.rstrip(';') + f';plan_id={self._locked_plan_id}'
         status_message = String()
         status_message.data = status
         self._status_publisher.publish(status_message)

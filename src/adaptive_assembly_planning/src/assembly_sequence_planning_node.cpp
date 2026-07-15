@@ -1,18 +1,22 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstdint>
 #include <iomanip>
 #include <memory>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <moveit/move_group_interface/move_group_interface.hpp>
+#include <moveit/robot_state/conversions.hpp>
+#include <moveit/robot_state/robot_state.hpp>
 #include <moveit_msgs/msg/robot_state.hpp>
 #include <moveit_msgs/msg/robot_trajectory.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -20,534 +24,618 @@
 #include <std_msgs/msg/float64.hpp>
 #include <std_msgs/msg/string.hpp>
 
+#include "adaptive_assembly_planning/linear_path_validation.hpp"
+#include "adaptive_assembly_planning/planning_contract.hpp"
+
+namespace aap = adaptive_assembly_planning;
+
 class AssemblySequencePlanningNode
 {
 public:
   explicit AssemblySequencePlanningNode(const rclcpp::Node::SharedPtr & node)
   : node_(node),
-    success_topic_(declare_parameter<std::string>(
-        "success_topic", "/assembly_sequence_plan_success")),
-    status_topic_(declare_parameter<std::string>(
-        "status_topic", "/assembly_sequence_planning_status")),
-    duration_topic_(declare_parameter<std::string>(
-        "duration_topic", "/assembly_sequence_planning_duration_ms")),
-    stage_status_topic_(declare_parameter<std::string>(
-        "stage_status_topic", "/assembly_sequence_stage_status")),
-    stage_success_topic_(declare_parameter<std::string>(
-        "stage_success_topic", "/assembly_sequence_stage_success")),
-    stage_duration_topic_(declare_parameter<std::string>(
-        "stage_duration_topic", "/assembly_sequence_stage_duration_ms")),
-    trajectory_status_topic_(declare_parameter<std::string>(
-        "trajectory_status_topic", "/assembly_sequence_trajectory_status")),
-    publish_diagnostics_(declare_parameter<bool>("publish_diagnostics", true)),
-    publish_trajectories_(declare_parameter<bool>("publish_trajectories", true)),
-    require_grasp_pose_(declare_parameter<bool>("require_grasp_pose", false)),
-    require_place_sequence_(declare_parameter<bool>("require_place_sequence", false)),
-    planning_group_(declare_parameter<std::string>("planning_group", "panda_arm")),
-    end_effector_link_(declare_parameter<std::string>("end_effector_link", "panda_link8")),
-    planner_id_(declare_parameter<std::string>("planner_id", "")),
-    num_planning_attempts_(declare_parameter<int>("num_planning_attempts", 1)),
-    planning_time_sec_(declare_parameter<double>("planning_time_sec", 5.0)),
-    position_tolerance_(declare_parameter<double>("position_tolerance", 0.01)),
-    orientation_tolerance_(declare_parameter<double>("orientation_tolerance", 0.10)),
-    start_state_mode_(declare_parameter<std::string>("start_state_mode", "current")),
+    success_topic_(param<std::string>("success_topic", "/assembly_sequence_plan_success")),
+    status_topic_(param<std::string>("status_topic", "/assembly_sequence_planning_status")),
+    duration_topic_(param<std::string>("duration_topic",
+    "/assembly_sequence_planning_duration_ms")),
+    stage_status_topic_(param<std::string>("stage_status_topic",
+    "/assembly_sequence_stage_status")),
+    stage_success_topic_(param<std::string>("stage_success_topic",
+    "/assembly_sequence_stage_success")),
+    stage_duration_topic_(param<std::string>("stage_duration_topic",
+    "/assembly_sequence_stage_duration_ms")),
+    trajectory_status_topic_(param<std::string>("trajectory_status_topic",
+    "/assembly_sequence_trajectory_status")),
+    plan_lock_status_topic_(param<std::string>("plan_lock_status_topic",
+    "/assembly_sequence_plan_lock_status")),
+    publish_diagnostics_(param<bool>("publish_diagnostics", true)),
+    publish_trajectories_(param<bool>("publish_trajectories", true)),
+    lock_after_successful_sequence_(param<bool>("lock_after_successful_sequence", false)),
+    require_dynamic_target_scene_ready_(param<bool>("require_dynamic_target_scene_ready", false)),
+    planning_group_(param<std::string>("planning_group", "panda_arm")),
+    end_effector_link_(param<std::string>("end_effector_link", "panda_link8")),
+    num_planning_attempts_(param<int>("num_planning_attempts", 1)),
+    planning_time_sec_(param<double>("planning_time_sec", 5.0)),
+    start_state_mode_(param<std::string>("start_state_mode", "current")),
+    default_profile_{
+      param<std::string>("default_planning_pipeline_id", "ompl"),
+      param<std::string>("default_planner_id", param<std::string>("planner_id", "")),
+      param<double>("position_tolerance", 0.01),
+      param<double>("orientation_tolerance", 0.10),
+      param<double>("max_velocity_scaling_factor", 1.0),
+      param<double>("max_acceleration_scaling_factor", 1.0), false},
+    linear_profile_{
+      param<std::string>("linear_planning_pipeline_id", "pilz_industrial_motion_planner"),
+      param<std::string>("linear_planner_id", "LIN"),
+      param<double>("linear_position_tolerance", 0.002),
+      param<double>("linear_orientation_tolerance", 0.01),
+      param<double>("linear_max_velocity_scaling_factor", 0.05),
+      param<double>("linear_max_acceleration_scaling_factor", 0.05), true},
+    snapshot_limits_{
+      param<double>("pose_snapshot_max_stamp_skew_sec", 0.20),
+      param<double>("grasp_approach_min_distance", 0.05),
+      param<double>("grasp_approach_max_distance", 0.30),
+      param<double>("grasp_approach_max_lateral_offset", 0.002),
+      param<double>("grasp_approach_max_orientation_difference", 0.01),
+      param<double>("pose_quaternion_norm_tolerance", 1.0e-3)},
+    linear_limits_{
+      param<double>("linear_max_lateral_deviation", 0.002),
+      param<double>("linear_max_orientation_deviation", 0.01),
+      param<double>("linear_max_endpoint_position_error", 0.002),
+      param<double>("linear_max_endpoint_orientation_error", 0.01),
+      param<double>("linear_max_path_length_ratio", 1.02),
+      param<double>("linear_progress_tolerance", 1.0e-4),
+      param<double>("linear_overshoot_tolerance", 1.0e-3)},
     move_group_(node_, planning_group_)
   {
     validate_parameters();
-    configure_move_group();
-    create_diagnostic_publishers();
     resolve_stage_names();
+    linear_stage_names_ = split_csv(param<std::string>("linear_stage_names_csv", ""));
+    configure_move_group_once();
+    create_publishers();
     create_stages();
-
+    if (require_dynamic_target_scene_ready_) {
+      dynamic_scene_ready_subscription_ = node_->create_subscription<std_msgs::msg::Bool>(
+        param<std::string>("dynamic_target_scene_ready_topic",
+        "/physical_target_planning_scene_ready"),
+        rclcpp::QoS(1).transient_local().reliable(),
+        [this](const std_msgs::msg::Bool::SharedPtr message) {
+          dynamic_scene_ready_ = message->data;
+          try_plan_sequence();
+        });
+    } else {
+      dynamic_scene_ready_ = true;
+    }
+    publish_lock_status("waiting", 0, false, 0, "waiting_for_inputs");
     RCLCPP_INFO(
       node_->get_logger(),
-      "Assembly sequence planner ready: stage_sequence='%s', planning_group='%s', "
-      "end_effector_link='%s', planner_id='%s', num_planning_attempts=%d, planning_time_sec=%.3f, "
-      "position_tolerance=%.3f, orientation_tolerance=%.3f, start_state_mode='%s', "
-      "publish_diagnostics=%s, publish_trajectories=%s. All stages are plan-only; "
-      "execution is disabled.",
-      stage_sequence_.c_str(), planning_group_.c_str(), end_effector_link_.c_str(),
-      planner_id_.c_str(),
-      num_planning_attempts_, planning_time_sec_, position_tolerance_,
-      orientation_tolerance_, start_state_mode_.c_str(),
-      publish_diagnostics_ ? "true" : "false",
-      publish_trajectories_ ? "true" : "false");
+      "Sequence planner ready: stages='%s', linear_stages='%s', default_pipeline='%s', "
+      "linear_pipeline='%s', linear_planner='%s', lock_after_success=%s.",
+      stage_sequence_.c_str(), join(linear_stage_names_).c_str(),
+      default_profile_.planning_pipeline_id.c_str(), linear_profile_.planning_pipeline_id.c_str(),
+      linear_profile_.planner_id.c_str(), lock_after_successful_sequence_ ? "true" : "false");
   }
 
 private:
-  struct StageConfig
+  enum class State {WAITING_FOR_INPUTS, PLANNING, LOCKED};
+
+  struct Stage
   {
     std::string name;
     std::string pose_topic;
     std::string trajectory_topic;
-    std::optional<geometry_msgs::msg::PoseStamped> pose;
-    bool updated{false};
+    std::optional<geometry_msgs::msg::PoseStamped> latest_pose;
+    std::uint64_t latest_pose_generation{0};
+    std::uint64_t consumed_generation{0};
+    rclcpp::Time latest_receive_time;
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr subscription;
     rclcpp::Publisher<moveit_msgs::msg::RobotTrajectory>::SharedPtr trajectory_publisher;
   };
 
-  struct StagePlanResult
+  struct Candidate
   {
-    bool succeeded;
-    double duration_ms;
+    moveit::planning_interface::MoveGroupInterface::Plan plan;
+    aap::StagePlanningProfile profile;
+    aap::LinearPathMetrics linear_metrics;
+    double duration_ms{0.0};
   };
 
-  template<typename ParameterT>
-  ParameterT declare_parameter(const std::string & name, const ParameterT & default_value)
+  template<typename T>
+  T param(const std::string & name, const T & default_value)
   {
     if (!node_->has_parameter(name)) {
-      node_->declare_parameter<ParameterT>(name, default_value);
+      node_->declare_parameter<T>(name, default_value);
     }
-    return node_->get_parameter(name).get_value<ParameterT>();
+    return node_->get_parameter(name).get_value<T>();
+  }
+
+  static std::unordered_set<std::string> split_csv(const std::string & text)
+  {
+    std::unordered_set<std::string> values;
+    std::istringstream stream(text);
+    std::string value;
+    while (std::getline(stream, value, ',')) {
+      value.erase(0, value.find_first_not_of(" \t"));
+      if (!value.empty()) {
+        value.erase(value.find_last_not_of(" \t") + 1);
+        values.insert(value);
+      }
+    }
+    return values;
+  }
+
+  static std::string join(const std::unordered_set<std::string> & values)
+  {
+    std::vector<std::string> sorted(values.begin(), values.end());
+    std::sort(sorted.begin(), sorted.end());
+    std::ostringstream out;
+    for (std::size_t i = 0; i < sorted.size(); ++i) {
+      if (i) {out << ',';}
+      out << sorted[i];
+    }
+    return out.str();
   }
 
   void validate_parameters()
   {
-    if (num_planning_attempts_ < 1) {
-      RCLCPP_WARN(node_->get_logger(), "num_planning_attempts is invalid; using 1.");
-      num_planning_attempts_ = 1;
+    if (num_planning_attempts_ < 1 || planning_time_sec_ <= 0.0) {
+      throw std::invalid_argument("invalid_planning_configuration");
     }
-    if (planning_time_sec_ <= 0.0) {
-      RCLCPP_WARN(node_->get_logger(), "planning_time_sec must be positive; using 5.0.");
-      planning_time_sec_ = 5.0;
-    }
-    if (position_tolerance_ <= 0.0) {
-      RCLCPP_WARN(node_->get_logger(), "position_tolerance must be positive; using 0.01.");
-      position_tolerance_ = 0.01;
-    }
-    if (orientation_tolerance_ <= 0.0) {
-      RCLCPP_WARN(node_->get_logger(), "orientation_tolerance must be positive; using 0.10.");
-      orientation_tolerance_ = 0.10;
+    const auto validate_profile = [](const aap::StagePlanningProfile & p) {
+        return !p.planning_pipeline_id.empty() && p.position_tolerance > 0.0 &&
+               p.orientation_tolerance > 0.0 && p.max_velocity_scaling_factor > 0.0 &&
+               p.max_velocity_scaling_factor <= 1.0 && p.max_acceleration_scaling_factor > 0.0 &&
+               p.max_acceleration_scaling_factor <= 1.0;
+      };
+    if (!validate_profile(default_profile_) || !validate_profile(linear_profile_) ||
+      linear_profile_.planner_id.empty())
+    {
+      throw std::invalid_argument("invalid_stage_planning_profile");
     }
     if (start_state_mode_ != "current" && start_state_mode_ != "fixed") {
-      RCLCPP_WARN(
-        node_->get_logger(), "start_state_mode='%s' is invalid; using 'current'.",
-        start_state_mode_.c_str());
-      start_state_mode_ = "current";
+      throw std::invalid_argument("invalid_start_state_mode");
     }
-  }
-
-  void configure_move_group()
-  {
-    const auto robot_model = move_group_.getRobotModel();
-    if (!robot_model || !robot_model->hasLinkModel(end_effector_link_)) {
-      throw std::invalid_argument(
-              "configured_end_effector_link_invalid: link '" + end_effector_link_ +
-              "' does not exist in the loaded robot model");
-    }
-    if (!move_group_.setEndEffectorLink(end_effector_link_)) {
-      throw std::invalid_argument(
-              "configured_end_effector_link_invalid: MoveIt rejected link '" +
-              end_effector_link_ + "' for planning group '" + planning_group_ + "'");
-    }
-    move_group_.setPlanningTime(planning_time_sec_);
-    move_group_.setGoalPositionTolerance(position_tolerance_);
-    move_group_.setGoalOrientationTolerance(orientation_tolerance_);
-    move_group_.setNumPlanningAttempts(num_planning_attempts_);
-    if (!planner_id_.empty()) {
-      move_group_.setPlannerId(planner_id_);
-    }
-  }
-
-  void create_diagnostic_publishers()
-  {
-    success_publisher_ = node_->create_publisher<std_msgs::msg::Bool>(success_topic_, 10);
-    status_publisher_ = node_->create_publisher<std_msgs::msg::String>(status_topic_, 10);
-    duration_publisher_ = node_->create_publisher<std_msgs::msg::Float64>(duration_topic_, 10);
-    stage_status_publisher_ =
-      node_->create_publisher<std_msgs::msg::String>(stage_status_topic_, 10);
-    stage_success_publisher_ =
-      node_->create_publisher<std_msgs::msg::Bool>(stage_success_topic_, 10);
-    stage_duration_publisher_ =
-      node_->create_publisher<std_msgs::msg::Float64>(stage_duration_topic_, 10);
-    trajectory_status_publisher_ =
-      node_->create_publisher<std_msgs::msg::String>(trajectory_status_topic_, 10);
   }
 
   void resolve_stage_names()
   {
-    const bool stage_names_provided = node_->has_parameter("stage_names");
-    if (stage_names_provided) {
+    if (node_->has_parameter("stage_names")) {
       stage_names_ = node_->get_parameter("stage_names").as_string_array();
-    } else if (node_->has_parameter("stage_names_csv") &&
-      !node_->get_parameter("stage_names_csv").as_string().empty())
-    {
-      std::istringstream stages_csv(node_->get_parameter("stage_names_csv").as_string());
-      std::string stage_name;
-      while (std::getline(stages_csv, stage_name, ',')) {
-        stage_names_.push_back(stage_name);
-      }
-    } else if (require_place_sequence_) {
-      stage_names_ = {"pre_grasp", "grasp", "pre_place", "place", "retreat"};
-      RCLCPP_WARN(
-        node_->get_logger(),
-        "require_place_sequence is deprecated; use stage_names instead.");
-    } else if (require_grasp_pose_) {
-      stage_names_ = {"pre_grasp", "grasp", "assembly"};
-      RCLCPP_WARN(
-        node_->get_logger(), "require_grasp_pose is deprecated; use stage_names instead.");
     } else {
-      stage_names_ = {"pre_grasp", "assembly"};
-    }
-
-    if (stage_names_.empty()) {
-      RCLCPP_WARN(node_->get_logger(), "stage_names is empty; using pre_grasp,assembly.");
-      stage_names_ = {"pre_grasp", "assembly"};
-    }
-
-    std::unordered_set<std::string> seen;
-    std::vector<std::string> valid_names;
-    for (const auto & name : stage_names_) {
-      if (name.empty()) {
-        RCLCPP_WARN(node_->get_logger(), "Ignoring an empty stage name.");
-      } else if (!seen.insert(name).second) {
-        RCLCPP_WARN(node_->get_logger(), "Ignoring duplicate stage '%s'.", name.c_str());
-      } else {
-        valid_names.push_back(name);
+      const auto names = split_csv(param<std::string>(
+        "stage_names_csv", "pre_grasp,grasp,lift,pre_place,place,retreat"));
+      const std::vector<std::string> canonical = {
+        "pre_grasp", "grasp", "lift", "pre_place", "place", "retreat", "assembly"};
+      for (const auto & name : canonical) {
+        if (names.count(name)) {stage_names_.push_back(name);}
       }
     }
-    stage_names_ = std::move(valid_names);
-    if (stage_names_.empty()) {
-      stage_names_ = {"pre_grasp", "assembly"};
-    }
-
+    if (stage_names_.empty()) {throw std::invalid_argument("empty_stage_sequence");}
+    std::unordered_set<std::string> unique;
     std::ostringstream sequence;
-    for (std::size_t index = 0; index < stage_names_.size(); ++index) {
-      if (index > 0) {
-        sequence << ',';
+    for (std::size_t i = 0; i < stage_names_.size(); ++i) {
+      if (stage_names_[i].empty() || !unique.insert(stage_names_[i]).second) {
+        throw std::invalid_argument("invalid_stage_sequence");
       }
-      sequence << stage_names_[index];
+      if (i) {sequence << ',';}
+      sequence << stage_names_[i];
     }
     stage_sequence_ = sequence.str();
   }
 
+  void configure_move_group_once()
+  {
+    robot_model_ = move_group_.getRobotModel();
+    if (!robot_model_ || !robot_model_->hasLinkModel(end_effector_link_)) {
+      throw std::invalid_argument("configured_end_effector_link_invalid");
+    }
+    if (!move_group_.setEndEffectorLink(end_effector_link_)) {
+      throw std::invalid_argument("configured_end_effector_link_invalid");
+    }
+    move_group_.setPlanningTime(planning_time_sec_);
+    move_group_.setNumPlanningAttempts(num_planning_attempts_);
+  }
+
+  void create_publishers()
+  {
+    success_publisher_ = node_->create_publisher<std_msgs::msg::Bool>(success_topic_, 10);
+    status_publisher_ = node_->create_publisher<std_msgs::msg::String>(status_topic_, 10);
+    duration_publisher_ = node_->create_publisher<std_msgs::msg::Float64>(duration_topic_, 10);
+    stage_status_publisher_ = node_->create_publisher<std_msgs::msg::String>(stage_status_topic_,
+      10);
+    stage_success_publisher_ = node_->create_publisher<std_msgs::msg::Bool>(stage_success_topic_,
+      10);
+    stage_duration_publisher_ =
+      node_->create_publisher<std_msgs::msg::Float64>(stage_duration_topic_, 10);
+    trajectory_status_publisher_ =
+      node_->create_publisher<std_msgs::msg::String>(trajectory_status_topic_, 10);
+    lock_status_publisher_ = node_->create_publisher<std_msgs::msg::String>(
+      plan_lock_status_topic_, rclcpp::QoS(10).reliable().durability_volatile());
+  }
+
   void create_stages()
   {
-    stages_.reserve(stage_names_.size());
     for (const auto & name : stage_names_) {
-      stages_.push_back(std::make_unique<StageConfig>());
-      auto & stage = *stages_.back();
-      stage.name = name;
-      stage.pose_topic = declare_parameter<std::string>(
-        name + "_topic", "/panda_" + name + "_pose");
-      stage.trajectory_topic = declare_parameter<std::string>(
-        name + "_trajectory_topic", "/" + name + "_trajectory");
-      stage.trajectory_publisher =
-        node_->create_publisher<moveit_msgs::msg::RobotTrajectory>(
-        stage.trajectory_topic, 10);
-      StageConfig * stage_ptr = &stage;
-      stage.subscription = node_->create_subscription<geometry_msgs::msg::PoseStamped>(
-        stage.pose_topic, 10,
-        [this, stage_ptr](const geometry_msgs::msg::PoseStamped::SharedPtr message) {
-          stage_ptr->pose = *message;
-          stage_ptr->updated = true;
+      auto stage = std::make_unique<Stage>();
+      stage->name = name;
+      stage->pose_topic = param<std::string>(name + "_topic", "/panda_" + name + "_pose");
+      stage->trajectory_topic = param<std::string>(name + "_trajectory_topic",
+        "/" + name + "_trajectory");
+      stage->trajectory_publisher = node_->create_publisher<moveit_msgs::msg::RobotTrajectory>(
+        stage->trajectory_topic, 10);
+      Stage * raw = stage.get();
+      stage->subscription = node_->create_subscription<geometry_msgs::msg::PoseStamped>(
+        stage->pose_topic, 10,
+        [this, raw](const geometry_msgs::msg::PoseStamped::SharedPtr message) {
+          raw->latest_pose = *message;
+          ++raw->latest_pose_generation;
+          raw->latest_receive_time = node_->now();
+          if (state_ == State::LOCKED) {
+            publish_update_ignored(raw->name);
+            return;
+          }
           try_plan_sequence();
         });
-      RCLCPP_INFO(
-        node_->get_logger(), "Configured stage '%s': pose='%s', trajectory='%s'.",
-        stage.name.c_str(), stage.pose_topic.c_str(), stage.trajectory_topic.c_str());
+      stages_.push_back(std::move(stage));
     }
+  }
+
+  void publish_update_ignored(const std::string & stage)
+  {
+    const auto now = std::chrono::steady_clock::now();
+    if (last_ignored_status_.time_since_epoch().count() != 0 &&
+      now - last_ignored_status_ < std::chrono::seconds(2)) {return;}
+    last_ignored_status_ = now;
+    publish_lock_status("update_ignored", locked_plan_id_, true, stages_.size(),
+      "plan_already_locked", stage);
+  }
+
+  bool inputs_ready() const
+  {
+    return dynamic_scene_ready_ && std::all_of(stages_.begin(), stages_.end(), [](const auto & s) {
+               return s->latest_pose.has_value() &&
+                      s->latest_pose_generation > s->consumed_generation;
+      });
   }
 
   void try_plan_sequence()
   {
-    const bool all_ready = std::all_of(
-      stages_.begin(), stages_.end(),
-      [](const std::unique_ptr<StageConfig> & stage) {
-        return stage->pose.has_value() && stage->updated;
-      });
-    if (!all_ready) {
+    if (state_ != State::WAITING_FOR_INPUTS || !inputs_ready()) {return;}
+    std::vector<std::pair<std::string, geometry_msgs::msg::PoseStamped>> snapshot;
+    snapshot.reserve(stages_.size());
+    for (const auto & stage : stages_) {snapshot.emplace_back(stage->name, *stage->latest_pose);}
+    const std::string snapshot_error = aap::validate_snapshot(snapshot, snapshot_limits_);
+    for (auto & stage : stages_) {stage->consumed_generation = stage->latest_pose_generation;}
+    const std::uint64_t plan_id = ++next_plan_id_;
+    snapshot_stamp_ns_ = node_->now().nanoseconds();
+    if (!snapshot_error.empty()) {
+      publish_failure(plan_id, "none", 0, 0.0, snapshot_error);
       return;
     }
-    for (auto & stage : stages_) {
-      stage->updated = false;
-    }
-    plan_sequence();
+    plan_sequence(plan_id, snapshot);
   }
 
-  void plan_sequence()
+  void apply_profile(const aap::StagePlanningProfile & profile)
   {
-    const std::size_t requested_stage_count = stages_.size();
-    std::size_t planned_stage_count = 0;
-    double total_duration_ms = 0.0;
-    std::optional<moveit_msgs::msg::RobotState> next_start_state;
-
-    set_pre_grasp_start_state();
-    for (std::size_t index = 0; index < stages_.size(); ++index) {
-      auto & stage = *stages_[index];
-      if (index > 0) {
-        if (!next_start_state.has_value()) {
-          publish_skipped_trajectories(index, "invalid_previous_trajectory");
-          publish_result(
-            false, "failure", stage.name, planned_stage_count, requested_stage_count,
-            total_duration_ms, "invalid_previous_trajectory");
-          return;
-        }
-        move_group_.setStartState(next_start_state.value());
-      }
-
-      set_pose_target(stage.pose.value());
-      moveit::planning_interface::MoveGroupInterface::Plan plan;
-      const auto result = plan_stage(plan);
-      total_duration_ms += result.duration_ms;
-      move_group_.clearPoseTargets();
-      publish_stage_result(
-        stage.name, index, requested_stage_count, result.succeeded, result.duration_ms);
-
-      if (!result.succeeded) {
-        publish_trajectory_status(
-          "skipped", stage.name, index, requested_stage_count, stage.trajectory_topic,
-          nullptr, "planning_failed");
-        publish_skipped_trajectories(index + 1, stage.name + "_failed");
-        publish_result(
-          false, "failure", stage.name, planned_stage_count, requested_stage_count,
-          total_duration_ms, "planning_failed");
-        return;
-      }
-
-      ++planned_stage_count;
-      publish_trajectory(stage, index, requested_stage_count, plan.trajectory);
-      next_start_state = final_state_from_plan(plan);
-      if (!next_start_state.has_value()) {
-        const bool next_stage_available = index + 1 < stages_.size();
-        if (next_stage_available) {
-          publish_skipped_trajectories(index + 1, "invalid_previous_trajectory");
-        }
-        publish_result(
-          false, "failure",
-          next_stage_available ? stages_[index + 1]->name : stage.name,
-          planned_stage_count,
-          requested_stage_count, total_duration_ms, "invalid_previous_trajectory");
-        return;
-      }
-    }
-
-    publish_result(
-      true, "success", "none", planned_stage_count, requested_stage_count,
-      total_duration_ms, "");
-    RCLCPP_INFO(
-      node_->get_logger(),
-      "Sequence planning succeeded for %zu stages in %.3f ms; execution remains disabled.",
-      planned_stage_count, total_duration_ms);
+    move_group_.setPlanningPipelineId(profile.planning_pipeline_id);
+    move_group_.setPlannerId(profile.planner_id);
+    move_group_.setGoalPositionTolerance(profile.position_tolerance);
+    move_group_.setGoalOrientationTolerance(profile.orientation_tolerance);
+    move_group_.setMaxVelocityScalingFactor(profile.max_velocity_scaling_factor);
+    move_group_.setMaxAccelerationScalingFactor(profile.max_acceleration_scaling_factor);
   }
 
-  void publish_skipped_trajectories(
-    const std::size_t first_index, const std::string & reason)
+  void set_initial_start_state()
   {
-    for (std::size_t index = first_index; index < stages_.size(); ++index) {
-      const auto & stage = *stages_[index];
-      publish_trajectory_status(
-        "skipped", stage.name, index, stages_.size(), stage.trajectory_topic, nullptr, reason);
-    }
-  }
-
-  void set_pose_target(const geometry_msgs::msg::PoseStamped & pose)
-  {
-    if (!pose.header.frame_id.empty()) {
-      move_group_.setPoseReferenceFrame(pose.header.frame_id);
-    }
-    move_group_.setPoseTarget(pose, end_effector_link_);
-  }
-
-  void set_pre_grasp_start_state()
-  {
-    if (start_state_mode_ == "current") {
-      move_group_.setStartStateToCurrentState();
-      return;
-    }
-    constexpr std::array<const char *, 7> joint_names = {
+    if (start_state_mode_ == "current") {move_group_.setStartStateToCurrentState(); return;}
+    constexpr std::array<const char *, 7> names = {
       "panda_joint1", "panda_joint2", "panda_joint3", "panda_joint4",
-      "panda_joint5", "panda_joint6", "panda_joint7"
-    };
-    constexpr std::array<double, 7> joint_positions = {
-      0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785
-    };
-    moveit_msgs::msg::RobotState fixed_state;
-    fixed_state.joint_state.name.assign(joint_names.begin(), joint_names.end());
-    fixed_state.joint_state.position.assign(joint_positions.begin(), joint_positions.end());
-    fixed_state.is_diff = false;
-    move_group_.setStartState(fixed_state);
+      "panda_joint5", "panda_joint6", "panda_joint7"};
+    constexpr std::array<double, 7> positions = {0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785};
+    moveit_msgs::msg::RobotState state;
+    state.joint_state.name.assign(names.begin(), names.end());
+    state.joint_state.position.assign(positions.begin(), positions.end());
+    move_group_.setStartState(state);
   }
 
-  StagePlanResult plan_stage(
-    moveit::planning_interface::MoveGroupInterface::Plan & plan)
+  std::optional<moveit_msgs::msg::RobotState> final_state(
+    const moveit::planning_interface::MoveGroupInterface::Plan & plan,
+    const std::optional<moveit_msgs::msg::RobotState> & requested_start_state) const
   {
-    const auto start = std::chrono::steady_clock::now();
-    const bool succeeded = static_cast<bool>(move_group_.plan(plan));
-    const auto end = std::chrono::steady_clock::now();
-    return {
-      succeeded,
-      std::chrono::duration<double, std::milli>(end - start).count()
-    };
-  }
-
-  static std::optional<moveit_msgs::msg::RobotState> final_state_from_plan(
-    const moveit::planning_interface::MoveGroupInterface::Plan & plan)
-  {
-    const auto & trajectory = plan.trajectory.joint_trajectory;
-    if (trajectory.points.empty()) {
+    const auto & jt = plan.trajectory.joint_trajectory;
+    if (jt.points.empty() || jt.joint_names.size() != jt.points.back().positions.size()) {
       return std::nullopt;
     }
-    moveit_msgs::msg::RobotState state = plan.start_state;
-    const auto & positions = trajectory.points.back().positions;
-    const std::size_t count = std::min(trajectory.joint_names.size(), positions.size());
-    for (std::size_t index = 0; index < count; ++index) {
-      const auto existing = std::find(
-        state.joint_state.name.begin(), state.joint_state.name.end(),
-        trajectory.joint_names[index]);
-      if (existing == state.joint_state.name.end()) {
-        state.joint_state.name.push_back(trajectory.joint_names[index]);
-        state.joint_state.position.push_back(positions[index]);
-      } else {
-        const auto state_index = static_cast<std::size_t>(
-          std::distance(state.joint_state.name.begin(), existing));
-        if (state.joint_state.position.size() <= state_index) {
-          state.joint_state.position.resize(state_index + 1, 0.0);
-        }
-        state.joint_state.position[state_index] = positions[index];
-      }
+    try {
+      moveit::core::RobotState complete_state(robot_model_);
+      const auto & base = requested_start_state.value_or(plan.start_state);
+      moveit::core::robotStateMsgToRobotState(base, complete_state, true);
+      complete_state.setVariablePositions(jt.joint_names, jt.points.back().positions);
+      const std::vector<double> zero(robot_model_->getVariableCount(), 0.0);
+      complete_state.setVariableVelocities(zero);
+      complete_state.setVariableEffort(zero);
+      complete_state.update();
+      moveit_msgs::msg::RobotState state;
+      moveit::core::robotStateToRobotStateMsg(complete_state, state, true);
+      state.is_diff = false;
+      return state;
+    } catch (const std::exception &) {
+      return std::nullopt;
     }
-    return state;
   }
 
-  void publish_trajectory(
-    const StageConfig & stage, const std::size_t stage_index,
-    const std::size_t requested_stage_count,
-    const moveit_msgs::msg::RobotTrajectory & trajectory)
+  std::optional<std::vector<geometry_msgs::msg::Pose>> fk_samples(
+    const moveit::planning_interface::MoveGroupInterface::Plan & plan) const
   {
-    if (!publish_trajectories_) {
-      publish_trajectory_status(
-        "skipped", stage.name, stage_index, requested_stage_count,
-        stage.trajectory_topic, &trajectory, "publishing_disabled");
-      return;
+    moveit::core::RobotState state(robot_model_);
+    try {
+      moveit::core::robotStateMsgToRobotState(plan.start_state, state, true);
+      std::vector<geometry_msgs::msg::Pose> samples;
+      const auto & jt = plan.trajectory.joint_trajectory;
+      for (const auto & point : jt.points) {
+        if (point.positions.size() != jt.joint_names.size() ||
+          !std::all_of(point.positions.begin(), point.positions.end(), [](double v) {
+            return std::isfinite(v);
+                                                                                                             }))
+        {return std::nullopt;}
+        state.setVariablePositions(jt.joint_names, point.positions);
+        state.updateLinkTransforms();
+        const Eigen::Isometry3d & transform = state.getGlobalLinkTransform(end_effector_link_);
+        const Eigen::Quaterniond q(transform.rotation());
+        geometry_msgs::msg::Pose pose;
+        pose.position.x = transform.translation().x();
+        pose.position.y = transform.translation().y();
+        pose.position.z = transform.translation().z();
+        pose.orientation.x = q.x(); pose.orientation.y = q.y();
+        pose.orientation.z = q.z(); pose.orientation.w = q.w();
+        samples.push_back(pose);
+      }
+      return samples;
+    } catch (const std::exception &) {
+      return std::nullopt;
     }
-    stage.trajectory_publisher->publish(trajectory);
-    publish_trajectory_status(
-      "published", stage.name, stage_index, requested_stage_count,
-      stage.trajectory_topic, &trajectory, "");
+  }
+
+  void plan_sequence(
+    const std::uint64_t plan_id,
+    const std::vector<std::pair<std::string, geometry_msgs::msg::PoseStamped>> & snapshot)
+  {
+    state_ = State::PLANNING;
+    publish_lock_status("planning_started", plan_id, false, 0, "");
+    std::vector<Candidate> candidates;
+    std::optional<moveit_msgs::msg::RobotState> next_start;
+    geometry_msgs::msg::Pose pre_grasp_fk;
+    bool have_pre_grasp_fk = false;
+    double total_ms = 0.0;
+    set_initial_start_state();
+
+    for (std::size_t i = 0; i < stages_.size(); ++i) {
+      const auto & stage = *stages_[i];
+      const auto profile = aap::resolve_stage_profile(
+        stage.name, linear_stage_names_, default_profile_, linear_profile_);
+      apply_profile(profile);
+      if (i > 0) {
+        if (!next_start) {
+          publish_failure(plan_id, stage.name, candidates.size(), total_ms,
+            "invalid_previous_trajectory"); return;
+        }
+        move_group_.setStartState(*next_start);
+      }
+      move_group_.setPoseReferenceFrame(snapshot[i].second.header.frame_id);
+      move_group_.setPoseTarget(snapshot[i].second, end_effector_link_);
+      Candidate candidate;
+      candidate.profile = profile;
+      const auto begin = std::chrono::steady_clock::now();
+      const bool success = static_cast<bool>(move_group_.plan(candidate.plan));
+      candidate.duration_ms = std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now() - begin).count();
+      total_ms += candidate.duration_ms;
+      move_group_.clearPoseTargets();
+      if (!success) {
+        const std::string reason =
+          profile.require_linear_validation ? "linear_planning_failed" : "planning_failed";
+        publish_stage(candidate, stage.name, i, plan_id, false, reason);
+        publish_failure(plan_id, stage.name, candidates.size(), total_ms, reason);
+        return;
+      }
+      next_start = final_state(candidate.plan, next_start);
+      if (!next_start) {
+        publish_stage(candidate, stage.name, i, plan_id, false, "invalid_trajectory_final_state");
+        publish_failure(plan_id, stage.name, candidates.size(), total_ms,
+          "invalid_trajectory_final_state");
+        return;
+      }
+      const auto samples = fk_samples(candidate.plan);
+      if (!samples || samples->empty()) {
+        publish_stage(candidate, stage.name, i, plan_id, false, "linear_path_invalid_fk");
+        publish_failure(plan_id, stage.name, candidates.size(), total_ms, "linear_path_invalid_fk");
+        return;
+      }
+      if (stage.name == "pre_grasp") {
+        pre_grasp_fk = samples->back();
+        have_pre_grasp_fk = true;
+      }
+      if (profile.require_linear_validation) {
+        if (!have_pre_grasp_fk) {
+          publish_failure(plan_id, stage.name, candidates.size(), total_ms,
+            "linear_path_missing_pre_grasp"); return;
+        }
+        candidate.linear_metrics = aap::validate_linear_path(
+          pre_grasp_fk, snapshot[i].second.pose, *samples, linear_limits_);
+        if (!candidate.linear_metrics.valid) {
+          publish_stage(candidate, stage.name, i, plan_id, false, candidate.linear_metrics.reason);
+          publish_failure(plan_id, stage.name, candidates.size(), total_ms,
+            candidate.linear_metrics.reason);
+          return;
+        }
+      }
+      publish_stage(candidate, stage.name, i, plan_id, true, "");
+      candidates.push_back(std::move(candidate));
+    }
+
+    if (publish_trajectories_) {
+      for (std::size_t i = 0; i < stages_.size(); ++i) {
+        stages_[i]->trajectory_publisher->publish(candidates[i].plan.trajectory);
+        publish_trajectory_status("published", *stages_[i], i, plan_id, candidates[i], "");
+      }
+    }
+    publish_result(true, plan_id, "none", candidates.size(), total_ms, "");
+    if (lock_after_successful_sequence_) {
+      state_ = State::LOCKED;
+      locked_plan_id_ = plan_id;
+      publish_lock_status("locked", plan_id, true, candidates.size(), "");
+    } else {
+      state_ = State::WAITING_FOR_INPUTS;
+    }
+  }
+
+  std::string profile_fields(const aap::StagePlanningProfile & p) const
+  {
+    std::ostringstream out;
+    out << ";planning_pipeline_id=" << p.planning_pipeline_id
+        << ";planner_id=" << (p.planner_id.empty() ? "<default>" : p.planner_id)
+        << ";position_tolerance=" << p.position_tolerance
+        << ";orientation_tolerance=" << p.orientation_tolerance
+        << ";max_velocity_scaling_factor=" << p.max_velocity_scaling_factor
+        << ";max_acceleration_scaling_factor=" << p.max_acceleration_scaling_factor
+        << ";require_linear_validation=" << (p.require_linear_validation ? "true" : "false");
+    return out.str();
+  }
+
+  std::string metric_fields(const aap::LinearPathMetrics & m) const
+  {
+    if (m.direct_distance == 0.0 && m.reason.empty()) {return "";}
+    std::ostringstream out;
+    out << ";direct_distance=" << m.direct_distance
+        << ";sampled_cartesian_path_length=" << m.sampled_cartesian_path_length
+        << ";path_length_ratio=" << m.path_length_ratio
+        << ";max_lateral_deviation=" << m.max_lateral_deviation
+        << ";max_orientation_deviation=" << m.max_orientation_deviation
+        << ";endpoint_position_error=" << m.endpoint_position_error
+        << ";endpoint_orientation_error=" << m.endpoint_orientation_error
+        << ";minimum_progress=" << m.minimum_progress
+        << ";maximum_progress=" << m.maximum_progress
+        << ";monotonic_progress=" << (m.monotonic_progress ? "true" : "false");
+    return out.str();
+  }
+
+  void publish_stage(
+    const Candidate & candidate, const std::string & stage, std::size_t index,
+    std::uint64_t plan_id, bool success, const std::string & reason)
+  {
+    std_msgs::msg::Bool success_msg; success_msg.data = success;
+    stage_success_publisher_->publish(success_msg);
+    if (!publish_diagnostics_) {return;}
+    std_msgs::msg::String message;
+    std::ostringstream out;
+    out << std::fixed << std::setprecision(6)
+        << "event=" << (success ? "success" : "failure") << ";stage=" << stage
+        << ";stage_index=" << index << ";requested_stage_count=" << stages_.size()
+        << ";plan_id=" << plan_id << ";duration_ms=" << candidate.duration_ms
+        << ";planning_group=" << planning_group_ << ";end_effector_link=" << end_effector_link_
+        << profile_fields(candidate.profile) << metric_fields(candidate.linear_metrics);
+    if (!reason.empty()) {out << ";reason=" << reason;}
+    out << ";execution=false";
+    message.data = out.str(); stage_status_publisher_->publish(message);
+    RCLCPP_INFO(node_->get_logger(), "Stage planning status: %s", message.data.c_str());
+    std_msgs::msg::Float64 duration; duration.data = candidate.duration_ms;
+    stage_duration_publisher_->publish(duration);
   }
 
   void publish_trajectory_status(
-    const std::string & event, const std::string & stage,
-    const std::size_t stage_index, const std::size_t requested_stage_count,
-    const std::string & topic, const moveit_msgs::msg::RobotTrajectory * trajectory,
-    const std::string & reason)
+    const std::string & event, const Stage & stage, std::size_t index,
+    std::uint64_t plan_id, const Candidate & candidate, const std::string & reason)
   {
     std_msgs::msg::String message;
-    std::ostringstream status;
-    status << "event=" << event << ";stage=" << stage
-           << ";stage_index=" << stage_index
-           << ";requested_stage_count=" << requested_stage_count
-           << ";topic=" << topic;
-    if (!reason.empty()) {
-      status << ";reason=" << reason;
-    }
-    if (trajectory != nullptr) {
-      status << ";point_count=" << trajectory->joint_trajectory.points.size()
-             << ";joint_count=" << trajectory->joint_trajectory.joint_names.size();
-    }
-    status << ";execution=false";
-    message.data = status.str();
+    std::ostringstream out;
+    out << std::fixed << std::setprecision(6) << "event=" << event << ";stage=" << stage.name
+        << ";stage_index=" << index << ";requested_stage_count=" << stages_.size()
+        << ";topic=" << stage.trajectory_topic << ";plan_id=" << plan_id
+        << ";point_count=" << candidate.plan.trajectory.joint_trajectory.points.size()
+        << ";joint_count=" << candidate.plan.trajectory.joint_trajectory.joint_names.size()
+        << profile_fields(candidate.profile) << metric_fields(candidate.linear_metrics);
+    if (!reason.empty()) {out << ";reason=" << reason;}
+    out << ";execution=false"; message.data = out.str();
     trajectory_status_publisher_->publish(message);
   }
 
-  void publish_result(
-    const bool success, const std::string & event, const std::string & failed_stage,
-    const std::size_t planned_stage_count, const std::size_t requested_stage_count,
-    const double total_duration_ms, const std::string & reason)
+  void publish_failure(
+    std::uint64_t plan_id, const std::string & stage, std::size_t planned,
+    double total_ms, const std::string & reason)
   {
-    std_msgs::msg::Bool success_message;
-    success_message.data = success;
-    success_publisher_->publish(success_message);
-    if (!publish_diagnostics_) {
-      return;
-    }
-    std_msgs::msg::String message;
-    std::ostringstream status;
-    status << std::fixed << std::setprecision(6)
-           << "event=" << event << ";failed_stage=" << failed_stage
-           << ";planned_stage_count=" << planned_stage_count
-           << ";requested_stage_count=" << requested_stage_count
-           << ";stage_sequence=" << stage_sequence_
-           << ";total_duration_ms=" << total_duration_ms
-           << ";start_state_mode=" << start_state_mode_
-           << ";end_effector_link=" << end_effector_link_;
-    if (!reason.empty()) {
-      status << ";reason=" << reason;
-    }
-    status << ";execution=false";
-    message.data = status.str();
-    status_publisher_->publish(message);
-    std_msgs::msg::Float64 duration_message;
-    duration_message.data = total_duration_ms;
-    duration_publisher_->publish(duration_message);
+    publish_result(false, plan_id, stage, planned, total_ms, reason);
+    publish_lock_status("failure", plan_id, false, planned, reason);
+    RCLCPP_WARN(
+      node_->get_logger(), "Sequence planning failed: plan_id=%lu stage='%s' reason='%s'.",
+      static_cast<unsigned long>(plan_id), stage.c_str(), reason.c_str());
+    state_ = State::WAITING_FOR_INPUTS;
   }
 
-  void publish_stage_result(
-    const std::string & stage, const std::size_t stage_index,
-    const std::size_t requested_stage_count, const bool success,
-    const double duration_ms)
+  void publish_result(
+    bool success, std::uint64_t plan_id, const std::string & failed_stage,
+    std::size_t planned, double total_ms, const std::string & reason)
   {
-    std_msgs::msg::Bool success_message;
-    success_message.data = success;
-    stage_success_publisher_->publish(success_message);
-    if (!publish_diagnostics_) {
-      return;
-    }
+    std_msgs::msg::Bool success_msg; success_msg.data = success;
+    success_publisher_->publish(success_msg);
     std_msgs::msg::String message;
-    std::ostringstream status;
-    status << std::fixed << std::setprecision(6)
-           << "event=" << (success ? "success" : "failure")
-           << ";stage=" << stage << ";stage_index=" << stage_index
-           << ";requested_stage_count=" << requested_stage_count
-           << ";duration_ms=" << duration_ms
-           << ";planning_group=" << planning_group_
-           << ";end_effector_link=" << end_effector_link_
-           << ";planner_id=" << (planner_id_.empty() ? "<default>" : planner_id_)
-           << ";num_planning_attempts=" << num_planning_attempts_
-           << ";planning_time_sec=" << planning_time_sec_
-           << ";position_tolerance=" << position_tolerance_
-           << ";orientation_tolerance=" << orientation_tolerance_
-           << ";start_state_mode=" << start_state_mode_
-           << ";execution=false";
-    message.data = status.str();
-    stage_status_publisher_->publish(message);
-    std_msgs::msg::Float64 duration_message;
-    duration_message.data = duration_ms;
-    stage_duration_publisher_->publish(duration_message);
+    std::ostringstream out;
+    out << std::fixed << std::setprecision(6) << "event=" << (success ? "success" : "failure")
+        << ";plan_id=" << plan_id << ";failed_stage=" << failed_stage
+        << ";planned_stage_count=" << planned << ";requested_stage_count=" << stages_.size()
+        << ";stage_sequence=" << stage_sequence_ << ";total_duration_ms=" << total_ms
+        << ";start_state_mode=" << start_state_mode_ << ";end_effector_link=" << end_effector_link_;
+    if (!reason.empty()) {out << ";reason=" << reason;}
+    out << ";execution=false"; message.data = out.str(); status_publisher_->publish(message);
+    std_msgs::msg::Float64 duration; duration.data = total_ms;
+    duration_publisher_->publish(duration);
+  }
+
+  void publish_lock_status(
+    const std::string & event, std::uint64_t plan_id, bool locked,
+    std::size_t planned_count, const std::string & reason,
+    const std::string & updated_stage = "")
+  {
+    std_msgs::msg::String message;
+    std::ostringstream out;
+    out << "event=" << event << ";mode=sequence_plan_lock;plan_id=" << plan_id
+        << ";stage_sequence=" << stage_sequence_ << ";snapshot_stamp_ns=" << snapshot_stamp_ns_
+        << ";locked=" << (locked ? "true" : "false")
+        << ";planned_stage_count=" << planned_count;
+    if (!updated_stage.empty()) {out << ";stage=" << updated_stage;}
+    if (!reason.empty()) {out << ";reason=" << reason;}
+    out << ";execution=false"; message.data = out.str(); lock_status_publisher_->publish(message);
   }
 
   rclcpp::Node::SharedPtr node_;
-  std::string success_topic_;
-  std::string status_topic_;
-  std::string duration_topic_;
-  std::string stage_status_topic_;
-  std::string stage_success_topic_;
-  std::string stage_duration_topic_;
-  std::string trajectory_status_topic_;
-  bool publish_diagnostics_;
-  bool publish_trajectories_;
-  bool require_grasp_pose_;
-  bool require_place_sequence_;
-  std::string planning_group_;
-  std::string end_effector_link_;
-  std::string planner_id_;
+  std::string success_topic_, status_topic_, duration_topic_, stage_status_topic_;
+  std::string stage_success_topic_, stage_duration_topic_, trajectory_status_topic_;
+  std::string plan_lock_status_topic_;
+  bool publish_diagnostics_, publish_trajectories_, lock_after_successful_sequence_;
+  bool require_dynamic_target_scene_ready_, dynamic_scene_ready_{false};
+  std::string planning_group_, end_effector_link_;
   int num_planning_attempts_;
   double planning_time_sec_;
-  double position_tolerance_;
-  double orientation_tolerance_;
   std::string start_state_mode_;
+  aap::StagePlanningProfile default_profile_, linear_profile_;
+  aap::SnapshotLimits snapshot_limits_;
+  aap::LinearPathLimits linear_limits_;
   std::vector<std::string> stage_names_;
   std::string stage_sequence_;
-  std::vector<std::unique_ptr<StageConfig>> stages_;
+  std::unordered_set<std::string> linear_stage_names_;
+  std::vector<std::unique_ptr<Stage>> stages_;
+  State state_{State::WAITING_FOR_INPUTS};
+  std::uint64_t next_plan_id_{0}, locked_plan_id_{0};
+  std::int64_t snapshot_stamp_ns_{0};
+  std::chrono::steady_clock::time_point last_ignored_status_;
   moveit::planning_interface::MoveGroupInterface move_group_;
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr success_publisher_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_publisher_;
-  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr duration_publisher_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr stage_status_publisher_;
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr stage_success_publisher_;
-  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr stage_duration_publisher_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr trajectory_status_publisher_;
+  moveit::core::RobotModelConstPtr robot_model_;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr success_publisher_, stage_success_publisher_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_publisher_, stage_status_publisher_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr trajectory_status_publisher_,
+    lock_status_publisher_;
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr duration_publisher_,
+    stage_duration_publisher_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr dynamic_scene_ready_subscription_;
 };
 
 int main(int argc, char * argv[])
@@ -556,16 +644,14 @@ int main(int argc, char * argv[])
   auto node = std::make_shared<rclcpp::Node>(
     "assembly_sequence_planning_node",
     rclcpp::NodeOptions().automatically_declare_parameters_from_overrides(true));
-  std::shared_ptr<AssemblySequencePlanningNode> planner;
   try {
-    planner = std::make_shared<AssemblySequencePlanningNode>(node);
-  } catch (const std::exception & exception) {
-    RCLCPP_FATAL(node->get_logger(), "%s", exception.what());
+    auto planner = std::make_shared<AssemblySequencePlanningNode>(node);
+    rclcpp::spin(node);
+  } catch (const std::exception & error) {
+    RCLCPP_FATAL(node->get_logger(), "%s", error.what());
     rclcpp::shutdown();
     return 2;
   }
-  rclcpp::spin(node);
-  planner.reset();
   rclcpp::shutdown();
   return 0;
 }

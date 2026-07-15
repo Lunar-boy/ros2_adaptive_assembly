@@ -18,6 +18,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
+find_package(moveit_ros_planning REQUIRED)
 find_package(moveit_msgs REQUIRED)
 find_package(shape_msgs REQUIRED)
 find_package(tf2 REQUIRED)
@@ -63,8 +64,29 @@ ament_target_dependencies(
   geometry_msgs
   std_msgs
   moveit_ros_planning_interface
+  moveit_ros_planning
   moveit_msgs
 )
+
+target_include_directories(assembly_sequence_planning_node PRIVATE include)
+
+add_executable(
+  physical_target_planning_scene_node
+  src/physical_target_planning_scene_node.cpp
+)
+ament_target_dependencies(
+  physical_target_planning_scene_node
+  rclcpp
+  geometry_msgs
+  std_msgs
+  moveit_ros_planning
+  moveit_msgs
+  shape_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+)
+target_include_directories(physical_target_planning_scene_node PRIVATE include)
 
 add_executable(static_planning_scene_node src/static_planning_scene_node.cpp)
 ament_target_dependencies(
@@ -94,8 +116,11 @@ install(
     assembly_sequence_planning_node
     static_planning_scene_node
     planning_scene_audit_node
+    physical_target_planning_scene_node
   DESTINATION lib/${PROJECT_NAME}
 )
+
+install(DIRECTORY include/ DESTINATION include)
 
 install(
   DIRECTORY launch
@@ -105,6 +130,7 @@ install(
 
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
+  find_package(ament_cmake_gtest REQUIRED)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
@@ -112,6 +138,11 @@ if(BUILD_TESTING)
   ament_add_pytest_test(
     test_assembly_sequence_planner_contract
     test/test_assembly_sequence_planner_contract.py
+  )
+  ament_add_gtest(test_planning_contract test/test_planning_contract.cpp)
+  target_include_directories(test_planning_contract PRIVATE include)
+  ament_target_dependencies(
+    test_planning_contract geometry_msgs moveit_msgs shape_msgs
   )
 endif()
 

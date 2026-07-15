@@ -14,6 +14,7 @@
   <depend>std_msgs</depend>
   <depend>std_srvs</depend>
   <depend>moveit_ros_planning_interface</depend>
+  <depend>moveit_ros_planning</depend>
   <depend>moveit_msgs</depend>
   <depend>shape_msgs</depend>
   <depend>tf2</depend>
@@ -23,6 +24,7 @@
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
   <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

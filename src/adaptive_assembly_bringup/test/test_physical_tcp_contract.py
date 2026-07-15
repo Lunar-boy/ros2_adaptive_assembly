@@ -66,8 +66,7 @@ def test_physical_planning_owns_the_assembly_tcp_contract():
         "LaunchConfiguration('end_effector_link')"
     ) in planning_source
 
-    assert "default_value='0.005'" in planning_source
-    assert "default_value='0.03'" in planning_source
+    assert planning_source.count("default_value='0.005'") >= 2
 
     assert 'end_effector_link' not in execution_source
     assert 'position_tolerance' not in execution_source

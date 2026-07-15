@@ -64,3 +64,6 @@ physical_pick_place_executor_node:
     open_gripper_before_first_arm_stage: true
     gripper_command_timeout_sec: 5.0
     expected_target_object: target_object
+    require_plan_lock: true
+    plan_lock_status_topic: /assembly_sequence_plan_lock_status
+    plan_lock_timeout_sec: 10.0
