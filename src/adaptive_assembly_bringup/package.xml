@@ -10,14 +10,10 @@
   <depend>rclpy</depend>
   <depend>launch</depend>
   <depend>launch_ros</depend>
-  <depend>adaptive_assembly_perception</depend>
   <depend>adaptive_assembly_task</depend>
   <depend>adaptive_assembly_planning</depend>
   <depend>adaptive_assembly_execution</depend>
-  <depend>adaptive_assembly_recovery</depend>
   <depend>adaptive_assembly_manipulation</depend>
-  <depend>adaptive_assembly_benchmark</depend>
-  <exec_depend>adaptive_assembly_episode</exec_depend>
   <exec_depend>adaptive_assembly_sim</exec_depend>
   <depend>moveit_resources_panda_moveit_config</depend>
   <exec_depend>moveit_configs_utils</exec_depend>

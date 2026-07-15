@@ -168,7 +168,8 @@ source install/setup.bash
 ## Run
 
 ```bash
-ros2 launch adaptive_assembly_bringup adaptive_assembly_pipeline.launch.py
+ros2 launch adaptive_assembly_bringup \
+  adaptive_assembly_full_physical_pick_place_demo.launch.py
 ```
 
 ## Validate

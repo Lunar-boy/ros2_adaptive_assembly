@@ -13,13 +13,9 @@ FULL_LAUNCH = (
     ROOT / 'src/adaptive_assembly_bringup/launch'
     / 'adaptive_assembly_full_physical_pick_place_demo.launch.py'
 )
-PANDA_DEMO_LAUNCH = (
+PHYSICAL_PLANNING_LAUNCH = (
     ROOT / 'src/adaptive_assembly_bringup/launch'
-    / 'adaptive_assembly_panda_demo.launch.py'
-)
-REACHABLE_LAUNCH = (
-    ROOT / 'src/adaptive_assembly_bringup/launch'
-    / 'adaptive_assembly_panda_sequence_planning_reachable.launch.py'
+    / 'adaptive_assembly_physical_planning.launch.py'
 )
 AUDIT_LAUNCH = (
     ROOT / 'src/adaptive_assembly_planning/launch'
@@ -38,10 +34,6 @@ def main() -> int:
     panda_demo_text = (
         PANDA_DEMO_LAUNCH.read_text(encoding='utf-8')
         if PANDA_DEMO_LAUNCH.exists() else ''
-    )
-    reachable_text = (
-        REACHABLE_LAUNCH.read_text(encoding='utf-8')
-        if REACHABLE_LAUNCH.exists() else ''
     )
     audit_text = AUDIT_LAUNCH.read_text(encoding='utf-8') if AUDIT_LAUNCH.exists() else ''
 
@@ -77,21 +69,19 @@ def main() -> int:
         "'target_object_raw_pose_topic': (",
         "'object_pose_topic': '/gazebo_target_object_pose'",
         "'launch_object_pose_observer': launch_object_pose_observer",
+        'assembly_task_node',
+        'move_group',
+        'static_planning_scene_node',
+        'planning_scene_audit_node',
+        'panda_pre_grasp_pose_adapter_node',
+        'assembly_sequence_planning_node',
+        'pre_grasp,grasp,lift,pre_place,place,retreat',
+        'assembly_tcp',
+        'physical_workcell_planning_scene.yaml',
     ]
     for token in required:
         if token not in text and token not in full_text:
             failures.append(f'missing launch token: {token}')
-
-    required_panda_demo_tokens = [
-        "default_value='true'",
-        'moveit_resources_panda_moveit_config',
-        'moveit_ros_move_group',
-        'UnlessCondition(use_standard_panda_demo)',
-        'panda_gripper_controller',
-    ]
-    for token in required_panda_demo_tokens:
-        if token not in panda_demo_text:
-            failures.append(f'missing no-fake planning token: {token}')
 
     required_audit_tokens = [
         'expected_object_ids',
@@ -125,6 +115,17 @@ def main() -> int:
         failures.append(
             'expected exactly one /gazebo_target_object_pose observer source'
         )
+    legacy_tokens = [
+        'adaptive_assembly_panda_sequence_planning_reachable.launch.py',
+        'adaptive_assembly_panda_sequence_planning_demo.launch.py',
+        'adaptive_assembly_panda_planning_demo.launch.py',
+        'adaptive_assembly_panda_demo.launch.py',
+        'adaptive_assembly_pipeline.launch.py',
+        'launch_reachable_sequence',
+    ]
+    for token in legacy_tokens:
+        if token in full_text or token in execution_text or token in planning_text:
+        failures.append(f'legacy planning token present: {token}')
 
     if failures:
         print('FAIL physical pick-place launch static check')

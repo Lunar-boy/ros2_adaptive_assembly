@@ -69,11 +69,7 @@ def test_physical_chain_propagates_an_overridable_params_file():
     chain = (
         'adaptive_assembly_full_physical_pick_place_demo.launch.py',
         'adaptive_assembly_physical_pick_place_execution.launch.py',
-        'adaptive_assembly_panda_sequence_planning_reachable.launch.py',
-        'adaptive_assembly_panda_sequence_planning_demo.launch.py',
-        'adaptive_assembly_panda_planning_demo.launch.py',
-        'adaptive_assembly_panda_demo.launch.py',
-        'adaptive_assembly_pipeline.launch.py',
+        'adaptive_assembly_physical_planning.launch.py',
     )
     for filename in chain:
         description = _load_launch(filename)
@@ -87,13 +83,7 @@ def test_only_physical_launches_reference_the_physical_profile():
     physical_launches = (
         'adaptive_assembly_full_physical_pick_place_demo.launch.py',
         'adaptive_assembly_physical_pick_place_execution.launch.py',
-    )
-    nonphysical_launches = (
-        'adaptive_assembly_panda_sequence_planning_reachable.launch.py',
-        'adaptive_assembly_panda_sequence_planning_demo.launch.py',
-        'adaptive_assembly_panda_planning_demo.launch.py',
-        'adaptive_assembly_panda_demo.launch.py',
-        'adaptive_assembly_pipeline.launch.py',
+        'adaptive_assembly_physical_planning.launch.py',
     )
     for filename in physical_launches:
         assert _references_profile(filename)
@@ -110,14 +100,3 @@ def test_only_physical_launches_reference_the_physical_profile():
             for node in ast.walk(tree)
         )
 
-
-def test_reachable_profile_remains_the_nonphysical_default():
-    """Preserve the reachable wrapper's existing parameter-file default."""
-    description = _load_launch(
-        'adaptive_assembly_panda_sequence_planning_reachable.launch.py'
-    )
-    _declaration(description, 'params_file')
-    assert _declares_default_variable(
-        'adaptive_assembly_panda_sequence_planning_reachable.launch.py',
-        'params_file', 'reachable_params'
-    )

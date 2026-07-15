@@ -1,2 +1,0 @@
-"""Adaptive assembly benchmark nodes."""
-

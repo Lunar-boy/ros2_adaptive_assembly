@@ -35,12 +35,6 @@ setup(
     extras_require={'test': ['pytest']},
     entry_points={
         'console_scripts': [
-            'logical_grasp_lifecycle_node = '
-            'adaptive_assembly_manipulation.'
-            'logical_grasp_lifecycle_node:main',
-            'gazebo_attach_detach_node = '
-            'adaptive_assembly_manipulation.'
-            'gazebo_attach_detach_node:main',
             'gripper_action_bridge_node = '
             'adaptive_assembly_manipulation.'
             'gripper_action_bridge_node:main',

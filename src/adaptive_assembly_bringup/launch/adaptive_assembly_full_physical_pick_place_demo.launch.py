@@ -1,11 +1,7 @@
 """Launch the simulator-only full physical pick-place demo."""
 
 from launch import LaunchDescription
-from launch.actions import (
-    DeclareLaunchArgument,
-    IncludeLaunchDescription,
-    LogInfo,
-)
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo
 from launch.conditions import UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
@@ -13,7 +9,7 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description() -> LaunchDescription:
-    """Start Gazebo with the physical workcell and physical execution path."""
+    """Start Gazebo dedicated physical planning and physical execution path."""
     default_world = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_sim'),
         'worlds',
@@ -23,6 +19,11 @@ def generate_launch_description() -> LaunchDescription:
         FindPackageShare('adaptive_assembly_sim'),
         'launch',
         'adaptive_assembly_panda_gazebo.launch.py',
+    ])
+    planning_launch = PathJoinSubstitution([
+        FindPackageShare('adaptive_assembly_bringup'),
+        'launch',
+        'adaptive_assembly_physical_planning.launch.py',
     ])
     execution_launch = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_bringup'),
@@ -72,7 +73,7 @@ def generate_launch_description() -> LaunchDescription:
             'world',
             default_value=default_world,
             description=(
-                'Physical Gazebo SDF workcell for contact verification.'
+                'Physical Gazebo SDF workcell for contact verification.',
             ),
         ),
         DeclareLaunchArgument(
@@ -96,9 +97,7 @@ def generate_launch_description() -> LaunchDescription:
             default_value=physical_planning_scene_params_file,
             description=(
                 'Physical-workcell static PlanningScene geometry. The SDF '
-                'world and panda_link0 are coincident in this demo because '
-                'the Panda spawn and world-to-base joint both use identity '
-                'transforms.'
+                'world and panda_link0 are coincident in this demo. '
             ),
         ),
         DeclareLaunchArgument(
@@ -114,22 +113,21 @@ def generate_launch_description() -> LaunchDescription:
             default_value='true',
             description=(
                 'Use the Gazebo /clock time domain for the physical demo. '
-                'The Gazebo clock bridge is required.'
             ),
         ),
         DeclareLaunchArgument(
             'launch_fake_object_pose_node',
             default_value='false',
             description=(
-                'Disable fake perception so Gazebo is the only intended '
-                '/target_pose source.'
+                'The dedicated physical planning launch '
+                'never starts fake perception'
             ),
         ),
         DeclareLaunchArgument(
             'launch_object_pose_observer',
             default_value='true',
             description=(
-                'Launch the one dedicated Gazebo target-object Pose bridge '
+                'Launch the dedicated Gazebo target-object Pose bridge '
                 'and observer. Keep true for the full physical demo.'
             ),
         ),
@@ -137,7 +135,7 @@ def generate_launch_description() -> LaunchDescription:
             'end_effector_link',
             default_value='assembly_tcp',
             description=(
-                'Explicit MoveIt target link for every physical stage pose.'
+                'Explicit MoveIt target link for every physical stage.'
             ),
         ),
         DeclareLaunchArgument(
@@ -145,8 +143,7 @@ def generate_launch_description() -> LaunchDescription:
             default_value='0.0',
             description=(
                 'Z offset from the Gazebo model center to the task reference '
-                'pose. The physical default keeps /target_pose at the 0.10 m '
-                'target cylinder geometric center.'
+                'pose. The physical default preserves the cylinder center. '
             ),
         ),
         DeclareLaunchArgument(
@@ -158,14 +155,9 @@ def generate_launch_description() -> LaunchDescription:
             ),
         ),
         LogInfo(msg=(
-            'Launching simulator-only full physical pick-place demo with '
-            'adaptive_assembly_physical_workcell.sdf, '
-            'world_name=adaptive_assembly_physical_workcell, and '
-            'enable_arm_collisions=true by default. This path is separate '
-            'from the kinematic attach visual demo. Simulation time is '
-            'enabled by default; /clock is expected from Gazebo. The observed '
-            'Gazebo target pose is adapted to /target_pose and fake '
-            'perception is disabled by default.'
+            'Launching the simulator-only full physical pick-place demo with '
+            'a dedicated physical planning stack. Legacy Panda planning demo '
+            'wrappers, fake perception, and fake controllers are bypassed.'
         )),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(sim_launch),
@@ -189,11 +181,25 @@ def generate_launch_description() -> LaunchDescription:
             }.items(),
         ),
         IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(planning_launch),
+            launch_arguments={
+                'params_file': params_file,
+                'static_planning_scene_params_file': (
+                    static_planning_scene_params_file
+                ),
+                'use_sim_time': use_sim_time,
+                'end_effector_link': end_effector_link,
+                'stage_names': (
+                    'pre_grasp,grasp,lift,pre_place,place,retreat'
+                ),
+                'position_tolerance': '0.005',
+                'orientation_tolerance': '0.03',
+            }.items(),
+        ),
+        IncludeLaunchDescription(
             PythonLaunchDescriptionSource(execution_launch),
             launch_arguments={
-                'use_standard_panda_demo': 'false',
                 'use_sim_time': use_sim_time,
-                'launch_fake_object_pose_node': launch_fake_object_pose_node,
                 'launch_object_pose_observer': launch_object_pose_observer,
                 'target_object_gazebo_pose_topic': '/model/target_object/pose',
                 'target_object_raw_pose_topic': (
@@ -204,10 +210,6 @@ def generate_launch_description() -> LaunchDescription:
                     '/gazebo_target_object_pose_available'
                 ),
                 'params_file': params_file,
-                'end_effector_link': end_effector_link,
-                'static_planning_scene_params_file': (
-                    static_planning_scene_params_file
-                ),
             }.items(),
         ),
     ])
