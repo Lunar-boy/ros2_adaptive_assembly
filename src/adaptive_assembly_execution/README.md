@@ -8,8 +8,8 @@ sequence trajectories:
 - `ros2_control_sequence_executor_node` validates the same stages and can send
   them in order to a simulated `FollowJointTrajectory` controller.
 - `physical_pick_place_executor_node` consumes the PR65 multi-stage trajectory
-  topics and interleaves simulator-only PR63 gripper close/open commands after
-  `grasp` and `place`.
+  topics, explicitly opens the simulator gripper before `pre_grasp`, and
+  interleaves gripper close/open commands after `grasp` and `place`.
 - `simulated_follow_joint_trajectory_server_node` provides deterministic
   success, rejection, failure, and timeout modes for local action-level checks.
 - `wait_for_gazebo_controller_ready_node` publishes retained readiness only

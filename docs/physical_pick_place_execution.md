@@ -8,13 +8,20 @@ now waits for `/physical_grasp_preflight_status` by default before sending arm
 goals, so the physical world, object pose observer, contact topics, and
 kinematic attach separation are checked before execution starts.
 
-The default sequence is:
+The physical profile enables `open_gripper_before_first_arm_stage`, so the
+default sequence is:
 
 ```text
-pre_grasp -> grasp -> close gripper -> grasp verification
+initial gripper open -> pre_grasp -> grasp -> close gripper -> grasp verification
           -> lift -> lift/slip verification
           -> pre_place -> place -> open gripper -> retreat
 ```
+
+The initial open is a command-ID-correlated state-machine transition, not a
+sleep or an assumption based on the URDF initial position. Rejection, abort,
+cancel, or timeout terminates execution before `pre_grasp`. Set
+`open_gripper_before_first_arm_stage=false` only for focused compatibility
+tests that require the former start sequence.
 
 It subscribes to `moveit_msgs/msg/RobotTrajectory` stages on:
 
@@ -41,6 +48,7 @@ Gripper commands are published to `/gripper_command` as semicolon-delimited
 `std_msgs/msg/String` messages:
 
 ```text
+event=command;command=open;source=physical_pick_place_executor;stage=initial_open;simulated=true;real_hardware=false
 event=command;command=close;source=physical_pick_place_executor;stage=grasp;simulated=true;real_hardware=false
 event=command;command=open;source=physical_pick_place_executor;stage=place;simulated=true;real_hardware=false
 ```

@@ -24,7 +24,10 @@ physical grasp.
 
 `gripper_action_bridge_node` consumes logical open/close strings from
 `/gripper_command` and sends two-finger `FollowJointTrajectory` goals to
-`/panda_gripper_controller/follow_joint_trajectory`. Its retained outputs are:
+`/panda_gripper_controller/follow_joint_trajectory`. The simulator contract is
+the ordered list `panda_finger_joint1`, `panda_finger_joint2`; every open or
+close point contains two equal positions. Incomplete, duplicate, reordered, or
+unexpected joint lists are rejected at startup. Its retained outputs are:
 
 - `/physical_gripper_command_status` (`std_msgs/msg/String`)
 - `/physical_gripper_command_success` (`std_msgs/msg/Bool`)

@@ -9,7 +9,10 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / 'src/adaptive_assembly_sim/config/panda_ros2_control.yaml'
-COMMAND_GRIPPER_JOINT = 'panda_finger_joint1'
+COMMAND_GRIPPER_JOINTS = [
+    'panda_finger_joint1',
+    'panda_finger_joint2',
+]
 
 
 def main() -> int:
@@ -40,15 +43,27 @@ def main() -> int:
     gripper = data.get('panda_gripper_controller', {}).get(
         'ros__parameters', {}
     )
-    if gripper.get('joints', []) != [COMMAND_GRIPPER_JOINT]:
+    if gripper.get('joints', []) != COMMAND_GRIPPER_JOINTS:
         failures.append(
-            'gripper controller must command only canonical primary finger joint'
+            'gripper controller must command both Panda finger joints in order'
         )
     if 'position' not in gripper.get('command_interfaces', []):
         failures.append('gripper controller lacks the position command interface')
     state_interfaces = set(gripper.get('state_interfaces', []))
     if not {'position', 'velocity'}.issubset(state_interfaces):
         failures.append('gripper controller lacks position/velocity state interfaces')
+    if gripper.get('allow_partial_joints_goal') is not False:
+        failures.append('gripper controller must reject partial joint goals')
+    if gripper.get('open_loop_control') is not False:
+        failures.append('gripper controller must use closed-loop state feedback')
+    constraints = gripper.get('constraints', {})
+    for joint_name in COMMAND_GRIPPER_JOINTS:
+        joint_constraints = constraints.get(joint_name)
+        if not isinstance(joint_constraints, dict):
+            failures.append(f'missing constraints for {joint_name}')
+            continue
+        if set(joint_constraints) != {'trajectory', 'goal'}:
+            failures.append(f'incomplete constraints for {joint_name}')
 
     if failures:
         print('FAIL: gripper controller configuration validation failed')

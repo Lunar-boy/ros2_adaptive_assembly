@@ -2,15 +2,23 @@
 """Validate the simulator-only Panda gripper links and ros2_control joints."""
 
 from pathlib import Path
-import sys
 import subprocess
+import sys
 import xml.etree.ElementTree as ET
 
 
 ROOT = Path(__file__).resolve().parents[1]
 URDF = ROOT / 'src/adaptive_assembly_sim/urdf/panda_gazebo_ros2_control.urdf.xacro'
+CANONICAL_URDF = ROOT / 'src/adaptive_assembly_sim/urdf/panda.urdf.xacro'
 REQUIRED_LINKS = ('panda_hand', 'panda_leftfinger', 'panda_rightfinger')
 REQUIRED_JOINTS = ('panda_finger_joint1', 'panda_finger_joint2')
+ARM_JOINTS = tuple(f'panda_joint{index}' for index in range(1, 8))
+
+sys.path.insert(0, str(ROOT / 'src/adaptive_assembly_sim'))
+from adaptive_assembly_sim.gazebo_robot_description_renderer import (  # noqa: E402
+    GazeboRobotDescriptionError,
+    render_gazebo_robot_description,
+)
 
 
 def fail(message: str) -> int:
@@ -34,14 +42,17 @@ def main() -> int:
         return fail(f'missing URDF/xacro: {URDF.relative_to(ROOT)}')
 
     try:
-        expanded = subprocess.run(
-            ['xacro', str(URDF)],
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout
+        expanded = render_gazebo_robot_description(str(URDF))
         root = ET.fromstring(expanded)
-    except (ET.ParseError, subprocess.CalledProcessError) as exc:
+        canonical = subprocess.run(
+            ['xacro', str(CANONICAL_URDF)], check=True,
+            capture_output=True, text=True,
+        ).stdout
+        canonical_root = ET.fromstring(canonical)
+    except (
+        ET.ParseError, subprocess.CalledProcessError,
+        GazeboRobotDescriptionError,
+    ) as exc:
         return fail(f'URDF/xacro expansion failed: {exc}')
 
     failures: list[str] = []
@@ -67,14 +78,31 @@ def main() -> int:
             if attr not in limit.attrib:
                 failures.append(f'{joint_name} limit is missing {attr}')
 
-    mimic_joint = find_named(joints, 'panda_finger_joint2')
-    mimic = mimic_joint.find('mimic') if mimic_joint is not None else None
-    if mimic is None or mimic.get('joint') != 'panda_finger_joint1':
+    for joint_name in REQUIRED_JOINTS:
+        joint = find_named(joints, joint_name)
+        if joint is not None and joint.find('mimic') is not None:
+            failures.append(f'Gazebo-rendered {joint_name} contains mimic')
+
+    canonical_mimic = canonical_root.find(
+        "./joint[@name='panda_finger_joint2']/mimic"
+    )
+    if (
+        canonical_mimic is None
+        or canonical_mimic.get('joint') != 'panda_finger_joint1'
+    ):
         failures.append(
-            'panda_finger_joint2 does not mimic panda_finger_joint1'
+            'canonical planning description lost the standard finger mimic'
         )
 
-    ros2_control = find_named(root.findall('.//ros2_control'), 'GazeboSystem')
+    systems = [
+        item for item in root.findall('.//ros2_control')
+        if item.get('name') == 'GazeboSystem'
+    ]
+    if len(systems) != 1:
+        failures.append(
+            f'expected exactly one GazeboSystem, found {len(systems)}'
+        )
+    ros2_control = systems[0] if len(systems) == 1 else None
     if ros2_control is None:
         failures.append('missing ros2_control block named GazeboSystem')
     else:
@@ -90,22 +118,44 @@ def main() -> int:
             state_names = [
                 item.get('name') for item in control_joint.findall('state_interface')
             ]
-            if (
-                joint_name == 'panda_finger_joint1'
-                and 'position' not in command_names
-            ):
+            if command_names != ['position']:
                 failures.append(
-                    f'{joint_name} missing position command_interface'
-                )
-            if joint_name == 'panda_finger_joint2' and command_names:
-                failures.append(
-                    'mimic panda_finger_joint2 must not expose command interfaces'
+                    f'{joint_name} must expose only position command_interface'
                 )
             for state_name in ('position', 'velocity'):
                 if state_name not in state_names:
                     failures.append(
                         f'{joint_name} missing {state_name} state_interface'
                     )
+            position_state = next(
+                (item for item in control_joint.findall('state_interface')
+                 if item.get('name') == 'position'), None
+            )
+            initial = (
+                position_state.find("./param[@name='initial_value']")
+                if position_state is not None else None
+            )
+            if initial is None or float(initial.text) != 0.04:
+                failures.append(
+                    f'{joint_name} initial position must be 0.04'
+                )
+        for joint_name in ARM_JOINTS:
+            control_joint = find_named(control_joints, joint_name)
+            if control_joint is None:
+                failures.append(f'{joint_name} missing from GazeboSystem')
+                continue
+            command_names = [
+                item.get('name')
+                for item in control_joint.findall('command_interface')
+            ]
+            state_names = {
+                item.get('name')
+                for item in control_joint.findall('state_interface')
+            }
+            if command_names != ['position']:
+                failures.append(f'{joint_name} command interfaces changed')
+            if state_names != {'position', 'velocity'}:
+                failures.append(f'{joint_name} state interfaces changed')
 
     if failures:
         print('FAIL: Panda gripper URDF validation failed')
@@ -114,8 +164,8 @@ def main() -> int:
         return 1
 
     print(
-        'PASS: Panda gripper links, prismatic finger joints, and '
-        'ros2_control interfaces are present'
+        'PASS: canonical planning mimic is preserved; Gazebo renders two '
+        'independently position-commanded Panda fingers in one GazeboSystem'
     )
     return 0
 
