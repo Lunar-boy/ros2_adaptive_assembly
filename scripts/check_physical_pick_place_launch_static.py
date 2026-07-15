@@ -3,6 +3,8 @@
 
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[1]
 BRINGUP_LAUNCH_DIR = ROOT / 'src/adaptive_assembly_bringup/launch'
@@ -33,6 +35,14 @@ TARGET_SCENE_CONTRACT = (
     ROOT / 'src/adaptive_assembly_planning/include'
     / 'adaptive_assembly_planning/target_scene_contract.hpp'
 )
+PHYSICAL_PROFILE = (
+    ROOT / 'src/adaptive_assembly_bringup/config'
+    / 'adaptive_assembly_physical_pick_place_params.yaml'
+)
+CLEARANCE_SOURCE = (
+    ROOT / 'src/adaptive_assembly_planning/src'
+    / 'grasp_clearance_validation.cpp'
+)
 
 
 def _load(path: Path, label: str, failures: list[str]) -> str:
@@ -62,6 +72,9 @@ def main() -> int:
     )
     target_contract_text = _load(
         TARGET_SCENE_CONTRACT, 'physical target scene contract', failures
+    )
+    clearance_text = _load(
+        CLEARANCE_SOURCE, 'grasp clearance validator', failures
     )
 
     _require(full_text, (
@@ -98,6 +111,9 @@ def main() -> int:
         "'linear_planner_id': 'LIN'",
         "'lock_after_successful_sequence': True",
         "'require_dynamic_target_scene_ready': True",
+        "'require_grasp_clearance_validation': True",
+        "'grasp_min_disallowed_clearance': 0.005",
+        "'grasp_allowed_contact_links_csv': (",
         "'target_object'",
     ), 'physical-planning', failures)
 
@@ -146,7 +162,37 @@ def main() -> int:
         'State::LOCKED',
         'planning_started',
         'update_ignored',
+        'evaluate_grasp_clearance(',
     ), 'sequence planner lock/LIN contract', failures)
+
+    _require(clearance_text, (
+        'distanceRobot(',
+        'checkCollision(',
+        'grasp_disallowed_collision',
+        'grasp_clearance_below_minimum',
+        'panda_finger_joint1',
+        'panda_finger_joint2',
+    ), 'grasp clearance validation', failures)
+
+    if PHYSICAL_PROFILE.is_file():
+        profile = yaml.safe_load(PHYSICAL_PROFILE.read_text(encoding='utf-8'))
+        task = profile['assembly_task_node']['ros__parameters']
+        clearance = profile[
+            'assembly_sequence_planning_node'
+        ]['ros__parameters']
+        offset = float(task['grasp_height_offset'])
+        if not 0.005 <= offset <= 0.030:
+            failures.append('physical grasp offset is outside calibration range')
+        if abs(task['pre_grasp_height_offset'] - offset - 0.20) > 1e-12:
+            failures.append('physical approach distance is not 0.20 m')
+        if clearance.get('require_grasp_clearance_validation') is not True:
+            failures.append('physical grasp clearance validation is disabled')
+        if float(clearance.get('grasp_min_disallowed_clearance', 0.0)) < 0.005:
+            failures.append('physical minimum disallowed clearance is below 5 mm')
+        if clearance.get('grasp_allowed_contact_links_csv') != (
+            'panda_leftfinger,panda_rightfinger'
+        ):
+            failures.append('physical clearance allowlist is not finger-only')
 
     _require('\n'.join((target_scene_text, target_contract_text)), (
         'SolidPrimitive::CYLINDER',

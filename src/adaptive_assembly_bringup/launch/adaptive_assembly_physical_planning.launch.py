@@ -252,7 +252,7 @@ def generate_launch_description() -> LaunchDescription:
         executable='assembly_sequence_planning_node',
         name='assembly_sequence_planning_node',
         output='screen',
-        parameters=[{
+        parameters=[params_file, {
             'pre_grasp_topic': '/panda_pre_grasp_pose',
             'grasp_topic': '/panda_grasp_pose',
             'lift_topic': '/panda_lift_pose',
@@ -280,6 +280,12 @@ def generate_launch_description() -> LaunchDescription:
             'linear_max_endpoint_position_error': 0.002,
             'linear_max_endpoint_orientation_error': 0.01,
             'linear_max_path_length_ratio': 1.02,
+            'require_grasp_clearance_validation': True,
+            'grasp_min_disallowed_clearance': 0.005,
+            'grasp_clearance_target_object_id': 'target_object',
+            'grasp_allowed_contact_links_csv': (
+                'panda_leftfinger,panda_rightfinger'
+            ),
             'pose_snapshot_max_stamp_skew_sec': 0.20,
             'grasp_approach_min_distance': 0.05,
             'grasp_approach_max_distance': 0.30,

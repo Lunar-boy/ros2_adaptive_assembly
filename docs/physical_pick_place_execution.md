@@ -42,6 +42,23 @@ orientation deviation above `0.01 rad`, endpoint position error above
 `0.002 m`, endpoint orientation error above `0.01 rad`, path-length ratio
 above `1.02`, non-monotonic progress, or endpoint overshoot.
 
+The physical task uses a collision-mesh-calibrated
+`grasp_height_offset: 0.018 m`. This places `assembly_tcp` above the cylinder
+center while leaving the canonical TCP fixed at the symmetric finger-pad
+midpoint. A deterministic `0.005–0.030 m` sweep found `0.018 m` to be the
+smallest 1 mm candidate with at least `0.005 m` clearance from every
+non-finger collision link. `pre_grasp_height_offset: 0.218 m` preserves the
+`0.20 m` approach, and `lift_height_offset: 0.20 m` remains relative to the
+selected grasp pose.
+
+After LIN/FK validation, a second validator checks every grasp trajectory
+waypoint against the frozen PlanningScene and its exact ACM. It rejects any
+target collision with a non-finger robot link and requires at least `0.005 m`
+minimum disallowed-link clearance. At the final arm state it sweeps the real
+finger collision meshes inward and requires bilateral target contact with no
+hand or arm contact. This is a geometric feasibility check, not force control
+or proof of a physical grasp.
+
 Every planning attempt copies all six fresh poses into one immutable,
 timestamp-coherent snapshot. Trajectories remain local candidates until all
 six stages and the LIN geometry check succeed, so a failed attempt publishes
@@ -235,9 +252,11 @@ The physical public pose meanings are:
   desired `assembly_tcp` poses in `panda_link0`.
 
 The cylinder model pose is its center and its length is `0.10 m`. The full
-physical launch uses `target_reference_z_offset:=0.0`, and the physical task
-profile uses `grasp_height_offset: 0.0`, so the grasp TCP Z equals the observed
-cylinder-center Z. Pre-grasp and lift remain `0.20 m` above that center. The
+physical launch uses `target_reference_z_offset:=0.0`. The physical task
+profile raises the grasp TCP `0.018 m` above the observed cylinder center for
+measured hand clearance, while preserving enough cylinder/finger axial
+overlap for bilateral mesh contact. Pre-grasp remains `0.20 m` above the
+selected grasp pose, and lift remains a `0.20 m` relative displacement. The
 fixed socket's `socket_z: 0.10` is also an object/TCP center and its physical
 `place_height_offset` is `0.0`. Generic visual and plan-only profiles retain
 their previous defaults. The physical planning wrapper uses `0.005 m` and
@@ -246,6 +265,15 @@ ensures the actual pre-grasp endpoint can seed the independently validated
 `0.01 rad` LIN orientation bound. These remain below the independent `0.02 m`
 and `0.10 rad`
 runtime acceptance tolerances; generic planner defaults remain unchanged.
+
+Run the deterministic collision calibration with:
+
+```bash
+python3 scripts/calibrate_physical_grasp_clearance.py
+```
+
+The command preserves a complete candidate table and the selected result
+under `runs/grasp_clearance_<timestamp>/`.
 
 The MoveIt planner nodes remain plan-only: their status messages retain
 `execution=false`, and they only publish six `RobotTrajectory` messages. The

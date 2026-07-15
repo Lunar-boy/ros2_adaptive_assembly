@@ -64,6 +64,7 @@ class PlanLockChecker(Node):
         self.gazebo_pose = None
         self.gazebo_pose_count_after_lock = 0
         self.close_pose = None
+        self.grasp_arm_completed = False
         self.failure = ''
         self.create_subscription(
             String, '/assembly_sequence_plan_lock_status',
@@ -127,6 +128,12 @@ class PlanLockChecker(Node):
     def _executor(self, message):
         fields = parse_status(message.data)
         self.executor_statuses.append(fields)
+        if (
+            fields.get('stage') == 'grasp'
+            and fields.get('action') == 'arm'
+            and fields.get('event') == 'success'
+        ):
+            self.grasp_arm_completed = True
         if (
             fields.get('stage') == 'grasp'
             and fields.get('action') == 'gripper'
@@ -200,6 +207,27 @@ class PlanLockChecker(Node):
             return 'linear_metrics_missing', metrics
         if metrics.get('monotonic_progress') != 'true':
             return 'linear_progress_non_monotonic', metrics
+        try:
+            if not math.isfinite(float(metrics['grasp_height_offset'])):
+                return 'grasp_height_offset_invalid', metrics
+            if float(metrics['grasp_height_offset']) <= 0.0:
+                return 'grasp_height_offset_not_positive', metrics
+            if not math.isfinite(float(metrics['minimum_disallowed_clearance'])):
+                return 'grasp_clearance_invalid', metrics
+            if float(metrics['minimum_disallowed_clearance']) < 0.005:
+                return 'grasp_clearance_below_minimum', metrics
+        except (KeyError, ValueError):
+            return 'grasp_clearance_metrics_missing', metrics
+        if not metrics.get('nearest_disallowed_link'):
+            return 'nearest_disallowed_link_missing', metrics
+        if metrics.get('disallowed_collision_count') != '0':
+            return 'grasp_disallowed_collision', metrics
+        if metrics.get('grasp_clearance_valid') != 'true':
+            return 'grasp_clearance_not_valid', metrics
+        if metrics.get('left_finger_target_geometry_valid') != 'true':
+            return 'left_finger_geometry_invalid', metrics
+        if metrics.get('right_finger_target_geometry_valid') != 'true':
+            return 'right_finger_geometry_invalid', metrics
         if self.scene_locked_plan_id != self.locked_plan_id:
             return 'target_scene_plan_id_mismatch', metrics
         executor_ids = {
@@ -208,6 +236,8 @@ class PlanLockChecker(Node):
         }
         if executor_ids != {self.locked_plan_id}:
             return 'executor_plan_id_mismatch', metrics
+        if not self.grasp_arm_completed:
+            return 'grasp_arm_stage_not_completed', metrics
         if self.gazebo_pose_count_after_lock < 5:
             return 'gazebo_pose_stream_stopped_after_scene_lock', metrics
         if self.scene_locked_pose is None or self.close_pose is None:
@@ -219,12 +249,16 @@ class PlanLockChecker(Node):
         distance = math.sqrt(dx * dx + dy * dy + dz * dz)
         result = {
             'plan_id': self.locked_plan_id,
+            'scene_locked_plan_id': self.scene_locked_plan_id,
+            'executor_plan_ids': sorted(executor_ids),
             'trajectory_counts': self.trajectory_counts,
             'grasp_metrics': metrics,
+            'gripper_close_started': self.close_pose is not None,
             'gazebo_pose_count_after_lock': self.gazebo_pose_count_after_lock,
             'target_xy_displacement_before_close_m': xy,
             'target_3d_displacement_before_close_m': distance,
             'planning_started_ids': self.planning_started_ids,
+            'grasp_arm_completed': self.grasp_arm_completed,
         }
         if xy > 0.002:
             return 'target_xy_displacement_before_close', result
@@ -284,6 +318,22 @@ def main():
             if not checker.complete() and not checker.failure:
                 checker.failure = 'runtime_timeout'
             reason, result = checker.validate()
+            forbidden_log_markers = (
+                'GOAL_STATE_INVALID',
+                'grasp_disallowed_collision',
+                'grasp_clearance_below_minimum',
+                'collision between target_object and panda_hand',
+                'collision between target_object and panda_link7',
+                'collision between target_object and panda_link8',
+            )
+            launch_log.flush()
+            log_text = launch_log_path.read_text(encoding='utf-8', errors='replace')
+            present_markers = [
+                marker for marker in forbidden_log_markers if marker in log_text
+            ]
+            if not reason and present_markers:
+                reason = 'forbidden_collision_log:' + ','.join(present_markers)
+            result['forbidden_log_markers'] = present_markers
             result['passed'] = not reason
             result['reason'] = reason or 'success'
             (run_dir / 'result.json').write_text(

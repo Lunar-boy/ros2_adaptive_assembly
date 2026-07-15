@@ -34,7 +34,11 @@ def test_physical_profile_matches_the_gazebo_socket_fixture():
     ]
 
     assert parameters['assembly_pose_mode'] == 'fixed_socket'
-    assert parameters['grasp_height_offset'] == 0.0
+    assert parameters['grasp_height_offset'] > 0.0
+    assert (
+        parameters['pre_grasp_height_offset']
+        - parameters['grasp_height_offset']
+    ) == 0.20
     assert parameters['lift_height_offset'] == 0.20
     assert parameters['replan_distance_threshold'] == 0.03
     assert parameters['place_height_offset'] == 0.0

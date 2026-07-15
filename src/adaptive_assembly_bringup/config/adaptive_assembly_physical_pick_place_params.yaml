@@ -17,10 +17,11 @@ fake_object_pose_node:
 
 assembly_task_node:
   ros__parameters:
-    pre_grasp_height_offset: 0.20
-    # /target_pose is the cylinder center in this profile, and physical Panda
-    # stage poses target assembly_tcp, so the grasp center needs no Z offset.
-    grasp_height_offset: 0.0
+    # Absolute target-center offset: grasp offset plus the 0.20 m approach.
+    pre_grasp_height_offset: 0.218
+    # assembly_tcp position above the cylinder center needed for hand clearance.
+    grasp_height_offset: 0.018
+    # Relative displacement above the selected grasp pose.
     lift_height_offset: 0.20
     assembly_height_offset: 0.05
     replan_distance_threshold: 0.03
@@ -34,6 +35,16 @@ assembly_task_node:
     socket_z: 0.10
     socket_yaw: 0.0
     socket_frame_id: world
+
+assembly_sequence_planning_node:
+  ros__parameters:
+    require_grasp_clearance_validation: true
+    grasp_min_disallowed_clearance: 0.005
+    grasp_clearance_target_object_id: target_object
+    grasp_allowed_contact_links_csv: panda_leftfinger,panda_rightfinger
+    grasp_synthetic_finger_open_position: 0.040
+    grasp_synthetic_finger_closed_position: 0.000
+    grasp_synthetic_finger_step: 0.001
 
 # Simulator-only physical close contract. The nominal zero close is expected
 # to abort with GOAL_TOLERANCE_VIOLATED when the 0.035 m-radius target is held.

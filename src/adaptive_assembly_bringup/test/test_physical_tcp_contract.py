@@ -1,5 +1,7 @@
 """Static geometry and launch tests for the physical assembly TCP contract."""
 
+import ast
+import math
 from pathlib import Path
 import xml.etree.ElementTree as ElementTree
 
@@ -23,6 +25,7 @@ PLANNING_LAUNCH = PACKAGE_DIR / 'launch' / (
 EXECUTION_LAUNCH = PACKAGE_DIR / 'launch' / (
     'adaptive_assembly_physical_pick_place_execution.launch.py'
 )
+PANDA_XACRO = SOURCE_ROOT / 'adaptive_assembly_sim' / 'urdf' / 'panda.urdf.xacro'
 
 
 def _physical_geometry():
@@ -33,23 +36,92 @@ def _physical_geometry():
     cylinder = target.find('.//collision/geometry/cylinder')
     assert cylinder is not None
     length = float(cylinder.findtext('length'))
-    return center_z, length
+    radius = float(cylinder.findtext('radius'))
+    return center_z, radius, length
 
 
-def test_physical_target_and_task_offsets_end_at_cylinder_grasp_center():
-    center_z, cylinder_length = _physical_geometry()
+def _literal_launch_parameters(path):
+    tree = ast.parse(path.read_text(encoding='utf-8'))
+    values = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Dict):
+            continue
+        for key, value in zip(node.keys, node.values):
+            if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                try:
+                    values[key.value] = ast.literal_eval(value)
+                except (ValueError, TypeError):
+                    pass
+    return values
+
+
+def _launch_argument_defaults(path):
+    tree = ast.parse(path.read_text(encoding='utf-8'))
+    values = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not isinstance(node.func, ast.Name) or node.func.id != 'DeclareLaunchArgument':
+            continue
+        if not node.args or not isinstance(node.args[0], ast.Constant):
+            continue
+        for keyword in node.keywords:
+            if keyword.arg == 'default_value' and isinstance(keyword.value, ast.Constant):
+                values[node.args[0].value] = keyword.value.value
+    return values
+
+
+def test_physical_target_and_task_offsets_preserve_calibrated_approach():
+    _, cylinder_radius, cylinder_length = _physical_geometry()
     parameters = yaml.safe_load(PHYSICAL_PROFILE.read_text(encoding='utf-8'))[
         'assembly_task_node'
     ]['ros__parameters']
-    launch_source = FULL_LAUNCH.read_text(encoding='utf-8')
 
+    assert cylinder_radius == 0.035
     assert cylinder_length == 0.10
-    assert "'target_reference_z_offset',\n            default_value='0.0'" in launch_source
-    final_grasp_z = center_z + parameters['grasp_height_offset']
-    assert final_grasp_z == center_z
-    assert parameters['pre_grasp_height_offset'] == 0.20
+    assert math.isfinite(parameters['grasp_height_offset'])
+    assert 0.005 <= parameters['grasp_height_offset'] <= 0.030
+    assert parameters['grasp_height_offset'] > 0.0
+    assert math.isclose(
+        parameters['pre_grasp_height_offset']
+        - parameters['grasp_height_offset'],
+        0.20,
+        abs_tol=1.0e-12,
+    )
     assert parameters['lift_height_offset'] == 0.20
     assert parameters['place_height_offset'] == 0.0
+
+    full_parameters = _launch_argument_defaults(FULL_LAUNCH)
+    assert full_parameters['target_reference_z_offset'] == '0.0'
+
+
+def test_assembly_tcp_and_clearance_contract_remain_exact():
+    root = ElementTree.parse(PANDA_XACRO).getroot()
+    joint = root.find("joint[@name='panda_hand_to_assembly_tcp']")
+    assert joint is not None
+    assert joint.find('parent').attrib['link'] == 'panda_hand'
+    assert joint.find('child').attrib['link'] == 'assembly_tcp'
+    assert joint.find('origin').attrib == {
+        'xyz': '0 0 0.1034',
+        'rpy': '0 0 0',
+    }
+
+    profile = yaml.safe_load(PHYSICAL_PROFILE.read_text(encoding='utf-8'))
+    clearance = profile['assembly_sequence_planning_node']['ros__parameters']
+    assert clearance['require_grasp_clearance_validation'] is True
+    assert clearance['grasp_min_disallowed_clearance'] >= 0.005
+    assert clearance['grasp_clearance_target_object_id'] == 'target_object'
+    assert clearance['grasp_allowed_contact_links_csv'].split(',') == [
+        'panda_leftfinger', 'panda_rightfinger'
+    ]
+
+    launch_parameters = _literal_launch_parameters(PLANNING_LAUNCH)
+    assert launch_parameters['require_grasp_clearance_validation'] is True
+    assert launch_parameters['grasp_min_disallowed_clearance'] >= 0.005
+    assert launch_parameters['grasp_clearance_target_object_id'] == 'target_object'
+    assert launch_parameters['grasp_allowed_contact_links_csv'] == (
+        'panda_leftfinger,panda_rightfinger'
+    )
 
 
 def test_physical_planning_owns_the_assembly_tcp_contract():
@@ -65,8 +137,6 @@ def test_physical_planning_owns_the_assembly_tcp_contract():
         "'end_effector_link': "
         "LaunchConfiguration('end_effector_link')"
     ) in planning_source
-
-    assert planning_source.count("default_value='0.005'") >= 2
 
     assert 'end_effector_link' not in execution_source
     assert 'position_tolerance' not in execution_source

@@ -33,6 +33,7 @@ The final condition must be verified from Gazebo-observed object state. Planning
 | Six-stage MoveIt planning | Implemented; grasp uses validated Pilz `LIN` |
 | Immutable physical plan generation | Implemented; one volatile plan lock |
 | Dynamic target collision object | Implemented; cylinder, finger-only ACM |
+| Grasp hand-clearance validation | Implemented; real meshes, 5 mm minimum |
 | Gazebo `ros2_control` arm execution | Implemented |
 | Simulated gripper close/open | Implemented |
 | Bilateral contact-aware close handling | Implemented |

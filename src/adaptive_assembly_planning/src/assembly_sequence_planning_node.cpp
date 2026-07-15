@@ -15,6 +15,8 @@
 
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <moveit/move_group_interface/move_group_interface.hpp>
+#include <moveit/planning_scene/planning_scene.hpp>
+#include <moveit/planning_scene_monitor/planning_scene_monitor.hpp>
 #include <moveit/robot_state/conversions.hpp>
 #include <moveit/robot_state/robot_state.hpp>
 #include <moveit_msgs/msg/robot_state.hpp>
@@ -25,6 +27,7 @@
 #include <std_msgs/msg/string.hpp>
 
 #include "adaptive_assembly_planning/linear_path_validation.hpp"
+#include "adaptive_assembly_planning/grasp_clearance_validation.hpp"
 #include "adaptive_assembly_planning/planning_contract.hpp"
 
 namespace aap = adaptive_assembly_planning;
@@ -52,6 +55,15 @@ public:
     publish_trajectories_(param<bool>("publish_trajectories", true)),
     lock_after_successful_sequence_(param<bool>("lock_after_successful_sequence", false)),
     require_dynamic_target_scene_ready_(param<bool>("require_dynamic_target_scene_ready", false)),
+    grasp_clearance_config_{
+      param<bool>("require_grasp_clearance_validation", false),
+      param<double>("grasp_min_disallowed_clearance", 0.005),
+      param<std::string>("grasp_clearance_target_object_id", "target_object"),
+      split_csv_vector(param<std::string>("grasp_allowed_contact_links_csv",
+        "panda_leftfinger,panda_rightfinger")),
+      param<double>("grasp_synthetic_finger_open_position", 0.040),
+      param<double>("grasp_synthetic_finger_closed_position", 0.000),
+      param<double>("grasp_synthetic_finger_step", 0.001)},
     planning_group_(param<std::string>("planning_group", "panda_arm")),
     end_effector_link_(param<std::string>("end_effector_link", "panda_link8")),
     num_planning_attempts_(param<int>("num_planning_attempts", 1)),
@@ -92,8 +104,13 @@ public:
     resolve_stage_names();
     linear_stage_names_ = split_csv(param<std::string>("linear_stage_names_csv", ""));
     configure_move_group_once();
+    configure_planning_scene_monitor();
     create_publishers();
     create_stages();
+    if (grasp_clearance_config_.required) {
+      scene_ready_timer_ = node_->create_wall_timer(
+        std::chrono::milliseconds(50), [this]() {try_plan_sequence();});
+    }
     if (require_dynamic_target_scene_ready_) {
       dynamic_scene_ready_subscription_ = node_->create_subscription<std_msgs::msg::Bool>(
         param<std::string>("dynamic_target_scene_ready_topic",
@@ -137,6 +154,7 @@ private:
     moveit::planning_interface::MoveGroupInterface::Plan plan;
     aap::StagePlanningProfile profile;
     aap::LinearPathMetrics linear_metrics;
+    aap::GraspClearanceMetrics clearance_metrics;
     double duration_ms{0.0};
   };
 
@@ -162,6 +180,14 @@ private:
       }
     }
     return values;
+  }
+
+  static std::vector<std::string> split_csv_vector(const std::string & text)
+  {
+    const auto values = split_csv(text);
+    std::vector<std::string> result(values.begin(), values.end());
+    std::sort(result.begin(), result.end());
+    return result;
   }
 
   static std::string join(const std::unordered_set<std::string> & values)
@@ -194,6 +220,14 @@ private:
     }
     if (start_state_mode_ != "current" && start_state_mode_ != "fixed") {
       throw std::invalid_argument("invalid_start_state_mode");
+    }
+    if (grasp_clearance_config_.required &&
+      (!(grasp_clearance_config_.minimum_disallowed_clearance >= 0.005) ||
+      grasp_clearance_config_.target_object_id.empty() ||
+      grasp_clearance_config_.allowed_contact_links !=
+      std::vector<std::string>({"panda_leftfinger", "panda_rightfinger"})))
+    {
+      throw std::invalid_argument("invalid_grasp_clearance_configuration");
     }
   }
 
@@ -234,6 +268,28 @@ private:
     }
     move_group_.setPlanningTime(planning_time_sec_);
     move_group_.setNumPlanningAttempts(num_planning_attempts_);
+  }
+
+  void configure_planning_scene_monitor()
+  {
+    if (!grasp_clearance_config_.required) {return;}
+    planning_scene_monitor_ = std::make_shared<planning_scene_monitor::PlanningSceneMonitor>(
+      node_, "robot_description", "assembly_sequence_clearance_monitor");
+    if (!planning_scene_monitor_->getPlanningScene()) {
+      throw std::invalid_argument("grasp_clearance_scene_unavailable");
+    }
+    planning_scene_monitor_->startSceneMonitor("/monitored_planning_scene");
+  }
+
+  planning_scene::PlanningSceneConstPtr frozen_scene_snapshot() const
+  {
+    if (!grasp_clearance_config_.required) {return nullptr;}
+    if (!planning_scene_monitor_) {return nullptr;}
+    planning_scene_monitor::LockedPlanningSceneRO locked_scene(planning_scene_monitor_);
+    if (!locked_scene) {return nullptr;}
+    auto snapshot = locked_scene->diff();
+    snapshot->decoupleParent();
+    return snapshot;
   }
 
   void create_publishers()
@@ -292,10 +348,20 @@ private:
 
   bool inputs_ready() const
   {
-    return dynamic_scene_ready_ && std::all_of(stages_.begin(), stages_.end(), [](const auto & s) {
+    return dynamic_scene_ready_ && clearance_scene_ready() &&
+           std::all_of(stages_.begin(), stages_.end(), [](const auto & s) {
                return s->latest_pose.has_value() &&
                       s->latest_pose_generation > s->consumed_generation;
       });
+  }
+
+  bool clearance_scene_ready() const
+  {
+    if (!grasp_clearance_config_.required) {return true;}
+    if (!planning_scene_monitor_) {return false;}
+    planning_scene_monitor::LockedPlanningSceneRO scene(planning_scene_monitor_);
+    return scene && scene->getWorld() &&
+           scene->getWorld()->hasObject(grasp_clearance_config_.target_object_id);
   }
 
   void try_plan_sequence()
@@ -312,7 +378,12 @@ private:
       publish_failure(plan_id, "none", 0, 0.0, snapshot_error);
       return;
     }
-    plan_sequence(plan_id, snapshot);
+    const auto scene_snapshot = frozen_scene_snapshot();
+    if (grasp_clearance_config_.required && !scene_snapshot) {
+      publish_failure(plan_id, "grasp", 0, 0.0, "grasp_clearance_scene_unavailable");
+      return;
+    }
+    plan_sequence(plan_id, snapshot, scene_snapshot);
   }
 
   void apply_profile(const aap::StagePlanningProfile & profile)
@@ -398,8 +469,10 @@ private:
 
   void plan_sequence(
     const std::uint64_t plan_id,
-    const std::vector<std::pair<std::string, geometry_msgs::msg::PoseStamped>> & snapshot)
+    const std::vector<std::pair<std::string, geometry_msgs::msg::PoseStamped>> & snapshot,
+    const planning_scene::PlanningSceneConstPtr & scene_snapshot)
   {
+    last_clearance_metrics_ = {};
     state_ = State::PLANNING;
     publish_lock_status("planning_started", plan_id, false, 0, "");
     std::vector<Candidate> candidates;
@@ -468,6 +541,21 @@ private:
             candidate.linear_metrics.reason);
           return;
         }
+        if (grasp_clearance_config_.required) {
+          candidate.clearance_metrics = aap::evaluate_grasp_clearance(
+            scene_snapshot, robot_model_, candidate.plan.start_state,
+            candidate.plan.trajectory, grasp_clearance_config_, end_effector_link_);
+          last_clearance_metrics_ = candidate.clearance_metrics;
+          if (!candidate.clearance_metrics.valid) {
+            publish_stage(
+              candidate, stage.name, i, plan_id, false,
+              candidate.clearance_metrics.reason);
+            publish_failure(
+              plan_id, stage.name, candidates.size(), total_ms,
+              candidate.clearance_metrics.reason);
+            return;
+          }
+        }
       }
       publish_stage(candidate, stage.name, i, plan_id, true, "");
       candidates.push_back(std::move(candidate));
@@ -519,6 +607,24 @@ private:
     return out.str();
   }
 
+  std::string clearance_fields(const aap::GraspClearanceMetrics & metrics) const
+  {
+    if (!std::isfinite(metrics.grasp_height_offset) && metrics.reason.empty()) {return "";}
+    std::ostringstream out;
+    out << ";grasp_height_offset=" << metrics.grasp_height_offset
+        << ";minimum_disallowed_clearance=" << metrics.minimum_disallowed_clearance
+        << ";nearest_disallowed_link=" <<
+      (metrics.nearest_disallowed_link.empty() ? "unavailable" :
+    metrics.nearest_disallowed_link)
+        << ";disallowed_collision_count=" << metrics.disallowed_collision_count
+        << ";left_finger_target_geometry_valid=" <<
+      (metrics.left_finger_target_geometry_valid ? "true" : "false")
+        << ";right_finger_target_geometry_valid=" <<
+      (metrics.right_finger_target_geometry_valid ? "true" : "false")
+        << ";grasp_clearance_valid=" << (metrics.grasp_clearance_valid ? "true" : "false");
+    return out.str();
+  }
+
   void publish_stage(
     const Candidate & candidate, const std::string & stage, std::size_t index,
     std::uint64_t plan_id, bool success, const std::string & reason)
@@ -533,7 +639,8 @@ private:
         << ";stage_index=" << index << ";requested_stage_count=" << stages_.size()
         << ";plan_id=" << plan_id << ";duration_ms=" << candidate.duration_ms
         << ";planning_group=" << planning_group_ << ";end_effector_link=" << end_effector_link_
-        << profile_fields(candidate.profile) << metric_fields(candidate.linear_metrics);
+        << profile_fields(candidate.profile) << metric_fields(candidate.linear_metrics)
+        << clearance_fields(candidate.clearance_metrics);
     if (!reason.empty()) {out << ";reason=" << reason;}
     out << ";execution=false";
     message.data = out.str(); stage_status_publisher_->publish(message);
@@ -553,7 +660,8 @@ private:
         << ";topic=" << stage.trajectory_topic << ";plan_id=" << plan_id
         << ";point_count=" << candidate.plan.trajectory.joint_trajectory.points.size()
         << ";joint_count=" << candidate.plan.trajectory.joint_trajectory.joint_names.size()
-        << profile_fields(candidate.profile) << metric_fields(candidate.linear_metrics);
+        << profile_fields(candidate.profile) << metric_fields(candidate.linear_metrics)
+        << clearance_fields(candidate.clearance_metrics);
     if (!reason.empty()) {out << ";reason=" << reason;}
     out << ";execution=false"; message.data = out.str();
     trajectory_status_publisher_->publish(message);
@@ -583,7 +691,8 @@ private:
         << ";plan_id=" << plan_id << ";failed_stage=" << failed_stage
         << ";planned_stage_count=" << planned << ";requested_stage_count=" << stages_.size()
         << ";stage_sequence=" << stage_sequence_ << ";total_duration_ms=" << total_ms
-        << ";start_state_mode=" << start_state_mode_ << ";end_effector_link=" << end_effector_link_;
+        << ";start_state_mode=" << start_state_mode_ << ";end_effector_link=" << end_effector_link_
+        << clearance_fields(last_clearance_metrics_);
     if (!reason.empty()) {out << ";reason=" << reason;}
     out << ";execution=false"; message.data = out.str(); status_publisher_->publish(message);
     std_msgs::msg::Float64 duration; duration.data = total_ms;
@@ -612,6 +721,7 @@ private:
   std::string plan_lock_status_topic_;
   bool publish_diagnostics_, publish_trajectories_, lock_after_successful_sequence_;
   bool require_dynamic_target_scene_ready_, dynamic_scene_ready_{false};
+  aap::GraspClearanceConfig grasp_clearance_config_;
   std::string planning_group_, end_effector_link_;
   int num_planning_attempts_;
   double planning_time_sec_;
@@ -619,6 +729,7 @@ private:
   aap::StagePlanningProfile default_profile_, linear_profile_;
   aap::SnapshotLimits snapshot_limits_;
   aap::LinearPathLimits linear_limits_;
+  aap::GraspClearanceMetrics last_clearance_metrics_;
   std::vector<std::string> stage_names_;
   std::string stage_sequence_;
   std::unordered_set<std::string> linear_stage_names_;
@@ -629,6 +740,7 @@ private:
   std::chrono::steady_clock::time_point last_ignored_status_;
   moveit::planning_interface::MoveGroupInterface move_group_;
   moveit::core::RobotModelConstPtr robot_model_;
+  planning_scene_monitor::PlanningSceneMonitorPtr planning_scene_monitor_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr success_publisher_, stage_success_publisher_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_publisher_, stage_status_publisher_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr trajectory_status_publisher_,
@@ -636,6 +748,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr duration_publisher_,
     stage_duration_publisher_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr dynamic_scene_ready_subscription_;
+  rclcpp::TimerBase::SharedPtr scene_ready_timer_;
 };
 
 int main(int argc, char * argv[])

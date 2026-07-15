@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include "adaptive_assembly_planning/linear_path_validation.hpp"
+#include "adaptive_assembly_planning/grasp_clearance_validation.hpp"
 #include "adaptive_assembly_planning/planning_contract.hpp"
 #include "adaptive_assembly_planning/target_scene_contract.hpp"
 
@@ -166,4 +167,97 @@ TEST(TargetScene, CylinderAndExactFingerAcm)
       acm.entry_names.begin(),
       std::find(acm.entry_names.begin(), acm.entry_names.end(), "work_table")));
   EXPECT_TRUE(acm.entry_values[base].enabled[table]);
+}
+
+namespace
+{
+aap::GraspClearanceObservation clearance(
+  double distance, const std::string & link = "panda_hand")
+{
+  aap::GraspClearanceObservation value;
+  value.minimum_disallowed_clearance = distance;
+  value.nearest_disallowed_link = link;
+  return value;
+}
+
+aap::GraspFingerGeometryObservation bilateral_fingers()
+{
+  aap::GraspFingerGeometryObservation value;
+  value.left_finger_target_geometry_valid = true;
+  value.right_finger_target_geometry_valid = true;
+  return value;
+}
+}  // namespace
+
+TEST(GraspClearance, AcceptsValidThresholdAndAllowedFingerGeometry)
+{
+  auto valid = aap::validate_grasp_clearance_observations(
+    {clearance(0.006)}, bilateral_fingers(), 0.005);
+  EXPECT_TRUE(valid.valid);
+  EXPECT_TRUE(valid.grasp_clearance_valid);
+  EXPECT_EQ(valid.nearest_disallowed_link, "panda_hand");
+  auto threshold = aap::validate_grasp_clearance_observations(
+    {clearance(0.005)}, bilateral_fingers(), 0.005);
+  EXPECT_TRUE(threshold.valid);
+}
+
+TEST(GraspClearance, RejectsHandLink7AndOtherDisallowedCollisions)
+{
+  for (const auto & link : {"panda_hand", "panda_link7", "panda_link3"}) {
+    auto observation = clearance(-0.001, link);
+    observation.disallowed_collision_pairs.push_back({"target_object", link});
+    const auto result = aap::validate_grasp_clearance_observations(
+      {observation}, bilateral_fingers(), 0.005);
+    EXPECT_EQ(result.reason, "grasp_disallowed_collision") << link;
+    EXPECT_EQ(result.disallowed_collision_count, 1U) << link;
+  }
+}
+
+TEST(GraspClearance, RejectsBelowThresholdMissingDistanceAndMalformedState)
+{
+  EXPECT_EQ(aap::validate_grasp_clearance_observations(
+      {clearance(0.004999)}, bilateral_fingers(), 0.005).reason,
+    "grasp_clearance_below_minimum");
+  auto absent = clearance(0.006); absent.distance_available = false;
+  EXPECT_EQ(aap::validate_grasp_clearance_observations(
+      {absent}, bilateral_fingers(), 0.005).reason,
+    "grasp_clearance_distance_unavailable");
+  auto malformed = clearance(0.006); malformed.state_valid = false;
+  EXPECT_EQ(aap::validate_grasp_clearance_observations(
+      {malformed}, bilateral_fingers(), 0.005).reason,
+    "grasp_clearance_invalid_state");
+  EXPECT_EQ(aap::validate_grasp_clearance_observations(
+      {}, bilateral_fingers(), 0.005).reason,
+    "grasp_clearance_invalid_state");
+}
+
+TEST(GraspClearance, RejectsIntermediateAndFinalWaypointViolations)
+{
+  const auto fingers = bilateral_fingers();
+  EXPECT_EQ(aap::validate_grasp_clearance_observations(
+      {clearance(0.010), clearance(0.004), clearance(0.008)}, fingers, 0.005).reason,
+    "grasp_clearance_below_minimum");
+  EXPECT_EQ(aap::validate_grasp_clearance_observations(
+      {clearance(0.010), clearance(0.008), clearance(0.004)}, fingers, 0.005).reason,
+    "grasp_clearance_below_minimum");
+}
+
+TEST(GraspClearance, RequiresBilateralFingerGeometry)
+{
+  auto unilateral = bilateral_fingers();
+  unilateral.right_finger_target_geometry_valid = false;
+  EXPECT_EQ(aap::validate_grasp_clearance_observations(
+      {clearance(0.010)}, unilateral, 0.005).reason,
+    "grasp_finger_geometry_invalid");
+}
+
+TEST(GraspClearance, RejectsMissingTargetAndNonExactFingerAllowlist)
+{
+  EXPECT_EQ(aap::grasp_clearance_context_error(true, false, true, true),
+    "grasp_clearance_target_missing");
+  EXPECT_FALSE(aap::exact_grasp_finger_allowlist({"panda_leftfinger"}));
+  EXPECT_FALSE(aap::exact_grasp_finger_allowlist(
+      {"panda_leftfinger", "panda_rightfinger", "panda_hand"}));
+  EXPECT_TRUE(aap::exact_grasp_finger_allowlist(
+      {"panda_rightfinger", "panda_leftfinger"}));
 }
