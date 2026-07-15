@@ -53,6 +53,8 @@ setup(
             'adaptive_assembly_sim.activate_gazebo_controllers_node:main',
             'check_robot_model_parity = '
             'adaptive_assembly_sim.robot_model_parity:main',
+            'render_gazebo_robot_description = '
+            'adaptive_assembly_sim.gazebo_robot_description_renderer:main',
         ],
     },
 )

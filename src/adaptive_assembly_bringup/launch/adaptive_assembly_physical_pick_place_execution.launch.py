@@ -94,6 +94,7 @@ def generate_launch_description() -> LaunchDescription:
         'send_arm_goals': 'true',
         'send_gripper_commands': 'true',
         'require_gripper_success': 'true',
+        'open_gripper_before_first_arm_stage': 'true',
         'require_non_empty_trajectory': 'true',
         'require_panda_joints': 'true',
         'require_joint_state': 'true',

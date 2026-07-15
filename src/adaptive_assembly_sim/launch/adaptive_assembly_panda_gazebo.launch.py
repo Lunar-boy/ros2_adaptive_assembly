@@ -13,10 +13,14 @@ from launch.actions import IncludeLaunchDescription
 from launch.actions import LogInfo, OpaqueFunction, RegisterEventHandler
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
+
+from adaptive_assembly_sim.gazebo_robot_description_renderer import (
+    render_gazebo_robot_description,
+)
 
 
 def _required_package_share(package_name: str, install_hint: str) -> str:
@@ -92,13 +96,12 @@ def _launch_setup(context, *args, **kwargs):
         'panda_ros2_control.yaml',
     )
 
-    robot_description = ParameterValue(
-        Command([
-            'xacro ', model,
-            ' controllers_file:=', controllers_file,
-            ' enable_arm_collisions:=', enable_arm_collisions,
-        ]),
-        value_type=str,
+    robot_description = render_gazebo_robot_description(
+        model.perform(context),
+        mappings={
+            'controllers_file': controllers_file,
+            'enable_arm_collisions': enable_arm_collisions.perform(context),
+        },
     )
 
     spawn_panda = Node(

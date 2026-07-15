@@ -25,6 +25,43 @@ from std_msgs.msg import Bool, String
 from trajectory_msgs.msg import JointTrajectoryPoint
 
 
+PANDA_FINGER_JOINTS = (
+    'panda_finger_joint1',
+    'panda_finger_joint2',
+)
+
+
+def validate_simulator_joint_names(joint_names) -> list[str]:
+    """Return the exact ordered simulator Panda finger-joint contract."""
+    names = [str(name) for name in joint_names]
+    if not names or any(not name for name in names):
+        raise ValueError('joint_names must contain non-empty names')
+    if len(names) != len(set(names)):
+        raise ValueError('joint_names must not contain duplicates')
+    if tuple(names) != PANDA_FINGER_JOINTS:
+        raise ValueError(
+            'simulator joint_names must be exactly '
+            f'{list(PANDA_FINGER_JOINTS)!r} in that order'
+        )
+    return names
+
+
+def make_gripper_goal(
+    joint_names: list[str], position: float, goal_time_sec: float
+) -> FollowJointTrajectory.Goal:
+    """Build one equal-position trajectory goal for both Panda fingers."""
+    point = JointTrajectoryPoint()
+    point.positions = [position] * len(joint_names)
+    point.time_from_start.sec = int(goal_time_sec)
+    point.time_from_start.nanosec = int(
+        (goal_time_sec - int(goal_time_sec)) * 1_000_000_000
+    )
+    goal = FollowJointTrajectory.Goal()
+    goal.trajectory.joint_names = joint_names
+    goal.trajectory.points = [point]
+    return goal
+
+
 def parse_status(status: str) -> Dict[str, str]:
     """Parse semicolon-delimited key/value fields, ignoring invalid items."""
     fields = {}
@@ -101,7 +138,7 @@ class GripperActionBridgeNode(Node):
             'closed_topic': '/physical_gripper_closed',
             'contact_status_topic': '/grasp_contact_status',
             'expected_target_object': 'target_object',
-            'joint_names': ['panda_finger_joint1'],
+            'joint_names': list(PANDA_FINGER_JOINTS),
             'open_position': 0.04,
             'close_position': 0.0,
             'goal_time_sec': 1.0,
@@ -176,6 +213,7 @@ class GripperActionBridgeNode(Node):
         self.get_logger().info(
             'Simulator-only gripper action bridge ready: '
             f"controller='{self._action_name}', send_goals={self._send_goals}, "
+            f'joint_names={self._joint_names}, '
             'allow_contact_limited_close='
             f'{self._allow_contact_limited_close}, '
             f"expected_target='{self._expected_target_object}'"
@@ -220,9 +258,7 @@ class GripperActionBridgeNode(Node):
             raise ValueError(
                 'simulated_only must remain true; real hardware is not supported'
             )
-        if not self._joint_names or any(
-                not str(name) for name in self._joint_names):
-            raise ValueError('joint_names must contain non-empty names')
+        self._joint_names = validate_simulator_joint_names(self._joint_names)
         if not all(math.isfinite(value) for value in (
             self._open_position,
             self._close_position,
@@ -347,15 +383,9 @@ class GripperActionBridgeNode(Node):
             self._finish_command()
             return
 
-        point = JointTrajectoryPoint()
-        point.positions = [position] * len(self._joint_names)
-        point.time_from_start.sec = int(self._goal_time_sec)
-        point.time_from_start.nanosec = int(
-            (self._goal_time_sec - int(self._goal_time_sec)) * 1_000_000_000
+        goal = make_gripper_goal(
+            self._joint_names, position, self._goal_time_sec
         )
-        goal = FollowJointTrajectory.Goal()
-        goal.trajectory.joint_names = self._joint_names
-        goal.trajectory.points = [point]
         self._publish_status(self._command_status('sending'))
         future = self._action_client.send_goal_async(
             goal, feedback_callback=self._feedback_callback

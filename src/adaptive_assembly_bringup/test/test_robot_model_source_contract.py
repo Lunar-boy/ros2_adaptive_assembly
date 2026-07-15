@@ -5,6 +5,9 @@ from pathlib import Path
 import subprocess
 import xml.etree.ElementTree as ET
 
+from adaptive_assembly_sim.gazebo_robot_description_renderer import (
+    render_gazebo_robot_description,
+)
 from adaptive_assembly_sim.robot_model_parity import CURRENT_PANDA_TOOL_LINK
 
 
@@ -158,11 +161,19 @@ def test_gazebo_wrapper_includes_canonical_description_without_arm_chain():
         'panda_link8', 'panda_hand',
         'panda_leftfinger', 'panda_rightfinger',
     }.issubset(links)
-    mimic = expanded_root.find(
+    canonical_mimic = expanded_root.find(
         "./joint[@name='panda_finger_joint2']/mimic"
     )
-    assert mimic is not None
-    assert mimic.get('joint') == 'panda_finger_joint1'
+    assert canonical_mimic is not None
+    assert canonical_mimic.get('joint') == 'panda_finger_joint1'
+
+    rendered_root = ET.fromstring(
+        render_gazebo_robot_description(str(GAZEBO_XACRO))
+    )
+    assert rendered_root.find(
+        "./joint[@name='panda_finger_joint2']/mimic"
+    ) is None
+    assert len(rendered_root.findall('./ros2_control')) == 1
 
 
 def test_current_parity_preset_uses_one_canonical_tool_endpoint():

@@ -111,12 +111,18 @@ finger joints:
 - `panda_finger_joint1`
 - `panda_finger_joint2`
 
-Both finger joints expose state through Gazebo ros2_control. The simulator-only
-`panda_gripper_controller` commands `panda_finger_joint1`; the canonical
-`panda_finger_joint2` mimic relation drives the other finger. This provides
-finger-joint actuation and state visibility only. It does not verify contact,
-lift, slip, or physical grasp success, and it does not add force control,
-MoveIt Servo, real hardware support, or a physical pick-place executor.
+The canonical MoveIt planning description retains the standard
+`panda_finger_joint2` mimic relation. Gazebo uses that same canonical model as
+its source, then its installed renderer validates and removes only joint2's
+`mimic` child because the current Gazebo Harmonic physics engine cannot create
+that constraint. The same rendered URDF is published to the Gazebo-side robot
+state publisher and used to spawn the robot and initialize `gz_ros2_control`.
+
+Both Gazebo finger joints expose position command and position/velocity state
+interfaces. The simulator-only `panda_gripper_controller` explicitly commands
+`panda_finger_joint1` and `panda_finger_joint2` to equal positions. This remains
+position-controlled, simulator-only actuation. It does not add force control or
+prove contact, lift, slip, physical grasp, placement, or whole-task success.
 
 The target synchronization node updates the static Gazebo model pose from
 `/target_pose`; `static` means physics does not move the model autonomously.
@@ -133,6 +139,7 @@ bash scripts/check_gazebo_workcell_assets.sh
 bash scripts/check_gazebo_workcell_launch_available.sh
 bash scripts/check_gazebo_panda_spawned.sh
 bash scripts/check_ros2_control_controllers_active.sh
+python3 scripts/check_gazebo_dual_finger_actuation.py
 bash scripts/check_gazebo_target_pose_sync_available.sh
 python3 scripts/check_target_pose_to_gazebo_entity_consistency.py
 bash scripts/check_gazebo_entity_pose_observer_available.sh

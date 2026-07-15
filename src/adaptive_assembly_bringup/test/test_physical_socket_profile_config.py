@@ -58,6 +58,9 @@ def test_physical_profile_enables_bounded_contact_aware_close():
 
     assert bridge['open_position'] == 0.04
     assert bridge['close_position'] == 0.0
+    assert bridge['joint_names'] == [
+        'panda_finger_joint1', 'panda_finger_joint2'
+    ]
     assert bridge['result_timeout_sec'] == 5.0
     assert bridge['contact_wait_timeout_sec'] == 1.0
     assert bridge['contact_freshness_timeout_sec'] == 0.25
@@ -65,6 +68,7 @@ def test_physical_profile_enables_bounded_contact_aware_close():
     assert bridge['allow_contact_limited_close'] is True
     assert bridge['expected_target_object'] == contacts['target_object_name']
     assert executor['expected_target_object'] == contacts['target_object_name']
+    assert executor['open_gripper_before_first_arm_stage'] is True
     assert contacts['contact_stale_timeout_sec'] == 0.25
     assert bridge['contact_settle_duration_sec'] <= (
         bridge['contact_wait_timeout_sec']

@@ -39,6 +39,9 @@ assembly_task_node:
 # to abort with GOAL_TOLERANCE_VIOLATED when the 0.035 m-radius target is held.
 gripper_action_bridge_node:
   ros__parameters:
+    joint_names:
+      - panda_finger_joint1
+      - panda_finger_joint2
     open_position: 0.04
     close_position: 0.0
     result_timeout_sec: 5.0
@@ -58,5 +61,6 @@ gazebo_grasp_contact_status_node:
 
 physical_pick_place_executor_node:
   ros__parameters:
+    open_gripper_before_first_arm_stage: true
     gripper_command_timeout_sec: 5.0
     expected_target_object: target_object

@@ -125,7 +125,10 @@ The Gazebo wrapper includes the canonical lower-level Panda description instead
 of the MoveIt configuration's top-level xacro because the latter also emits
 mock `ros2_control` systems. The wrapper therefore adds exactly one usable
 `gz_ros2_control` system while retaining canonical links, joint transforms,
-axes, limits, topology, meshes, collisions, inertials, hand, and mimic finger.
+axes, limits, topology, meshes, collisions, inertials, hand, and canonical mimic
+finger. The Gazebo runtime renderer intentionally removes only the second
+finger's mimic element after this canonical-source parity check; arm kinematics
+and all other robot elements remain unchanged.
 
 The default parity command proves that identical arm joint values produce the
 same `panda_link0 -> panda_link8` transform. The explicit TCP command proves

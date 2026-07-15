@@ -84,6 +84,7 @@ def main() -> int:
         'stage_names',
         'lift_trajectory_topic',
         'send_gripper_commands',
+        'open_gripper_before_first_arm_stage',
         'simulated_execution_only',
         'launch_gripper_bridge',
         'launch_physical_grasp_preflight',

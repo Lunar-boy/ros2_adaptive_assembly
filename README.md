@@ -80,6 +80,7 @@ six RobotTrajectory topics
 physical_pick_place_executor_node
         |
         +--> Panda arm FollowJointTrajectory action
+        +--> initial gripper open before pre_grasp
         +--> gripper close after grasp
         +--> grasp verification
         +--> lift/slip verification
@@ -90,10 +91,15 @@ physical_pick_place_executor_node
 The default stage order is:
 
 ```text
-pre_grasp -> grasp -> close -> verify grasp
+initial open -> pre_grasp -> grasp -> close -> verify grasp
           -> lift -> verify lift/slip
           -> pre_place -> place -> open -> retreat
 ```
+
+The canonical MoveIt Panda description retains its standard second-finger
+mimic relation. The Gazebo-only renderer removes that one mimic element and
+the simulator controller commands both Panda finger joints to equal position
+targets; this remains simulator-only position control, not force control.
 
 ## Environment
 
@@ -267,6 +273,7 @@ Important defaults include:
 - end-effector target link: `assembly_tcp`;
 - stage order: `pre_grasp,grasp,lift,pre_place,place,retreat`;
 - socket center: `(0.62, -0.18, 0.10)` in `world`;
+- required gripper open before `pre_grasp`;
 - gripper close after `grasp`;
 - gripper open after `place`;
 - required physical preflight;
