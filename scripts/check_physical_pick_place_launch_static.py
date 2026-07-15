@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-"""Static checks for the PR66 bringup launch file."""
+"""Statically check the supported physical pick-place launch composition."""
 
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+BRINGUP_LAUNCH_DIR = ROOT / 'src/adaptive_assembly_bringup/launch'
 EXECUTION_LAUNCH = (
-    ROOT / 'src/adaptive_assembly_bringup/launch'
+    BRINGUP_LAUNCH_DIR
     / 'adaptive_assembly_physical_pick_place_execution.launch.py'
 )
 FULL_LAUNCH = (
-    ROOT / 'src/adaptive_assembly_bringup/launch'
+    BRINGUP_LAUNCH_DIR
     / 'adaptive_assembly_full_physical_pick_place_demo.launch.py'
 )
 PHYSICAL_PLANNING_LAUNCH = (
-    ROOT / 'src/adaptive_assembly_bringup/launch'
-    / 'adaptive_assembly_physical_planning.launch.py'
+    BRINGUP_LAUNCH_DIR / 'adaptive_assembly_physical_planning.launch.py'
 )
 AUDIT_LAUNCH = (
     ROOT / 'src/adaptive_assembly_planning/launch'
@@ -23,52 +23,44 @@ AUDIT_LAUNCH = (
 )
 
 
+def _load(path: Path, label: str, failures: list[str]) -> str:
+    if not path.is_file():
+        failures.append(f'missing {label}: {path}')
+        return ''
+    return path.read_text(encoding='utf-8')
+
+
+def _require(text: str, tokens: tuple[str, ...], scope: str, failures):
+    for token in tokens:
+        if token not in text:
+            failures.append(f'missing {scope} token: {token}')
+
+
 def main() -> int:
     failures = []
-    if not EXECUTION_LAUNCH.exists():
-        failures.append('physical pick-place launch file is missing')
-        text = ''
-    else:
-        text = EXECUTION_LAUNCH.read_text(encoding='utf-8')
-    full_text = FULL_LAUNCH.read_text(encoding='utf-8') if FULL_LAUNCH.exists() else ''
-    panda_demo_text = (
-        PANDA_DEMO_LAUNCH.read_text(encoding='utf-8')
-        if PANDA_DEMO_LAUNCH.exists() else ''
+    execution_text = _load(EXECUTION_LAUNCH, 'execution launch', failures)
+    full_text = _load(FULL_LAUNCH, 'full demo launch', failures)
+    planning_text = _load(
+        PHYSICAL_PLANNING_LAUNCH, 'physical planning launch', failures
     )
-    audit_text = AUDIT_LAUNCH.read_text(encoding='utf-8') if AUDIT_LAUNCH.exists() else ''
+    audit_text = _load(AUDIT_LAUNCH, 'planning scene audit launch', failures)
 
-    required = [
-        'physical_pick_place_executor_node',
-        'gripper_action_bridge_node',
-        'stage_names',
-        'lift_trajectory_topic',
-        'send_gripper_commands',
-        'simulated_execution_only',
-        'launch_reachable_sequence',
-        'launch_gripper_bridge',
-        'launch_physical_grasp_preflight',
-        'require_physical_grasp_preflight',
-        'physical_grasp_preflight_timeout_sec',
-        '/physical_grasp_preflight_status',
-        '/world/adaptive_assembly_physical_workcell/pose/info',
-        'adaptive_assembly_physical_workcell.sdf',
-        'use_standard_panda_demo',
-        "'use_standard_panda_demo': 'false'",
-        "'require_target_entity_exact_match': 'false'",
-        "'send_arm_goals': 'true'",
-        "'launch_fake_object_pose_node': launch_fake_object_pose_node",
-        "default_value='false'",
+    _require(full_text, (
+        'adaptive_assembly_panda_gazebo.launch.py',
         'gazebo_target_pose_adapter.launch.py',
+        'adaptive_assembly_physical_planning.launch.py',
+        'adaptive_assembly_physical_pick_place_execution.launch.py',
+        'adaptive_assembly_physical_workcell.sdf',
+        "default_value='false'",
+        'UnlessCondition(launch_fake_object_pose_node)',
         "'input_pose_topic': '/gazebo_target_object_pose'",
         "'output_pose_topic': '/target_pose'",
-        'target_reference_z_offset',
-        'UnlessCondition(launch_fake_object_pose_node)',
-        "'require_model_name_match': _typed_value(",
-        "'require_target_entity_exact_match', bool",
         "'target_object_gazebo_pose_topic': '/model/target_object/pose'",
-        "'target_object_raw_pose_topic': (",
         "'object_pose_topic': '/gazebo_target_object_pose'",
-        "'launch_object_pose_observer': launch_object_pose_observer",
+        "'end_effector_link': end_effector_link",
+    ), 'full-demo orchestration', failures)
+
+    _require(planning_text, (
         'assembly_task_node',
         'move_group',
         'static_planning_scene_node',
@@ -77,55 +69,80 @@ def main() -> int:
         'assembly_sequence_planning_node',
         'pre_grasp,grasp,lift,pre_place,place,retreat',
         'assembly_tcp',
+        'position_tolerance',
+        'orientation_tolerance',
         'physical_workcell_planning_scene.yaml',
-    ]
-    for token in required:
-        if token not in text and token not in full_text:
-            failures.append(f'missing launch token: {token}')
+    ), 'physical-planning', failures)
 
-    required_audit_tokens = [
+    _require(execution_text, (
+        'physical_pick_place_executor_node',
+        'gripper_action_bridge_node',
+        'gazebo_grasp_contact_status_node',
+        'grasp_verifier_node',
+        'physical_grasp_preflight_node',
+        'gazebo_entity_pose_observer_node',
+        'stage_names',
+        'lift_trajectory_topic',
+        'send_gripper_commands',
+        'simulated_execution_only',
+        'launch_gripper_bridge',
+        'launch_physical_grasp_preflight',
+        'require_physical_grasp_preflight',
+        'physical_grasp_preflight_timeout_sec',
+        '/physical_grasp_preflight_status',
+        '/world/adaptive_assembly_physical_workcell/pose/info',
+        "'require_target_entity_exact_match': 'false'",
+        "'send_arm_goals': 'true'",
+        "'require_model_name_match': _typed_value(",
+        "'require_target_entity_exact_match', bool",
+        "'output_pose_topic': LaunchConfiguration('object_pose_topic')",
+    ), 'physical-execution', failures)
+
+    _require('\n'.join((planning_text, audit_text)), (
         'expected_object_ids',
         'planning_scene_audit_expected_object_ids',
         'work_table,target_support',
-    ]
-    combined_audit_text = '\n'.join([reachable_text, audit_text])
-    for token in required_audit_tokens:
-        if token not in combined_audit_text:
-            failures.append(f'missing planning scene audit token: {token}')
+        '/planning_scene_audit_status',
+        '/planning_scene_audit_ready',
+    ), 'PlanningScene/audit', failures)
 
-    forbidden = [
+    combined_text = '\n'.join((full_text, planning_text, execution_text))
+    for token in (
         'enable_real_hardware',
         'real_hardware:=true',
         'hardware_driver',
         'camera',
         "'require_model_name_match': True",
-    ]
-    for token in forbidden:
-        if token in text or token in full_text:
-            failures.append(f'forbidden launch token present: {token}')
+    ):
+        if token in combined_text:
+            failures.append(f'forbidden physical-path token present: {token}')
 
-    if "@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V" in text:
-        failures.append('physical SceneBroadcaster Pose_V bridge is present')
-    if text.count("'@geometry_msgs/msg/PoseStamped[gz.msgs.Pose'") != 1:
-        failures.append('expected exactly one dedicated target Pose bridge')
-    output_pose_source = (
-        "'output_pose_topic': LaunchConfiguration('object_pose_topic')"
-    )
-    if text.count(output_pose_source) != 1:
-        failures.append(
-            'expected exactly one /gazebo_target_object_pose observer source'
-        )
-    legacy_tokens = [
+    legacy_tokens = (
         'adaptive_assembly_panda_sequence_planning_reachable.launch.py',
         'adaptive_assembly_panda_sequence_planning_demo.launch.py',
         'adaptive_assembly_panda_planning_demo.launch.py',
         'adaptive_assembly_panda_demo.launch.py',
         'adaptive_assembly_pipeline.launch.py',
         'launch_reachable_sequence',
-    ]
+        'use_standard_panda_demo',
+    )
     for token in legacy_tokens:
-        if token in full_text or token in execution_text or token in planning_text:
-        failures.append(f'legacy planning token present: {token}')
+        if token in combined_text:
+            failures.append(f'legacy planning token present: {token}')
+
+    pose_vector_bridge = '@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V'
+    if pose_vector_bridge in execution_text:
+        failures.append('physical SceneBroadcaster Pose_V bridge is present')
+    pose_bridge = "'@geometry_msgs/msg/PoseStamped[gz.msgs.Pose'"
+    if execution_text.count(pose_bridge) != 1:
+        failures.append('expected exactly one dedicated target Pose bridge')
+    output_pose_source = (
+        "'output_pose_topic': LaunchConfiguration('object_pose_topic')"
+    )
+    if execution_text.count(output_pose_source) != 1:
+        failures.append(
+            'expected exactly one /gazebo_target_object_pose observer source'
+        )
 
     if failures:
         print('FAIL physical pick-place launch static check')

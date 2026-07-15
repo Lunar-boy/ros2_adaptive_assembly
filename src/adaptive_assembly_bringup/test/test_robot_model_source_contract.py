@@ -88,7 +88,6 @@ def test_physical_demo_model_sources_match_the_expected_parity_contract():
     assert 'adaptive_assembly_physical_planning.launch.py' in (
         _assignment_strings(full_demo, 'planning_launch')
     )
-    
 
     builder = _find_call(physical_planning, 'MoveItConfigsBuilder')
     assert isinstance(builder.args[0], ast.Constant)
@@ -114,6 +113,8 @@ def test_physical_demo_model_sources_match_the_expected_parity_contract():
     physical_execution_text = physical_execution.read_text(encoding='utf-8')
     assert 'adaptive_assembly_panda_demo.launch.py' not in full_demo_text
     assert 'adaptive_assembly_panda_demo.launch.py' not in physical_execution_text
+    assert 'launch_reachable_sequence' not in full_demo_text
+    assert 'launch_reachable_sequence' not in physical_execution_text
 
 
 def test_gazebo_wrapper_includes_canonical_description_without_arm_chain():

@@ -12,8 +12,10 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
+
 def _typed_value(name: str, value_type):
     return ParameterValue(LaunchConfiguration(name), value_type=value_type)
+
 
 def _warn_if_non_physical_world_marker(context, *args, **kwargs):
     """Warn when preflight is not configured for the physical Gazebo world."""
@@ -29,8 +31,9 @@ def _warn_if_non_physical_world_marker(context, *args, **kwargs):
         'dedicated /model/target_object/pose bridge.'
     ))]
 
+
 def generate_launch_description() -> LaunchDescription:
-    """Start the PR65 planner, PR63 bridge, and PR66 executor as requested."""
+    """Start physical execution, contact, pose, verification, and executor nodes."""
     launch_gripper_bridge = LaunchConfiguration('launch_gripper_bridge')
     launch_contact_bridge = LaunchConfiguration('launch_contact_bridge')
     launch_contact_status_node = LaunchConfiguration('launch_contact_status_node')

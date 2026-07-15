@@ -1,13 +1,14 @@
 """Regression tests for the dedicated physical planning launch."""
-from launch import LaunchContext
-from launch.utilities import perform_substitutions
+
 import ast
 import importlib.util
 from pathlib import Path
 import xml.etree.ElementTree as ElementTree
 
 from ament_index_python.packages import get_package_share_directory
+from launch import LaunchContext
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.utilities import perform_substitutions
 from launch_ros.actions import Node
 import yaml
 
@@ -42,6 +43,7 @@ def _nodes(description):
 def _executable(node):
     return node.__dict__['_Node__node_executable']
 
+
 def _default_text(description, name):
     declaration = next(
         entity for entity in description.entities
@@ -52,6 +54,7 @@ def _default_text(description, name):
         LaunchContext(),
         declaration.default_value,
     )
+
 
 def test_physical_configuration_is_installed_and_contains_all_objects():
     source_profile = PACKAGE_DIR / 'config' / PHYSICAL_CONFIGURATION

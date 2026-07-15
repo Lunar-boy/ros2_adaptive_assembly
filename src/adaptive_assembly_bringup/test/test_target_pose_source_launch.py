@@ -4,7 +4,7 @@ import importlib.util
 from pathlib import Path
 
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-from launch.conditions import IfCondition, UnlessCondition
+from launch.conditions import UnlessCondition
 from launch_ros.actions import Node
 
 
@@ -53,6 +53,7 @@ def _nodes(description):
 def _executable(node):
     return node.__dict__['_Node__node_executable']
 
+
 def test_physical_planning_starts_task_without_fake_perception():
     """Start the physical task directly without fake perception."""
     description = _load_launch(
@@ -62,6 +63,7 @@ def test_physical_planning_starts_task_without_fake_perception():
 
     assert executables.count('assembly_task_node') == 1
     assert 'fake_object_pose_node' not in executables
+
 
 def test_physical_demo_selects_gazebo_adapter_without_duplicate_source():
     """Use inverse conditions so the target publishers cannot coexist."""
@@ -82,26 +84,35 @@ def test_physical_demo_selects_gazebo_adapter_without_duplicate_source():
     assert dict(adapter_include.launch_arguments)['input_pose_topic'] == (
         '/gazebo_target_object_pose'
     )
-    assert any(
-        FAKE_SWITCH in dict(include.launch_arguments)
-        for include in _includes(description)
-    )
     execution_arguments = next(
         dict(include.launch_arguments)
         for include in _includes(description)
-        if dict(include.launch_arguments).get('use_standard_panda_demo')
-        == 'false'
+        if dict(include.launch_arguments).get(
+            'target_object_gazebo_pose_topic'
+        ) == '/model/target_object/pose'
     )
-    assert 'launch_object_pose_observer' in execution_arguments
-    assert execution_arguments['target_object_gazebo_pose_topic'] == (
-        '/model/target_object/pose'
-    )
+    assert set(execution_arguments) == {
+        'launch_object_pose_observer',
+        'target_object_gazebo_pose_topic',
+        'target_object_raw_pose_topic',
+        'object_pose_topic',
+        'object_pose_available_topic',
+        'params_file',
+        'use_sim_time',
+    }
     assert execution_arguments['target_object_raw_pose_topic'] == (
         '/gazebo_target_object_pose_raw'
     )
-    assert execution_arguments['object_pose_topic'] == (
-        '/gazebo_target_object_pose'
+    assert execution_arguments['object_pose_topic'] == '/gazebo_target_object_pose'
+    assert execution_arguments['object_pose_available_topic'] == (
+        '/gazebo_target_object_pose_available'
     )
+    for forbidden in (
+        'use_standard_panda_demo',
+        'launch_reachable_sequence',
+        'launch_fake_object_pose_node',
+    ):
+        assert forbidden not in execution_arguments
 
 
 def test_physical_execution_has_one_dedicated_pose_source_and_no_pose_vector():

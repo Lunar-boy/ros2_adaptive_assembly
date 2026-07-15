@@ -4,7 +4,9 @@ import ast
 import importlib.util
 from pathlib import Path
 
+from launch import LaunchContext
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.utilities import perform_substitutions
 
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
@@ -26,8 +28,10 @@ def _declaration(description, name):
         if isinstance(action, DeclareLaunchArgument) and action.name == name
     )
 
+
 def _source_tree(filename):
-    return ast.parse((LAUNCH_DIR / filename).read_text())
+    return ast.parse((LAUNCH_DIR / filename).read_text(encoding='utf-8'))
+
 
 def _references_profile(filename):
     return any(
@@ -35,6 +39,33 @@ def _references_profile(filename):
         and node.value == 'adaptive_assembly_physical_pick_place_params.yaml'
         for node in ast.walk(_source_tree(filename))
     )
+
+
+def _default_text(description, name):
+    return perform_substitutions(
+        LaunchContext(), _declaration(description, name).default_value
+    )
+
+
+def _node_parameter_names(filename):
+    """Return names referenced by each Node parameters expression."""
+    parameter_names = []
+    for node in ast.walk(_source_tree(filename)):
+        if not isinstance(node, ast.Call):
+            continue
+        if getattr(node.func, 'id', None) != 'Node':
+            continue
+        parameters = next(
+            (keyword.value for keyword in node.keywords
+             if keyword.arg == 'parameters'),
+            None,
+        )
+        if parameters is not None:
+            parameter_names.append({
+                child.id for child in ast.walk(parameters)
+                if isinstance(child, ast.Name)
+            })
+    return parameter_names
 
 
 def test_physical_profile_is_declared_and_forwarded_to_both_stacks():
@@ -58,21 +89,23 @@ def test_physical_profile_is_declared_and_forwarded_to_both_stacks():
         if isinstance(action, IncludeLaunchDescription)
     ]
 
-    assert sum(
-        'params_file' in arguments
-        for arguments in include_arguments
-    ) == 2
+    profile_consumers = [
+        arguments for arguments in include_arguments
+        if 'params_file' in arguments
+    ]
+    assert len(profile_consumers) == 2
+    assert any('end_effector_link' in item for item in profile_consumers)
+    assert any(
+        item.get('target_object_gazebo_pose_topic')
+        == '/model/target_object/pose'
+        for item in profile_consumers
+    )
 
-    planning_source = (
-        LAUNCH_DIR / 'adaptive_assembly_physical_planning.launch.py'
-    ).read_text(encoding='utf-8')
-    execution_source = (
-        LAUNCH_DIR
-        / 'adaptive_assembly_physical_pick_place_execution.launch.py'
-    ).read_text(encoding='utf-8')
-
-    assert 'parameters=[params_file,' in planning_source
-    assert 'parameters=[params_file,' in execution_source
+    for filename in filenames[1:]:
+        assert any(
+            'params_file' in names
+            for names in _node_parameter_names(filename)
+        )
 
 
 def test_all_physical_launches_default_to_the_physical_profile():
@@ -85,4 +118,7 @@ def test_all_physical_launches_default_to_the_physical_profile():
 
     for filename in physical_launches:
         assert _references_profile(filename)
-        _declaration(_load_launch(filename), 'params_file')
+        default = _default_text(_load_launch(filename), 'params_file')
+        assert default.endswith(
+            'adaptive_assembly_physical_pick_place_params.yaml'
+        )

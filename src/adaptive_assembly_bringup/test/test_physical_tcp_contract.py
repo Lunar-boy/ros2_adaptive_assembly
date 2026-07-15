@@ -51,6 +51,7 @@ def test_physical_target_and_task_offsets_end_at_cylinder_grasp_center():
     assert parameters['lift_height_offset'] == 0.20
     assert parameters['place_height_offset'] == 0.0
 
+
 def test_physical_planning_owns_the_assembly_tcp_contract():
     full_source = FULL_LAUNCH.read_text(encoding='utf-8')
     planning_source = PLANNING_LAUNCH.read_text(encoding='utf-8')
@@ -71,6 +72,7 @@ def test_physical_planning_owns_the_assembly_tcp_contract():
     assert 'end_effector_link' not in execution_source
     assert 'position_tolerance' not in execution_source
     assert 'orientation_tolerance' not in execution_source
+
 
 def test_dedicated_planning_launch_has_six_physical_adapters():
     source = PLANNING_LAUNCH.read_text(encoding='utf-8')
