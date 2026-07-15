@@ -51,22 +51,26 @@ def test_physical_target_and_task_offsets_end_at_cylinder_grasp_center():
     assert parameters['lift_height_offset'] == 0.20
     assert parameters['place_height_offset'] == 0.0
 
+def test_physical_planning_owns_the_assembly_tcp_contract():
+    full_source = FULL_LAUNCH.read_text(encoding='utf-8')
+    planning_source = PLANNING_LAUNCH.read_text(encoding='utf-8')
+    execution_source = EXECUTION_LAUNCH.read_text(encoding='utf-8')
 
-def test_physical_launch_chain_uses_one_assembly_tcp_argument():
-    sources = [
-        FULL_LAUNCH.read_text(encoding='utf-8'),
-        PLANNING_LAUNCH.read_text(encoding='utf-8'),
-        EXECUTION_LAUNCH.read_text(encoding='utf-8'),
-    ]
+    assert "default_value='assembly_tcp'" in full_source
+    assert "default_value='assembly_tcp'" in planning_source
 
-    assert "default_value='assembly_tcp'" in sources[0]
-    assert "default_value='assembly_tcp'" in sources[1]
-    assert "'end_effector_link': 'assembly_tcp'" in sources[2]
-    assert "default_value='0.005'" in sources[2]
-    assert "default_value='0.03'" in sources[2]
-    for source in sources:
-        assert 'end_effector_link' in source
+    assert "'end_effector_link': end_effector_link" in full_source
+    assert (
+        "'end_effector_link': "
+        "LaunchConfiguration('end_effector_link')"
+    ) in planning_source
 
+    assert "default_value='0.005'" in planning_source
+    assert "default_value='0.03'" in planning_source
+
+    assert 'end_effector_link' not in execution_source
+    assert 'position_tolerance' not in execution_source
+    assert 'orientation_tolerance' not in execution_source
 
 def test_dedicated_planning_launch_has_six_physical_adapters():
     source = PLANNING_LAUNCH.read_text(encoding='utf-8')

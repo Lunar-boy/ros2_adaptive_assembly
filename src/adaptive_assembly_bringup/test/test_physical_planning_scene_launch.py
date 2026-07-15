@@ -1,5 +1,6 @@
 """Regression tests for the dedicated physical planning launch."""
-
+from launch import LaunchContext
+from launch.utilities import perform_substitutions
 import ast
 import importlib.util
 from pathlib import Path
@@ -41,16 +42,16 @@ def _nodes(description):
 def _executable(node):
     return node.__dict__['_Node__node_executable']
 
-
 def _default_text(description, name):
     declaration = next(
         entity for entity in description.entities
-        if isinstance(entity, DeclareLaunchArgument) and entity.name == name
+        if isinstance(entity, DeclareLaunchArgument)
+        and entity.name == name
     )
-    return ''.join(
-        item.text for item in declaration.default_value if hasattr(item, 'text')
+    return perform_substitutions(
+        LaunchContext(),
+        declaration.default_value,
     )
-
 
 def test_physical_configuration_is_installed_and_contains_all_objects():
     source_profile = PACKAGE_DIR / 'config' / PHYSICAL_CONFIGURATION

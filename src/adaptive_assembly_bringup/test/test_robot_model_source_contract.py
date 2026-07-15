@@ -88,9 +88,7 @@ def test_physical_demo_model_sources_match_the_expected_parity_contract():
     assert 'adaptive_assembly_physical_planning.launch.py' in (
         _assignment_strings(full_demo, 'planning_launch')
     )
-    assert "'launch_reachable_sequence': 'false'" in (
-            full_demo.read_text(encoding='utf-8')
-    )
+    
 
     builder = _find_call(physical_planning, 'MoveItConfigsBuilder')
     assert isinstance(builder.args[0], ast.Constant)

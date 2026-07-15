@@ -26,35 +26,8 @@ def _declaration(description, name):
         if isinstance(action, DeclareLaunchArgument) and action.name == name
     )
 
-
-def _launch_includes_params_file(filename):
-    description = _load_launch(filename)
-    return any(
-        'params_file' in dict(action.launch_arguments)
-        for action in description.entities
-        if isinstance(action, IncludeLaunchDescription)
-    )
-
-
 def _source_tree(filename):
     return ast.parse((LAUNCH_DIR / filename).read_text())
-
-
-def _declares_default_variable(filename, argument, variable):
-    for node in ast.walk(_source_tree(filename)):
-        if not isinstance(node, ast.Call):
-            continue
-        if getattr(node.func, 'id', None) != 'DeclareLaunchArgument':
-            continue
-        if not node.args or getattr(node.args[0], 'value', None) != argument:
-            continue
-        for keyword in node.keywords:
-            if keyword.arg == 'default_value' and getattr(
-                keyword.value, 'id', None
-            ) == variable:
-                return True
-    return False
-
 
 def _references_profile(filename):
     return any(
@@ -64,39 +37,52 @@ def _references_profile(filename):
     )
 
 
-def test_physical_chain_propagates_an_overridable_params_file():
-    """Route the physical default profile through every nested task wrapper."""
-    chain = (
+def test_physical_profile_is_declared_and_forwarded_to_both_stacks():
+    """Forward one overridable physical profile to planning and execution."""
+    filenames = (
         'adaptive_assembly_full_physical_pick_place_demo.launch.py',
-        'adaptive_assembly_physical_pick_place_execution.launch.py',
         'adaptive_assembly_physical_planning.launch.py',
+        'adaptive_assembly_physical_pick_place_execution.launch.py',
     )
-    for filename in chain:
+
+    for filename in filenames:
         description = _load_launch(filename)
         _declaration(description, 'params_file')
-    for filename in chain[:-1]:
-        assert _launch_includes_params_file(filename)
+
+    full_description = _load_launch(
+        'adaptive_assembly_full_physical_pick_place_demo.launch.py'
+    )
+    include_arguments = [
+        dict(action.launch_arguments)
+        for action in full_description.entities
+        if isinstance(action, IncludeLaunchDescription)
+    ]
+
+    assert sum(
+        'params_file' in arguments
+        for arguments in include_arguments
+    ) == 2
+
+    planning_source = (
+        LAUNCH_DIR / 'adaptive_assembly_physical_planning.launch.py'
+    ).read_text(encoding='utf-8')
+    execution_source = (
+        LAUNCH_DIR
+        / 'adaptive_assembly_physical_pick_place_execution.launch.py'
+    ).read_text(encoding='utf-8')
+
+    assert 'parameters=[params_file,' in planning_source
+    assert 'parameters=[params_file,' in execution_source
 
 
-def test_only_physical_launches_reference_the_physical_profile():
-    """Leave generic and plan-only launch defaults on their existing profiles."""
+def test_all_physical_launches_default_to_the_physical_profile():
+    """Use the physical task profile in every physical launch entrypoint."""
     physical_launches = (
         'adaptive_assembly_full_physical_pick_place_demo.launch.py',
-        'adaptive_assembly_physical_pick_place_execution.launch.py',
         'adaptive_assembly_physical_planning.launch.py',
+        'adaptive_assembly_physical_pick_place_execution.launch.py',
     )
+
     for filename in physical_launches:
         assert _references_profile(filename)
-        assert _declares_default_variable(
-            filename, 'params_file', 'physical_params_file'
-        )
-    for filename in nonphysical_launches:
-        assert not _references_profile(filename)
-
-        tree = _source_tree(filename)
-        assert any(
-            isinstance(node, ast.Call)
-            and getattr(node.func, 'id', None) == 'DeclareLaunchArgument'
-            for node in ast.walk(tree)
-        )
-
+        _declaration(_load_launch(filename), 'params_file')

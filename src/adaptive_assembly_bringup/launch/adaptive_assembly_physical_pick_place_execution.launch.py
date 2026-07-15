@@ -12,10 +12,8 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
-
 def _typed_value(name: str, value_type):
     return ParameterValue(LaunchConfiguration(name), value_type=value_type)
-
 
 def _warn_if_non_physical_world_marker(context, *args, **kwargs):
     """Warn when preflight is not configured for the physical Gazebo world."""
@@ -31,7 +29,6 @@ def _warn_if_non_physical_world_marker(context, *args, **kwargs):
         'dedicated /model/target_object/pose bridge.'
     ))]
 
-
 def generate_launch_description() -> LaunchDescription:
     """Start the PR65 planner, PR63 bridge, and PR66 executor as requested."""
     launch_gripper_bridge = LaunchConfiguration('launch_gripper_bridge')
@@ -42,9 +39,6 @@ def generate_launch_description() -> LaunchDescription:
     launch_physical_grasp_preflight = LaunchConfiguration(
         'launch_physical_grasp_preflight'
     )
-    use_sim_time = LaunchConfiguration('use_sim_time')
-
-    
     physical_params_file = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_bringup'),
         'config',
@@ -136,9 +130,7 @@ def generate_launch_description() -> LaunchDescription:
             **string_arguments, **bool_arguments, **float_arguments
         }.items()
     ]
-    
-    
-    
+
     declarations.append(DeclareLaunchArgument(
         'params_file',
         default_value=physical_params_file,
