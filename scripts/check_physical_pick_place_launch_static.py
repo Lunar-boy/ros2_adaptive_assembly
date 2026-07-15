@@ -3,6 +3,8 @@
 
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[1]
 BRINGUP_LAUNCH_DIR = ROOT / 'src/adaptive_assembly_bringup/launch'
@@ -20,6 +22,26 @@ PHYSICAL_PLANNING_LAUNCH = (
 AUDIT_LAUNCH = (
     ROOT / 'src/adaptive_assembly_planning/launch'
     / 'planning_scene_audit.launch.py'
+)
+PLANNER_SOURCE = (
+    ROOT / 'src/adaptive_assembly_planning/src'
+    / 'assembly_sequence_planning_node.cpp'
+)
+TARGET_SCENE_SOURCE = (
+    ROOT / 'src/adaptive_assembly_planning/src'
+    / 'physical_target_planning_scene_node.cpp'
+)
+TARGET_SCENE_CONTRACT = (
+    ROOT / 'src/adaptive_assembly_planning/include'
+    / 'adaptive_assembly_planning/target_scene_contract.hpp'
+)
+PHYSICAL_PROFILE = (
+    ROOT / 'src/adaptive_assembly_bringup/config'
+    / 'adaptive_assembly_physical_pick_place_params.yaml'
+)
+CLEARANCE_SOURCE = (
+    ROOT / 'src/adaptive_assembly_planning/src'
+    / 'grasp_clearance_validation.cpp'
 )
 
 
@@ -44,6 +66,16 @@ def main() -> int:
         PHYSICAL_PLANNING_LAUNCH, 'physical planning launch', failures
     )
     audit_text = _load(AUDIT_LAUNCH, 'planning scene audit launch', failures)
+    planner_text = _load(PLANNER_SOURCE, 'sequence planner source', failures)
+    target_scene_text = _load(
+        TARGET_SCENE_SOURCE, 'physical target scene source', failures
+    )
+    target_contract_text = _load(
+        TARGET_SCENE_CONTRACT, 'physical target scene contract', failures
+    )
+    clearance_text = _load(
+        CLEARANCE_SOURCE, 'grasp clearance validator', failures
+    )
 
     _require(full_text, (
         'adaptive_assembly_panda_gazebo.launch.py',
@@ -72,6 +104,17 @@ def main() -> int:
         'position_tolerance',
         'orientation_tolerance',
         'physical_workcell_planning_scene.yaml',
+        'physical_target_planning_scene_node',
+        "'linear_stage_names_csv': 'grasp'",
+        "'linear_planning_pipeline_id': (",
+        "'pilz_industrial_motion_planner'",
+        "'linear_planner_id': 'LIN'",
+        "'lock_after_successful_sequence': True",
+        "'require_dynamic_target_scene_ready': True",
+        "'require_grasp_clearance_validation': True",
+        "'grasp_min_disallowed_clearance': 0.005",
+        "'grasp_allowed_contact_links_csv': (",
+        "'target_object'",
     ), 'physical-planning', failures)
 
     _require(execution_text, (
@@ -97,6 +140,8 @@ def main() -> int:
         "'require_model_name_match': _typed_value(",
         "'require_target_entity_exact_match', bool",
         "'output_pose_topic': LaunchConfiguration('object_pose_topic')",
+        "'require_plan_lock': 'true'",
+        "'plan_lock_status_topic': '/assembly_sequence_plan_lock_status'",
     ), 'physical-execution', failures)
 
     _require('\n'.join((planning_text, audit_text)), (
@@ -105,7 +150,60 @@ def main() -> int:
         'work_table,target_support',
         '/planning_scene_audit_status',
         '/planning_scene_audit_ready',
+        'target_object',
     ), 'PlanningScene/audit', failures)
+
+    _require(planner_text, (
+        'setPlanningPipelineId(profile.planning_pipeline_id)',
+        'setPlannerId(profile.planner_id)',
+        'linear_planning_failed',
+        'validate_linear_path(',
+        'std::vector<Candidate> candidates',
+        'State::LOCKED',
+        'planning_started',
+        'update_ignored',
+        'evaluate_grasp_clearance(',
+    ), 'sequence planner lock/LIN contract', failures)
+
+    _require(clearance_text, (
+        'distanceRobot(',
+        'checkCollision(',
+        'grasp_disallowed_collision',
+        'grasp_clearance_below_minimum',
+        'panda_finger_joint1',
+        'panda_finger_joint2',
+    ), 'grasp clearance validation', failures)
+
+    if PHYSICAL_PROFILE.is_file():
+        profile = yaml.safe_load(PHYSICAL_PROFILE.read_text(encoding='utf-8'))
+        task = profile['assembly_task_node']['ros__parameters']
+        clearance = profile[
+            'assembly_sequence_planning_node'
+        ]['ros__parameters']
+        offset = float(task['grasp_height_offset'])
+        if not 0.005 <= offset <= 0.030:
+            failures.append('physical grasp offset is outside calibration range')
+        if abs(task['pre_grasp_height_offset'] - offset - 0.20) > 1e-12:
+            failures.append('physical approach distance is not 0.20 m')
+        if clearance.get('require_grasp_clearance_validation') is not True:
+            failures.append('physical grasp clearance validation is disabled')
+        if float(clearance.get('grasp_min_disallowed_clearance', 0.0)) < 0.005:
+            failures.append('physical minimum disallowed clearance is below 5 mm')
+        if clearance.get('grasp_allowed_contact_links_csv') != (
+            'panda_leftfinger,panda_rightfinger'
+        ):
+            failures.append('physical clearance allowlist is not finger-only')
+
+    _require('\n'.join((target_scene_text, target_contract_text)), (
+        'SolidPrimitive::CYLINDER',
+        'CYLINDER_HEIGHT',
+        'CYLINDER_RADIUS',
+        'panda_leftfinger,panda_rightfinger',
+        'set_acm_pair(acm, object_id, name, false)',
+        'set_acm_pair(acm, object_id, link, true)',
+        'scene.robot_state.is_diff = true',
+        'locked_ = true',
+    ), 'dynamic target PlanningScene', failures)
 
     combined_text = '\n'.join((full_text, planning_text, execution_text))
     for token in (

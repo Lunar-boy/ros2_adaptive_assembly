@@ -144,13 +144,14 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument('num_planning_attempts', default_value='1'),
         DeclareLaunchArgument('planning_time_sec', default_value='5.0'),
         DeclareLaunchArgument('position_tolerance', default_value='0.005'),
-        DeclareLaunchArgument('orientation_tolerance', default_value='0.03'),
+        DeclareLaunchArgument('orientation_tolerance', default_value='0.005'),
         DeclareLaunchArgument(
             'planning_scene_audit_expected_object_ids',
             default_value=(
                 'work_table,target_support,assembly_socket_base,'
                 'assembly_socket_left_wall,assembly_socket_right_wall,'
-                'assembly_socket_back_wall,assembly_socket_front_wall'
+                'assembly_socket_back_wall,assembly_socket_front_wall,'
+                'target_object'
             ),
         ),
         DeclareLaunchArgument(
@@ -202,6 +203,33 @@ def generate_launch_description() -> LaunchDescription:
         parameters=[scene_params_file],
     )
 
+    dynamic_target_scene = Node(
+        package='adaptive_assembly_planning',
+        executable='physical_target_planning_scene_node',
+        name='physical_target_planning_scene_node',
+        output='screen',
+        parameters=[
+            moveit_config.robot_description,
+            {
+                'use_sim_time': _typed('use_sim_time', bool),
+                'target_object_id': 'target_object',
+                'target_pose_topic': '/target_pose',
+                'planning_frame': 'panda_link0',
+                'target_radius': 0.035,
+                'target_height': 0.10,
+                'target_pose_stale_timeout_sec': 1.0,
+                'target_allowed_collision_links_csv': (
+                    'panda_leftfinger,panda_rightfinger'
+                ),
+                'ready_topic': '/physical_target_planning_scene_ready',
+                'status_topic': '/physical_target_planning_scene_status',
+                'plan_lock_status_topic': (
+                    '/assembly_sequence_plan_lock_status'
+                ),
+            },
+        ],
+    )
+
     scene_audit = Node(
         package='adaptive_assembly_planning',
         executable='planning_scene_audit_node',
@@ -224,7 +252,7 @@ def generate_launch_description() -> LaunchDescription:
         executable='assembly_sequence_planning_node',
         name='assembly_sequence_planning_node',
         output='screen',
-        parameters=[{
+        parameters=[params_file, {
             'pre_grasp_topic': '/panda_pre_grasp_pose',
             'grasp_topic': '/panda_grasp_pose',
             'lift_topic': '/panda_lift_pose',
@@ -236,6 +264,39 @@ def generate_launch_description() -> LaunchDescription:
             'planning_group': 'panda_arm',
             'end_effector_link': LaunchConfiguration('end_effector_link'),
             'planner_id': LaunchConfiguration('planner_id'),
+            'default_planning_pipeline_id': 'ompl',
+            'default_planner_id': LaunchConfiguration('planner_id'),
+            'linear_stage_names_csv': 'grasp',
+            'linear_planning_pipeline_id': (
+                'pilz_industrial_motion_planner'
+            ),
+            'linear_planner_id': 'LIN',
+            'linear_position_tolerance': 0.002,
+            'linear_orientation_tolerance': 0.01,
+            'linear_max_velocity_scaling_factor': 0.05,
+            'linear_max_acceleration_scaling_factor': 0.05,
+            'linear_max_lateral_deviation': 0.002,
+            'linear_max_orientation_deviation': 0.01,
+            'linear_max_endpoint_position_error': 0.002,
+            'linear_max_endpoint_orientation_error': 0.01,
+            'linear_max_path_length_ratio': 1.02,
+            'require_grasp_clearance_validation': True,
+            'grasp_min_disallowed_clearance': 0.005,
+            'grasp_clearance_target_object_id': 'target_object',
+            'grasp_allowed_contact_links_csv': (
+                'panda_leftfinger,panda_rightfinger'
+            ),
+            'pose_snapshot_max_stamp_skew_sec': 0.20,
+            'grasp_approach_min_distance': 0.05,
+            'grasp_approach_max_distance': 0.30,
+            'grasp_approach_max_lateral_offset': 0.002,
+            'grasp_approach_max_orientation_difference': 0.01,
+            'lock_after_successful_sequence': True,
+            'require_dynamic_target_scene_ready': True,
+            'dynamic_target_scene_ready_topic': (
+                '/physical_target_planning_scene_ready'
+            ),
+            'plan_lock_status_topic': '/assembly_sequence_plan_lock_status',
             'num_planning_attempts': _typed('num_planning_attempts', int),
             'planning_time_sec': _typed('planning_time_sec', float),
             'position_tolerance': _typed('position_tolerance', float),
@@ -286,6 +347,7 @@ def generate_launch_description() -> LaunchDescription:
         task_node,
         move_group,
         static_scene,
+        dynamic_target_scene,
         scene_audit,
         *adapters,
         sequence_planner,

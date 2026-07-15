@@ -30,7 +30,10 @@ The final condition must be verified from Gazebo-observed object state. Planning
 |---|---|
 | Physical Gazebo workcell with Panda, support, dynamic target, and socket | Implemented |
 | Gazebo target-object pose observation | Implemented |
-| Six-stage MoveIt planning | Implemented |
+| Six-stage MoveIt planning | Implemented; grasp uses validated Pilz `LIN` |
+| Immutable physical plan generation | Implemented; one volatile plan lock |
+| Dynamic target collision object | Implemented; cylinder, finger-only ACM |
+| Grasp hand-clearance validation | Implemented; real meshes, 5 mm minimum |
 | Gazebo `ros2_control` arm execution | Implemented |
 | Simulated gripper close/open | Implemented |
 | Bilateral contact-aware close handling | Implemented |
@@ -329,6 +332,7 @@ cd ~/ros2_adaptive_assembly_ws/src/ros2_adaptive_assembly
 python3 scripts/check_physical_pick_place_launch_static.py
 python3 scripts/check_physical_grasp_preflight_static.py
 python3 scripts/check_physical_planning_scene_parity.py
+python3 scripts/check_physical_pick_place_executor_static.py
 ```
 
 ### Bounded runtime checks
@@ -336,6 +340,7 @@ python3 scripts/check_physical_planning_scene_parity.py
 ```bash
 python3 scripts/check_full_physical_pick_place_arm_motion.py
 python3 scripts/check_full_physical_pick_place_tcp_contract.py
+python3 scripts/check_full_physical_pick_place_plan_lock_runtime.py
 ```
 
 The arm-motion check proves initial controller acceptance and motion. The TCP check proves bounded Cartesian agreement for pre-grasp and grasp. Neither check proves contact grasp, lift, final placement, or socket insertion.

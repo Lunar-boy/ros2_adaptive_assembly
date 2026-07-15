@@ -15,7 +15,7 @@ def test_planner_declares_validates_and_explicitly_targets_configured_link():
     assert '"end_effector_link", "panda_link8"' in source
     assert 'hasLinkModel(end_effector_link_)' in source
     assert 'setEndEffectorLink(end_effector_link_)' in source
-    assert 'setPoseTarget(pose, end_effector_link_)' in source
+    assert 'setPoseTarget(snapshot[i].second, end_effector_link_)' in source
     assert 'configured_end_effector_link_invalid' in source
     assert ';end_effector_link=' in source
     assert 'setPoseTarget(pose);' not in source

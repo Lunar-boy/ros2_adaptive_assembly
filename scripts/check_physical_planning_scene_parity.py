@@ -18,6 +18,10 @@ PHYSICAL_PARAMETERS = (
     ROOT / 'src/adaptive_assembly_bringup/config'
     / 'physical_workcell_planning_scene.yaml'
 )
+PHYSICAL_PLANNING_LAUNCH = (
+    ROOT / 'src/adaptive_assembly_bringup/launch'
+    / 'adaptive_assembly_physical_planning.launch.py'
+)
 
 SDF_OBJECTS = {
     'work_table': ('work_table', 'work_surface_link', 'work_surface_collision'),
@@ -210,6 +214,22 @@ def main() -> int:
         fail('physical PlanningScene frame must be panda_link0')
 
     root = ElementTree.parse(PHYSICAL_WORLD).getroot()
+    target_collision = root.find(
+        ".//model[@name='target_object']/link/collision/geometry/cylinder"
+    )
+    if target_collision is None:
+        fail('physical target_object must be a Gazebo cylinder')
+    target_radius = float(target_collision.findtext('radius', default='nan'))
+    target_height = float(target_collision.findtext('length', default='nan'))
+    planning_launch = PHYSICAL_PLANNING_LAUNCH.read_text(encoding='utf-8')
+    if f"'target_radius': {target_radius}" not in planning_launch:
+        fail('dynamic target PlanningScene radius differs from Gazebo SDF')
+    if f"'target_height': {target_height:.2f}" not in planning_launch:
+        fail('dynamic target PlanningScene height differs from Gazebo SDF')
+    if "'target_allowed_collision_links_csv': (" not in planning_launch or (
+        "'panda_leftfinger,panda_rightfinger'" not in planning_launch
+    ):
+        fail('dynamic target ACM allowlist is not exactly the two fingers')
     expected = {
         object_id: sdf_geometry(root, *sdf_path)
         for object_id, sdf_path in SDF_OBJECTS.items()
@@ -231,7 +251,8 @@ def main() -> int:
 
     print(
         'PASS: physical PlanningScene geometry matches the Gazebo SDF for '
-        f'{len(SDF_OBJECTS)} objects (tolerance {TOLERANCE:g})'
+        f'{len(SDF_OBJECTS)} static objects plus the target cylinder '
+        f'(tolerance {TOLERANCE:g})'
     )
     return 0
 

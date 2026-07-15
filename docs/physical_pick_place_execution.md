@@ -23,6 +23,75 @@ cancel, or timeout terminates execution before `pre_grasp`. Set
 `open_gripper_before_first_arm_stage=false` only for focused compatibility
 tests that require the former start sequence.
 
+## Linear grasp planning and immutable plan generation
+
+The physical sequence planner uses the normal `ompl` pipeline for
+`pre_grasp`, `lift`, `pre_place`, `place`, and `retreat`. Only `grasp` uses
+`planning_pipeline_id=pilz_industrial_motion_planner` and `planner_id=LIN`.
+That stage has a `0.002 m` position tolerance, `0.01 rad` orientation
+tolerance, and `0.05` maximum velocity and acceleration scaling. A Pilz
+failure is terminal for that planning attempt; the physical path does not
+fall back to OMPL for `grasp`, and `place` is not a linear stage.
+
+The LIN result is independently checked with FK for every trajectory
+waypoint of `assembly_tcp`. The validator measures Cartesian path length,
+lateral and orientation deviation, endpoint error, and projected progress
+against the direct segment from the successful `pre_grasp` final state to the
+requested grasp pose. It rejects lateral deviation above `0.002 m`,
+orientation deviation above `0.01 rad`, endpoint position error above
+`0.002 m`, endpoint orientation error above `0.01 rad`, path-length ratio
+above `1.02`, non-monotonic progress, or endpoint overshoot.
+
+The physical task uses a collision-mesh-calibrated
+`grasp_height_offset: 0.018 m`. This places `assembly_tcp` above the cylinder
+center while leaving the canonical TCP fixed at the symmetric finger-pad
+midpoint. A deterministic `0.005–0.030 m` sweep found `0.018 m` to be the
+smallest 1 mm candidate with at least `0.005 m` clearance from every
+non-finger collision link. `pre_grasp_height_offset: 0.218 m` preserves the
+`0.20 m` approach, and `lift_height_offset: 0.20 m` remains relative to the
+selected grasp pose.
+
+After LIN/FK validation, a second validator checks every grasp trajectory
+waypoint against the frozen PlanningScene and its exact ACM. It rejects any
+target collision with a non-finger robot link and requires at least `0.005 m`
+minimum disallowed-link clearance. At the final arm state it sweeps the real
+finger collision meshes inward and requires bilateral target contact with no
+hand or arm contact. This is a geometric feasibility check, not force control
+or proof of a physical grasp.
+
+Every planning attempt copies all six fresh poses into one immutable,
+timestamp-coherent snapshot. Trajectories remain local candidates until all
+six stages and the LIN geometry check succeed, so a failed attempt publishes
+no executable trajectory. Success publishes one trajectory per stage and
+then one volatile `/assembly_sequence_plan_lock_status` `locked` event with a
+single `plan_id`. Later pose updates are diagnosed and ignored; restarting the
+single-shot planner begins another episode.
+
+The physical executor requires that volatile lock, an exactly matching stage
+sequence, and all six trajectories. DDS delivery order does not matter: the
+lock may precede the last trajectory or follow the complete set. At start the
+executor copies the buffered set into its immutable execution dictionary and
+includes the locked `plan_id` in execution statuses. The generic executor
+default remains `require_plan_lock=false` for non-physical compatibility.
+
+`physical_target_planning_scene_node` transforms the Gazebo-derived
+`/target_pose` into `panda_link0` and applies `target_object` as a MoveIt
+cylinder with radius `0.035 m` and height `0.10 m`. Its ACM permits target
+contact with exactly `panda_leftfinger` and `panda_rightfinger`; contact with
+the hand, TCP, and all arm links remains collision-checked. On plan lock it
+retains the last applied scene pose and stops applying later target updates.
+This freezes only the planning-scene snapshot: it does not alter, attach, or
+freeze the actual Gazebo model or its physics.
+
+The ACM also retains one unrelated physical-mount allowance between
+`panda_link0` and `work_table`, whose collision meshes overlap at the fixed
+base/table interface. This does not broaden the target-object allowlist.
+
+These contracts prove a bounded, collision-aware grasp approach and a
+single planner/executor generation. They do not prove gripper contact, a
+successful grasp or lift, placement, or socket insertion. Payload attachment
+and final Gazebo-state placement verification remain future work.
+
 It subscribes to `moveit_msgs/msg/RobotTrajectory` stages on:
 
 - `/pre_grasp_trajectory`
@@ -183,14 +252,28 @@ The physical public pose meanings are:
   desired `assembly_tcp` poses in `panda_link0`.
 
 The cylinder model pose is its center and its length is `0.10 m`. The full
-physical launch uses `target_reference_z_offset:=0.0`, and the physical task
-profile uses `grasp_height_offset: 0.0`, so the grasp TCP Z equals the observed
-cylinder-center Z. Pre-grasp and lift remain `0.20 m` above that center. The
+physical launch uses `target_reference_z_offset:=0.0`. The physical task
+profile raises the grasp TCP `0.018 m` above the observed cylinder center for
+measured hand clearance, while preserving enough cylinder/finger axial
+overlap for bilateral mesh contact. Pre-grasp remains `0.20 m` above the
+selected grasp pose, and lift remains a `0.20 m` relative displacement. The
 fixed socket's `socket_z: 0.10` is also an object/TCP center and its physical
 `place_height_offset` is `0.0`. Generic visual and plan-only profiles retain
 their previous defaults. The physical planning wrapper uses `0.005 m` and
-`0.03 rad` planning tolerances, below the independent `0.02 m` and `0.10 rad`
+`0.005 rad` planning tolerances. The tighter physical orientation tolerance
+ensures the actual pre-grasp endpoint can seed the independently validated
+`0.01 rad` LIN orientation bound. These remain below the independent `0.02 m`
+and `0.10 rad`
 runtime acceptance tolerances; generic planner defaults remain unchanged.
+
+Run the deterministic collision calibration with:
+
+```bash
+python3 scripts/calibrate_physical_grasp_clearance.py
+```
+
+The command preserves a complete candidate table and the selected result
+under `runs/grasp_clearance_<timestamp>/`.
 
 The MoveIt planner nodes remain plan-only: their status messages retain
 `execution=false`, and they only publish six `RobotTrajectory` messages. The

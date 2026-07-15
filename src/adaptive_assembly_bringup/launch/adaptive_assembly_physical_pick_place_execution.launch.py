@@ -89,6 +89,7 @@ def generate_launch_description() -> LaunchDescription:
         'target_object_raw_pose_topic': '/gazebo_target_object_pose_raw',
         'close_after_stage': 'grasp',
         'open_after_stage': 'place',
+        'plan_lock_status_topic': '/assembly_sequence_plan_lock_status',
     }
     bool_arguments = {
         'send_arm_goals': 'true',
@@ -114,6 +115,7 @@ def generate_launch_description() -> LaunchDescription:
         'require_object_pose': 'true',
         'require_target_object_contact': 'true',
         'require_target_entity_exact_match': 'false',
+        'require_plan_lock': 'true',
     }
     float_arguments = {
         'wait_for_arm_controller_sec': '5.0',
@@ -126,6 +128,7 @@ def generate_launch_description() -> LaunchDescription:
         'max_slip_distance_m': '0.025',
         'pose_stale_timeout_sec': '1.0',
         'start_state_tolerance': '0.05',
+        'plan_lock_timeout_sec': '10.0',
     }
 
     declarations = [
@@ -164,6 +167,7 @@ def generate_launch_description() -> LaunchDescription:
         'physical_grasp_preflight_status_topic',
         'close_after_stage',
         'open_after_stage',
+        'plan_lock_status_topic',
     )
     executor_parameters = {
         name: LaunchConfiguration(name)

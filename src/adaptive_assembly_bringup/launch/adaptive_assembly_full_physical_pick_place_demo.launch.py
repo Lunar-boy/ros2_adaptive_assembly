@@ -193,7 +193,7 @@ def generate_launch_description() -> LaunchDescription:
                     'pre_grasp,grasp,lift,pre_place,place,retreat'
                 ),
                 'position_tolerance': '0.005',
-                'orientation_tolerance': '0.03',
+                'orientation_tolerance': '0.005',
             }.items(),
         ),
         IncludeLaunchDescription(
