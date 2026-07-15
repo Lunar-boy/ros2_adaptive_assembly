@@ -24,15 +24,6 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 
-add_executable(pre_grasp_planning_node src/pre_grasp_planning_node.cpp)
-ament_target_dependencies(
-  pre_grasp_planning_node
-  rclcpp
-  geometry_msgs
-  std_msgs
-  moveit_ros_planning_interface
-  moveit_msgs
-)
 
 add_executable(
   panda_pre_grasp_pose_adapter_node
@@ -87,17 +78,6 @@ ament_target_dependencies(
   shape_msgs
 )
 
-add_executable(dynamic_target_scene_node src/dynamic_target_scene_node.cpp)
-ament_target_dependencies(
-  dynamic_target_scene_node
-  rclcpp
-  geometry_msgs
-  std_msgs
-  moveit_ros_planning_interface
-  moveit_msgs
-  shape_msgs
-)
-
 add_executable(planning_scene_audit_node src/planning_scene_audit_node.cpp)
 ament_target_dependencies(
   planning_scene_audit_node
@@ -109,12 +89,10 @@ ament_target_dependencies(
 
 install(
   TARGETS
-    pre_grasp_planning_node
     panda_pre_grasp_pose_adapter_node
     panda_assembly_pose_adapter_node
     assembly_sequence_planning_node
     static_planning_scene_node
-    dynamic_target_scene_node
     planning_scene_audit_node
   DESTINATION lib/${PROJECT_NAME}
 )

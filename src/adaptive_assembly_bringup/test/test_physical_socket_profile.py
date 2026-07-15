@@ -4,7 +4,9 @@ import ast
 import importlib.util
 from pathlib import Path
 
+from launch import LaunchContext
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.utilities import perform_substitutions
 
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
@@ -27,33 +29,8 @@ def _declaration(description, name):
     )
 
 
-def _launch_includes_params_file(filename):
-    description = _load_launch(filename)
-    return any(
-        'params_file' in dict(action.launch_arguments)
-        for action in description.entities
-        if isinstance(action, IncludeLaunchDescription)
-    )
-
-
 def _source_tree(filename):
-    return ast.parse((LAUNCH_DIR / filename).read_text())
-
-
-def _declares_default_variable(filename, argument, variable):
-    for node in ast.walk(_source_tree(filename)):
-        if not isinstance(node, ast.Call):
-            continue
-        if getattr(node.func, 'id', None) != 'DeclareLaunchArgument':
-            continue
-        if not node.args or getattr(node.args[0], 'value', None) != argument:
-            continue
-        for keyword in node.keywords:
-            if keyword.arg == 'default_value' and getattr(
-                keyword.value, 'id', None
-            ) == variable:
-                return True
-    return False
+    return ast.parse((LAUNCH_DIR / filename).read_text(encoding='utf-8'))
 
 
 def _references_profile(filename):
@@ -64,60 +41,84 @@ def _references_profile(filename):
     )
 
 
-def test_physical_chain_propagates_an_overridable_params_file():
-    """Route the physical default profile through every nested task wrapper."""
-    chain = (
-        'adaptive_assembly_full_physical_pick_place_demo.launch.py',
-        'adaptive_assembly_physical_pick_place_execution.launch.py',
-        'adaptive_assembly_panda_sequence_planning_reachable.launch.py',
-        'adaptive_assembly_panda_sequence_planning_demo.launch.py',
-        'adaptive_assembly_panda_planning_demo.launch.py',
-        'adaptive_assembly_panda_demo.launch.py',
-        'adaptive_assembly_pipeline.launch.py',
+def _default_text(description, name):
+    return perform_substitutions(
+        LaunchContext(), _declaration(description, name).default_value
     )
-    for filename in chain:
+
+
+def _node_parameter_names(filename):
+    """Return names referenced by each Node parameters expression."""
+    parameter_names = []
+    for node in ast.walk(_source_tree(filename)):
+        if not isinstance(node, ast.Call):
+            continue
+        if getattr(node.func, 'id', None) != 'Node':
+            continue
+        parameters = next(
+            (keyword.value for keyword in node.keywords
+             if keyword.arg == 'parameters'),
+            None,
+        )
+        if parameters is not None:
+            parameter_names.append({
+                child.id for child in ast.walk(parameters)
+                if isinstance(child, ast.Name)
+            })
+    return parameter_names
+
+
+def test_physical_profile_is_declared_and_forwarded_to_both_stacks():
+    """Forward one overridable physical profile to planning and execution."""
+    filenames = (
+        'adaptive_assembly_full_physical_pick_place_demo.launch.py',
+        'adaptive_assembly_physical_planning.launch.py',
+        'adaptive_assembly_physical_pick_place_execution.launch.py',
+    )
+
+    for filename in filenames:
         description = _load_launch(filename)
         _declaration(description, 'params_file')
-    for filename in chain[:-1]:
-        assert _launch_includes_params_file(filename)
+
+    full_description = _load_launch(
+        'adaptive_assembly_full_physical_pick_place_demo.launch.py'
+    )
+    include_arguments = [
+        dict(action.launch_arguments)
+        for action in full_description.entities
+        if isinstance(action, IncludeLaunchDescription)
+    ]
+
+    profile_consumers = [
+        arguments for arguments in include_arguments
+        if 'params_file' in arguments
+    ]
+    assert len(profile_consumers) == 2
+    assert any('end_effector_link' in item for item in profile_consumers)
+    assert any(
+        item.get('target_object_gazebo_pose_topic')
+        == '/model/target_object/pose'
+        for item in profile_consumers
+    )
+
+    for filename in filenames[1:]:
+        assert any(
+            'params_file' in names
+            for names in _node_parameter_names(filename)
+        )
 
 
-def test_only_physical_launches_reference_the_physical_profile():
-    """Leave generic and plan-only launch defaults on their existing profiles."""
+def test_all_physical_launches_default_to_the_physical_profile():
+    """Use the physical task profile in every physical launch entrypoint."""
     physical_launches = (
         'adaptive_assembly_full_physical_pick_place_demo.launch.py',
+        'adaptive_assembly_physical_planning.launch.py',
         'adaptive_assembly_physical_pick_place_execution.launch.py',
     )
-    nonphysical_launches = (
-        'adaptive_assembly_panda_sequence_planning_reachable.launch.py',
-        'adaptive_assembly_panda_sequence_planning_demo.launch.py',
-        'adaptive_assembly_panda_planning_demo.launch.py',
-        'adaptive_assembly_panda_demo.launch.py',
-        'adaptive_assembly_pipeline.launch.py',
-    )
+
     for filename in physical_launches:
         assert _references_profile(filename)
-        assert _declares_default_variable(
-            filename, 'params_file', 'physical_params_file'
+        default = _default_text(_load_launch(filename), 'params_file')
+        assert default.endswith(
+            'adaptive_assembly_physical_pick_place_params.yaml'
         )
-    for filename in nonphysical_launches:
-        assert not _references_profile(filename)
-
-        tree = _source_tree(filename)
-        assert any(
-            isinstance(node, ast.Call)
-            and getattr(node.func, 'id', None) == 'DeclareLaunchArgument'
-            for node in ast.walk(tree)
-        )
-
-
-def test_reachable_profile_remains_the_nonphysical_default():
-    """Preserve the reachable wrapper's existing parameter-file default."""
-    description = _load_launch(
-        'adaptive_assembly_panda_sequence_planning_reachable.launch.py'
-    )
-    _declaration(description, 'params_file')
-    assert _declares_default_variable(
-        'adaptive_assembly_panda_sequence_planning_reachable.launch.py',
-        'params_file', 'reachable_params'
-    )

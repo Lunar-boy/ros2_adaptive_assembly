@@ -29,11 +29,6 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'dry_run_sequence_executor_node = '
-            'adaptive_assembly_execution.dry_run_sequence_executor_node:main',
-            'ros2_control_sequence_executor_node = '
-            'adaptive_assembly_execution.'
-            'ros2_control_sequence_executor_node:main',
             'physical_pick_place_executor_node = '
             'adaptive_assembly_execution.'
             'physical_pick_place_executor_node:main',
@@ -45,15 +40,6 @@ setup(
             'gazebo_grasp_contact_status_node:main',
             'grasp_verifier_node = '
             'adaptive_assembly_execution.grasp_verifier_node:main',
-            'simulated_follow_joint_trajectory_server_node = '
-            'adaptive_assembly_execution.'
-            'simulated_follow_joint_trajectory_server_node:main',
-            'wait_for_gazebo_controller_ready_node = '
-            'adaptive_assembly_execution.'
-            'wait_for_gazebo_controller_ready_node:main',
-            'wait_for_gazebo_controller_ready_status_node = '
-            'adaptive_assembly_execution.'
-            'wait_for_gazebo_controller_ready_status_node:main',
         ],
     },
 )

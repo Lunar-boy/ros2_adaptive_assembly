@@ -62,8 +62,14 @@ The supported entry point is:
 adaptive_assembly_full_physical_pick_place_demo.launch.py
   -> adaptive_assembly_panda_gazebo.launch.py
   -> gazebo_target_pose_adapter.launch.py
+  -> adaptive_assembly_physical_planning.launch.py
+       -> assembly_task_node
+       -> move_group
+       -> static_planning_scene_node
+       -> planning_scene_audit_node
+       -> six Panda pose-adapter nodes
+       -> assembly_sequence_planning_node
   -> adaptive_assembly_physical_pick_place_execution.launch.py
-       -> adaptive_assembly_panda_sequence_planning_reachable.launch.py
        -> gripper_action_bridge_node
        -> gazebo_grasp_contact_status_node
        -> grasp_verifier_node

@@ -72,8 +72,8 @@ def test_physical_demo_model_sources_match_the_expected_parity_contract():
         BRINGUP_LAUNCH
         / 'adaptive_assembly_physical_pick_place_execution.launch.py'
     )
-    panda_demo = (
-        BRINGUP_LAUNCH / 'adaptive_assembly_panda_demo.launch.py'
+    physical_planning = (
+        BRINGUP_LAUNCH / 'adaptive_assembly_physical_planning.launch.py'
     )
     gazebo_launch = (
         SIM_LAUNCH / 'adaptive_assembly_panda_gazebo.launch.py'
@@ -85,21 +85,21 @@ def test_physical_demo_model_sources_match_the_expected_parity_contract():
     assert 'adaptive_assembly_physical_pick_place_execution.launch.py' in (
         _assignment_strings(full_demo, 'execution_launch')
     )
-    assert 'adaptive_assembly_panda_sequence_planning_reachable.launch.py' in (
-        _assignment_strings(physical_execution, 'reachable_sequence_launch')
+    assert 'adaptive_assembly_physical_planning.launch.py' in (
+        _assignment_strings(full_demo, 'planning_launch')
     )
 
-    builder = _find_call(panda_demo, 'MoveItConfigsBuilder')
+    builder = _find_call(physical_planning, 'MoveItConfigsBuilder')
     assert isinstance(builder.args[0], ast.Constant)
     assert builder.args[0].value == 'moveit_resources_panda'
-    robot_description = _find_call(panda_demo, 'robot_description')
+    robot_description = _find_call(physical_planning, 'robot_description')
     file_path = next(
         item for item in robot_description.keywords if item.arg == 'file_path'
     ).value
     assert isinstance(file_path, ast.Name)
     assert file_path.id == 'canonical_panda_xacro'
     assert {'adaptive_assembly_sim', 'panda.urdf.xacro'}.issubset(
-        _assignment_strings(panda_demo, 'canonical_panda_xacro')
+        _assignment_strings(physical_planning, 'canonical_panda_xacro')
     )
 
     assert 'adaptive_assembly_sim' in _assignment_strings(
@@ -113,6 +113,8 @@ def test_physical_demo_model_sources_match_the_expected_parity_contract():
     physical_execution_text = physical_execution.read_text(encoding='utf-8')
     assert 'adaptive_assembly_panda_demo.launch.py' not in full_demo_text
     assert 'adaptive_assembly_panda_demo.launch.py' not in physical_execution_text
+    assert 'launch_reachable_sequence' not in full_demo_text
+    assert 'launch_reachable_sequence' not in physical_execution_text
 
 
 def test_gazebo_wrapper_includes_canonical_description_without_arm_chain():

@@ -3,12 +3,10 @@
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
-    IncludeLaunchDescription,
     LogInfo,
     OpaqueFunction,
 )
 from launch.conditions import IfCondition
-from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
@@ -35,9 +33,7 @@ def _warn_if_non_physical_world_marker(context, *args, **kwargs):
 
 
 def generate_launch_description() -> LaunchDescription:
-    """Start the PR65 planner, PR63 bridge, and PR66 executor as requested."""
-    stage_names = LaunchConfiguration('stage_names')
-    launch_reachable_sequence = LaunchConfiguration('launch_reachable_sequence')
+    """Start physical execution, contact, pose, verification, and executor nodes."""
     launch_gripper_bridge = LaunchConfiguration('launch_gripper_bridge')
     launch_contact_bridge = LaunchConfiguration('launch_contact_bridge')
     launch_contact_status_node = LaunchConfiguration('launch_contact_status_node')
@@ -46,29 +42,14 @@ def generate_launch_description() -> LaunchDescription:
     launch_physical_grasp_preflight = LaunchConfiguration(
         'launch_physical_grasp_preflight'
     )
-    use_standard_panda_demo = LaunchConfiguration('use_standard_panda_demo')
-    use_sim_time = LaunchConfiguration('use_sim_time')
-    launch_fake_object_pose_node = LaunchConfiguration(
-        'launch_fake_object_pose_node'
-    )
-
-    reachable_sequence_launch = PathJoinSubstitution([
-        FindPackageShare('adaptive_assembly_bringup'),
-        'launch',
-        'adaptive_assembly_panda_sequence_planning_reachable.launch.py',
-    ])
     physical_params_file = PathJoinSubstitution([
         FindPackageShare('adaptive_assembly_bringup'),
         'config',
         'adaptive_assembly_physical_pick_place_params.yaml',
     ])
     params_file = LaunchConfiguration('params_file')
-    static_planning_scene_params_file = LaunchConfiguration(
-        'static_planning_scene_params_file'
-    )
 
     string_arguments = {
-        'end_effector_link': 'assembly_tcp',
         'stage_names': 'pre_grasp,grasp,lift,pre_place,place,retreat',
         'pre_grasp_trajectory_topic': '/pre_grasp_trajectory',
         'grasp_trajectory_topic': '/grasp_trajectory',
@@ -117,14 +98,12 @@ def generate_launch_description() -> LaunchDescription:
         'require_panda_joints': 'true',
         'require_joint_state': 'true',
         'simulated_execution_only': 'true',
-        'launch_reachable_sequence': 'true',
         'launch_gripper_bridge': 'true',
         'launch_contact_bridge': 'true',
         'launch_contact_status_node': 'true',
         'launch_grasp_verifier': 'true',
         'launch_object_pose_observer': 'true',
         'launch_physical_grasp_preflight': 'true',
-        'use_standard_panda_demo': 'false',
         'use_sim_time': 'false',
         'require_physical_grasp_preflight': 'true',
         'require_grasp_verification': 'true',
@@ -154,43 +133,13 @@ def generate_launch_description() -> LaunchDescription:
             **string_arguments, **bool_arguments, **float_arguments
         }.items()
     ]
-    declarations.append(DeclareLaunchArgument(
-        'position_tolerance',
-        default_value='0.005',
-        description=(
-            'Physical MoveIt position tolerance, kept below the runtime '
-            'assembly_tcp acceptance tolerance.'
-        ),
-    ))
-    declarations.append(DeclareLaunchArgument(
-        'orientation_tolerance',
-        default_value='0.03',
-        description=(
-            'Physical MoveIt orientation tolerance, kept below the runtime '
-            'assembly_tcp acceptance tolerance.'
-        ),
-    ))
-    declarations.append(DeclareLaunchArgument(
-        'launch_fake_object_pose_node',
-        default_value='true',
-        description=(
-            'Whether the nested adaptive pipeline starts fake perception.'
-        ),
-    ))
+
     declarations.append(DeclareLaunchArgument(
         'params_file',
         default_value=physical_params_file,
         description=(
             'Task parameter YAML for physical pick-place placement at the '
             'Gazebo assembly socket.'
-        ),
-    ))
-    declarations.append(DeclareLaunchArgument(
-        'static_planning_scene_params_file',
-        default_value='',
-        description=(
-            'Optional static PlanningScene parameter YAML forwarded to the '
-            'nested planning launch.'
         ),
     ))
 
@@ -222,14 +171,12 @@ def generate_launch_description() -> LaunchDescription:
     executor_parameters.update({
         name: _typed_value(name, bool) for name in bool_arguments
         if name not in (
-            'launch_reachable_sequence',
             'launch_gripper_bridge',
             'launch_contact_bridge',
             'launch_contact_status_node',
             'launch_grasp_verifier',
             'launch_object_pose_observer',
             'launch_physical_grasp_preflight',
-            'use_standard_panda_demo',
             'require_both_contacts',
             'require_gripper_closed',
             'require_object_pose',
@@ -338,45 +285,6 @@ def generate_launch_description() -> LaunchDescription:
             'launch_grasp_verifier. Real hardware execution is unsupported.'
         )),
         OpaqueFunction(function=_warn_if_non_physical_world_marker),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(reachable_sequence_launch),
-            condition=IfCondition(launch_reachable_sequence),
-            launch_arguments={
-                'stage_names': stage_names,
-                'end_effector_link': LaunchConfiguration('end_effector_link'),
-                'orientation_tolerance': LaunchConfiguration(
-                    'orientation_tolerance'
-                ),
-                'position_tolerance': LaunchConfiguration(
-                    'position_tolerance'
-                ),
-                'pre_grasp_trajectory_topic': LaunchConfiguration(
-                    'pre_grasp_trajectory_topic'
-                ),
-                'grasp_trajectory_topic': LaunchConfiguration(
-                    'grasp_trajectory_topic'
-                ),
-                'lift_trajectory_topic': LaunchConfiguration(
-                    'lift_trajectory_topic'
-                ),
-                'pre_place_trajectory_topic': LaunchConfiguration(
-                    'pre_place_trajectory_topic'
-                ),
-                'place_trajectory_topic': LaunchConfiguration(
-                    'place_trajectory_topic'
-                ),
-                'retreat_trajectory_topic': LaunchConfiguration(
-                    'retreat_trajectory_topic'
-                ),
-                'use_standard_panda_demo': use_standard_panda_demo,
-                'use_sim_time': use_sim_time,
-                'launch_fake_object_pose_node': launch_fake_object_pose_node,
-                'params_file': params_file,
-                'static_planning_scene_params_file': (
-                    static_planning_scene_params_file
-                ),
-            }.items(),
-        ),
         Node(
             package='adaptive_assembly_manipulation',
             executable='gripper_action_bridge_node',
