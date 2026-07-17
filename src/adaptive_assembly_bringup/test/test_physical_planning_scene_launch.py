@@ -89,7 +89,8 @@ def test_dedicated_planning_launch_starts_required_nodes_directly():
     assert executables.count('static_planning_scene_node') == 1
     assert executables.count('planning_scene_audit_node') == 1
     assert executables.count('panda_pre_grasp_pose_adapter_node') == 6
-    assert executables.count('assembly_sequence_planning_node') == 1
+    assert executables.count('assembly_sequence_planning_node') == 2
+    assert executables.count('payload_planning_scene_manager_node') == 1
     assert not any(
         isinstance(entity, IncludeLaunchDescription)
         for entity in description.entities

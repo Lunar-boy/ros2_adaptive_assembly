@@ -33,8 +33,8 @@ END_EFFECTOR_LINK = 'assembly_tcp'
 STATUS_TOPICS = (
     '/gazebo_target_object_pose_status',
     '/physical_grasp_preflight_status',
-    '/assembly_sequence_planning_status',
-    '/assembly_sequence_trajectory_status',
+    '/grasp_planning_status',
+    '/grasp_trajectory_status',
     '/physical_pick_place_stage_status',
     '/physical_pick_place_execution_status',
 )
@@ -44,7 +44,7 @@ MILESTONES = (
     'gazebo_target_pose_available',
     'target_pose_semantics_valid',
     'physical_grasp_preflight_success',
-    'six_nonempty_trajectories_planned',
+    'two_grasp_trajectories_planned',
     'pre_grasp_goal_accepted',
     'pre_grasp_arm_stage_succeeded',
     'pre_grasp_tcp_reached',
@@ -266,11 +266,11 @@ class TcpContractChecker(Node):
                 self.preflight_success = True
             elif event == 'failure':
                 self.failure_reason = 'physical_grasp_preflight_failed'
-        elif topic == '/assembly_sequence_planning_status':
+        elif topic == '/grasp_planning_status':
             if event == 'success':
                 valid_success = (
-                    fields.get('planned_stage_count') == '6'
-                    and fields.get('requested_stage_count') == '6'
+                    fields.get('planned_stage_count') == '2'
+                    and fields.get('requested_stage_count') == '2'
                     and fields.get('end_effector_link') == END_EFFECTOR_LINK
                 )
                 self.planning_success = self.planning_success or valid_success
@@ -469,7 +469,7 @@ class TcpContractChecker(Node):
             self.target_available and self.gazebo_pose is not None,
             self.target_semantics_valid(),
             self.preflight_success,
-            self.planning_success and self.trajectories == set(STAGES),
+            self.planning_success and set(MEASURED_STAGES).issubset(self.trajectories),
             self.goal_accepted['pre_grasp'],
             self.stage_success['pre_grasp'],
             self.stage_reached('pre_grasp'),
@@ -510,7 +510,7 @@ def terminal_reason(checker: TcpContractChecker) -> str:
         'gazebo_target_pose_available': 'missing_target_pose',
         'target_pose_semantics_valid': 'target_pose_semantics_mismatch',
         'physical_grasp_preflight_success': 'missing_preflight_success',
-        'six_nonempty_trajectories_planned': 'missing_trajectories',
+        'two_grasp_trajectories_planned': 'missing_grasp_trajectories',
         'pre_grasp_goal_accepted': 'pre_grasp_goal_not_accepted',
         'pre_grasp_arm_stage_succeeded': 'pre_grasp_arm_stage_failed',
         'pre_grasp_tcp_reached': _tcp_failure(checker, 'pre_grasp'),

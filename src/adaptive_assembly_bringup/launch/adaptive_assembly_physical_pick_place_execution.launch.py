@@ -90,6 +90,10 @@ def generate_launch_description() -> LaunchDescription:
         'close_after_stage': 'grasp',
         'open_after_stage': 'place',
         'plan_lock_status_topic': '/assembly_sequence_plan_lock_status',
+        'grasp_plan_lock_status_topic': '/grasp_plan_lock_status',
+        'transport_plan_lock_status_topic': '/transport_plan_lock_status',
+        'payload_attachment_command_topic': '/payload_attachment_command',
+        'payload_attachment_status_topic': '/payload_attachment_status',
     }
     bool_arguments = {
         'send_arm_goals': 'true',
@@ -116,6 +120,7 @@ def generate_launch_description() -> LaunchDescription:
         'require_target_object_contact': 'true',
         'require_target_entity_exact_match': 'false',
         'require_plan_lock': 'true',
+        'two_phase_planning': 'true',
     }
     float_arguments = {
         'wait_for_arm_controller_sec': '5.0',
@@ -129,6 +134,7 @@ def generate_launch_description() -> LaunchDescription:
         'pose_stale_timeout_sec': '1.0',
         'start_state_tolerance': '0.05',
         'plan_lock_timeout_sec': '10.0',
+        'payload_operation_timeout_sec': '5.0',
     }
 
     declarations = [
@@ -168,6 +174,10 @@ def generate_launch_description() -> LaunchDescription:
         'close_after_stage',
         'open_after_stage',
         'plan_lock_status_topic',
+        'grasp_plan_lock_status_topic',
+        'transport_plan_lock_status_topic',
+        'payload_attachment_command_topic',
+        'payload_attachment_status_topic',
     )
     executor_parameters = {
         name: LaunchConfiguration(name)

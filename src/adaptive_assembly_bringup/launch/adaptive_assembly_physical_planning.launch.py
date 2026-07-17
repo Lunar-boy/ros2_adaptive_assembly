@@ -150,8 +150,7 @@ def generate_launch_description() -> LaunchDescription:
             default_value=(
                 'work_table,target_support,assembly_socket_base,'
                 'assembly_socket_left_wall,assembly_socket_right_wall,'
-                'assembly_socket_back_wall,assembly_socket_front_wall,'
-                'target_object'
+                'assembly_socket_back_wall,assembly_socket_front_wall'
             ),
         ),
         DeclareLaunchArgument(
@@ -224,7 +223,7 @@ def generate_launch_description() -> LaunchDescription:
                 'ready_topic': '/physical_target_planning_scene_ready',
                 'status_topic': '/physical_target_planning_scene_status',
                 'plan_lock_status_topic': (
-                    '/assembly_sequence_plan_lock_status'
+                    '/grasp_plan_lock_status'
                 ),
             },
         ],
@@ -242,30 +241,39 @@ def generate_launch_description() -> LaunchDescription:
             'audit_period_sec': 2.0,
             'status_topic': '/planning_scene_audit_status',
             'ready_topic': '/planning_scene_audit_ready',
+            'target_object_id': 'target_object',
         }],
     )
 
     adapters = [_pose_adapter(*stage) for stage in STAGES]
 
-    sequence_planner = Node(
+    common_planner_parameters = {
+        'planning_group': 'panda_arm',
+        'end_effector_link': LaunchConfiguration('end_effector_link'),
+        'planner_id': LaunchConfiguration('planner_id'),
+        'default_planning_pipeline_id': 'ompl',
+        'default_planner_id': LaunchConfiguration('planner_id'),
+        'num_planning_attempts': _typed('num_planning_attempts', int),
+        'planning_time_sec': _typed('planning_time_sec', float),
+        'position_tolerance': _typed('position_tolerance', float),
+        'orientation_tolerance': _typed('orientation_tolerance', float),
+        'lock_after_successful_sequence': True,
+        'publish_diagnostics': True,
+        'publish_trajectories': True,
+        'use_sim_time': _typed('use_sim_time', bool),
+    }
+
+    grasp_planner = Node(
         package='adaptive_assembly_planning',
         executable='assembly_sequence_planning_node',
-        name='assembly_sequence_planning_node',
+        name='grasp_sequence_planning_node',
         output='screen',
-        parameters=[params_file, {
+        parameters=[params_file, common_planner_parameters, {
             'pre_grasp_topic': '/panda_pre_grasp_pose',
             'grasp_topic': '/panda_grasp_pose',
-            'lift_topic': '/panda_lift_pose',
-            'pre_place_topic': '/panda_pre_place_pose',
-            'place_topic': '/panda_place_pose',
-            'retreat_topic': '/panda_retreat_pose',
-            'assembly_topic': '/panda_assembly_pose',
-            'stage_names_csv': LaunchConfiguration('stage_names'),
-            'planning_group': 'panda_arm',
-            'end_effector_link': LaunchConfiguration('end_effector_link'),
-            'planner_id': LaunchConfiguration('planner_id'),
-            'default_planning_pipeline_id': 'ompl',
-            'default_planner_id': LaunchConfiguration('planner_id'),
+            'stage_names_csv': 'pre_grasp,grasp',
+            'plan_phase': 'grasp',
+            'initial_plan_id': 0,
             'linear_stage_names_csv': 'grasp',
             'linear_planning_pipeline_id': (
                 'pilz_industrial_motion_planner'
@@ -291,48 +299,76 @@ def generate_launch_description() -> LaunchDescription:
             'grasp_approach_max_distance': 0.30,
             'grasp_approach_max_lateral_offset': 0.002,
             'grasp_approach_max_orientation_difference': 0.01,
-            'lock_after_successful_sequence': True,
             'require_dynamic_target_scene_ready': True,
             'dynamic_target_scene_ready_topic': (
                 '/physical_target_planning_scene_ready'
             ),
-            'plan_lock_status_topic': '/assembly_sequence_plan_lock_status',
-            'num_planning_attempts': _typed('num_planning_attempts', int),
-            'planning_time_sec': _typed('planning_time_sec', float),
-            'position_tolerance': _typed('position_tolerance', float),
-            'orientation_tolerance': _typed('orientation_tolerance', float),
+            'plan_lock_status_topic': '/grasp_plan_lock_status',
             'start_state_mode': 'fixed',
-            'publish_diagnostics': True,
-            'publish_trajectories': True,
-            'require_grasp_pose': False,
-            'require_place_sequence': False,
-            'use_sim_time': _typed('use_sim_time', bool),
-            'success_topic': '/assembly_sequence_plan_success',
-            'status_topic': '/assembly_sequence_planning_status',
-            'duration_topic': '/assembly_sequence_planning_duration_ms',
-            'stage_status_topic': '/assembly_sequence_stage_status',
-            'stage_success_topic': '/assembly_sequence_stage_success',
-            'stage_duration_topic': '/assembly_sequence_stage_duration_ms',
-            'trajectory_status_topic': '/assembly_sequence_trajectory_status',
+            'success_topic': '/grasp_plan_success',
+            'status_topic': '/grasp_planning_status',
+            'duration_topic': '/grasp_planning_duration_ms',
+            'stage_status_topic': '/grasp_stage_planning_status',
+            'stage_success_topic': '/grasp_stage_planning_success',
+            'stage_duration_topic': '/grasp_stage_planning_duration_ms',
+            'trajectory_status_topic': '/grasp_trajectory_status',
             'pre_grasp_trajectory_topic': LaunchConfiguration(
                 'pre_grasp_trajectory_topic'
             ),
             'grasp_trajectory_topic': LaunchConfiguration(
                 'grasp_trajectory_topic'
             ),
-            'lift_trajectory_topic': LaunchConfiguration(
-                'lift_trajectory_topic'
-            ),
-            'pre_place_trajectory_topic': LaunchConfiguration(
-                'pre_place_trajectory_topic'
-            ),
-            'place_trajectory_topic': LaunchConfiguration(
-                'place_trajectory_topic'
-            ),
-            'retreat_trajectory_topic': LaunchConfiguration(
-                'retreat_trajectory_topic'
-            ),
-            'assembly_trajectory_topic': '/assembly_trajectory',
+        }],
+    )
+
+    payload_manager = Node(
+        package='adaptive_assembly_planning',
+        executable='payload_planning_scene_manager_node',
+        name='payload_planning_scene_manager_node',
+        output='screen',
+        parameters=[moveit_config.robot_description, {
+            'use_sim_time': _typed('use_sim_time', bool),
+            'object_id': 'target_object',
+            'attachment_link': 'assembly_tcp',
+            'touch_links': 'panda_leftfinger,panda_rightfinger',
+            'planning_frame': 'panda_link0',
+            'gazebo_pose_topic': '/gazebo_target_object_pose',
+            'pose_freshness_timeout_sec': 0.5,
+        }],
+    )
+
+    transport_planner = Node(
+        package='adaptive_assembly_planning',
+        executable='assembly_sequence_planning_node',
+        name='transport_sequence_planning_node',
+        output='screen',
+        parameters=[params_file, common_planner_parameters, {
+            'lift_topic': '/panda_lift_pose',
+            'pre_place_topic': '/panda_pre_place_pose',
+            'place_topic': '/panda_place_pose',
+            'retreat_topic': '/panda_retreat_pose',
+            'stage_names_csv': 'lift,pre_place,place,retreat',
+            'plan_phase': 'transport',
+            'initial_plan_id': 1000000,
+            'linear_stage_names_csv': '',
+            'require_grasp_clearance_validation': False,
+            'require_dynamic_target_scene_ready': True,
+            'dynamic_target_scene_ready_topic': '/payload_attachment_ready',
+            'plan_lock_status_topic': '/transport_plan_lock_status',
+            'start_state_mode': 'current',
+            'require_fresh_current_start_state': True,
+            'current_start_state_freshness_sec': 0.5,
+            'success_topic': '/transport_plan_success',
+            'status_topic': '/transport_planning_status',
+            'duration_topic': '/transport_planning_duration_ms',
+            'stage_status_topic': '/transport_stage_planning_status',
+            'stage_success_topic': '/transport_stage_planning_success',
+            'stage_duration_topic': '/transport_stage_planning_duration_ms',
+            'trajectory_status_topic': '/transport_trajectory_status',
+            'lift_trajectory_topic': LaunchConfiguration('lift_trajectory_topic'),
+            'pre_place_trajectory_topic': LaunchConfiguration('pre_place_trajectory_topic'),
+            'place_trajectory_topic': LaunchConfiguration('place_trajectory_topic'),
+            'retreat_trajectory_topic': LaunchConfiguration('retreat_trajectory_topic'),
         }],
     )
 
@@ -340,8 +376,9 @@ def generate_launch_description() -> LaunchDescription:
         LogInfo(msg=(
             'Launching the dedicated physical planning stack directly: '
             'assembly task, MoveIt move_group, physical static PlanningScene, '
-            'PlanningScene audit, six Panda pose adapters, and six-stage '
-            'sequence planning. Fake perception and fake controllers are not '
+            'PlanningScene audit, six Panda pose adapters, and separately '
+            'locked grasp and payload-aware transport planning. Fake '
+            'perception and fake controllers are not '
             'started by this launch.'
         )),
         task_node,
@@ -350,5 +387,7 @@ def generate_launch_description() -> LaunchDescription:
         dynamic_target_scene,
         scene_audit,
         *adapters,
-        sequence_planner,
+        grasp_planner,
+        payload_manager,
+        transport_planner,
     ])

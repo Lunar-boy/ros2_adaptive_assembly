@@ -22,6 +22,7 @@
 #include <moveit_msgs/msg/robot_state.hpp>
 #include <moveit_msgs/msg/robot_trajectory.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/joint_state.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/float64.hpp>
 #include <std_msgs/msg/string.hpp>
@@ -51,6 +52,7 @@ public:
     "/assembly_sequence_trajectory_status")),
     plan_lock_status_topic_(param<std::string>("plan_lock_status_topic",
     "/assembly_sequence_plan_lock_status")),
+    plan_phase_(param<std::string>("plan_phase", "sequence")),
     publish_diagnostics_(param<bool>("publish_diagnostics", true)),
     publish_trajectories_(param<bool>("publish_trajectories", true)),
     lock_after_successful_sequence_(param<bool>("lock_after_successful_sequence", false)),
@@ -69,6 +71,8 @@ public:
     num_planning_attempts_(param<int>("num_planning_attempts", 1)),
     planning_time_sec_(param<double>("planning_time_sec", 5.0)),
     start_state_mode_(param<std::string>("start_state_mode", "current")),
+    require_fresh_current_start_state_(param<bool>("require_fresh_current_start_state", false)),
+    current_start_state_freshness_sec_(param<double>("current_start_state_freshness_sec", 0.5)),
     default_profile_{
       param<std::string>("default_planning_pipeline_id", "ompl"),
       param<std::string>("default_planner_id", param<std::string>("planner_id", "")),
@@ -100,12 +104,26 @@ public:
       param<double>("linear_overshoot_tolerance", 1.0e-3)},
     move_group_(node_, planning_group_)
   {
+    next_plan_id_ = static_cast<std::uint64_t>(param<int>("initial_plan_id", 0));
     validate_parameters();
     resolve_stage_names();
     linear_stage_names_ = split_csv(param<std::string>("linear_stage_names_csv", ""));
     configure_move_group_once();
     configure_planning_scene_monitor();
     create_publishers();
+    joint_state_subscription_ = node_->create_subscription<sensor_msgs::msg::JointState>(
+      param<std::string>("joint_state_topic", "/joint_states"), 20,
+      [this](const sensor_msgs::msg::JointState::SharedPtr message) {
+        if (message->name.size() == message->position.size() &&
+        std::all_of(message->position.begin(), message->position.end(), [](double value) {
+          return std::isfinite(value);
+          }))
+        {
+          latest_joint_state_ = *message;
+          latest_joint_state_time_ = node_->now();
+          try_plan_sequence();
+        }
+      });
     create_stages();
     if (grasp_clearance_config_.required) {
       scene_ready_timer_ = node_->create_wall_timer(
@@ -220,6 +238,9 @@ private:
     }
     if (start_state_mode_ != "current" && start_state_mode_ != "fixed") {
       throw std::invalid_argument("invalid_start_state_mode");
+    }
+    if (current_start_state_freshness_sec_ <= 0.0) {
+      throw std::invalid_argument("invalid_current_start_state_freshness");
     }
     if (grasp_clearance_config_.required &&
       (!(grasp_clearance_config_.minimum_disallowed_clearance >= 0.005) ||
@@ -348,11 +369,20 @@ private:
 
   bool inputs_ready() const
   {
-    return dynamic_scene_ready_ && clearance_scene_ready() &&
+    return dynamic_scene_ready_ && clearance_scene_ready() && current_start_state_ready() &&
            std::all_of(stages_.begin(), stages_.end(), [](const auto & s) {
                return s->latest_pose.has_value() &&
                       s->latest_pose_generation > s->consumed_generation;
       });
+  }
+
+  bool current_start_state_ready() const
+  {
+    if (start_state_mode_ != "current" || !require_fresh_current_start_state_) {return true;}
+    return latest_joint_state_.has_value() &&
+           (node_->now() - latest_joint_state_time_).seconds() >= 0.0 &&
+           (node_->now() - latest_joint_state_time_).seconds() <=
+           current_start_state_freshness_sec_;
   }
 
   bool clearance_scene_ready() const
@@ -396,9 +426,20 @@ private:
     move_group_.setMaxAccelerationScalingFactor(profile.max_acceleration_scaling_factor);
   }
 
-  void set_initial_start_state()
+  bool set_initial_start_state()
   {
-    if (start_state_mode_ == "current") {move_group_.setStartStateToCurrentState(); return;}
+    if (start_state_mode_ == "current") {
+      if (latest_joint_state_) {
+        moveit_msgs::msg::RobotState state;
+        state.joint_state = *latest_joint_state_;
+        state.is_diff = true;
+        move_group_.setStartState(state);
+        return true;
+      }
+      if (require_fresh_current_start_state_) {return false;}
+      move_group_.setStartStateToCurrentState();
+      return true;
+    }
     constexpr std::array<const char *, 7> names = {
       "panda_joint1", "panda_joint2", "panda_joint3", "panda_joint4",
       "panda_joint5", "panda_joint6", "panda_joint7"};
@@ -407,6 +448,7 @@ private:
     state.joint_state.name.assign(names.begin(), names.end());
     state.joint_state.position.assign(positions.begin(), positions.end());
     move_group_.setStartState(state);
+    return true;
   }
 
   std::optional<moveit_msgs::msg::RobotState> final_state(
@@ -480,7 +522,11 @@ private:
     geometry_msgs::msg::Pose pre_grasp_fk;
     bool have_pre_grasp_fk = false;
     double total_ms = 0.0;
-    set_initial_start_state();
+    if (!set_initial_start_state()) {
+      publish_failure(plan_id, stages_.front()->name, 0, 0.0,
+        "current_start_state_unavailable");
+      return;
+    }
 
     for (std::size_t i = 0; i < stages_.size(); ++i) {
       const auto & stage = *stages_[i];
@@ -706,7 +752,8 @@ private:
   {
     std_msgs::msg::String message;
     std::ostringstream out;
-    out << "event=" << event << ";mode=sequence_plan_lock;plan_id=" << plan_id
+    out << "event=" << event << ";mode=sequence_plan_lock;phase=" << plan_phase_
+        << ";plan_id=" << plan_id
         << ";stage_sequence=" << stage_sequence_ << ";snapshot_stamp_ns=" << snapshot_stamp_ns_
         << ";locked=" << (locked ? "true" : "false")
         << ";planned_stage_count=" << planned_count;
@@ -719,6 +766,7 @@ private:
   std::string success_topic_, status_topic_, duration_topic_, stage_status_topic_;
   std::string stage_success_topic_, stage_duration_topic_, trajectory_status_topic_;
   std::string plan_lock_status_topic_;
+  std::string plan_phase_;
   bool publish_diagnostics_, publish_trajectories_, lock_after_successful_sequence_;
   bool require_dynamic_target_scene_ready_, dynamic_scene_ready_{false};
   aap::GraspClearanceConfig grasp_clearance_config_;
@@ -726,6 +774,10 @@ private:
   int num_planning_attempts_;
   double planning_time_sec_;
   std::string start_state_mode_;
+  bool require_fresh_current_start_state_;
+  double current_start_state_freshness_sec_;
+  std::optional<sensor_msgs::msg::JointState> latest_joint_state_;
+  rclcpp::Time latest_joint_state_time_;
   aap::StagePlanningProfile default_profile_, linear_profile_;
   aap::SnapshotLimits snapshot_limits_;
   aap::LinearPathLimits linear_limits_;
@@ -748,6 +800,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr duration_publisher_,
     stage_duration_publisher_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr dynamic_scene_ready_subscription_;
+  rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_subscription_;
   rclcpp::TimerBase::SharedPtr scene_ready_timer_;
 };
 

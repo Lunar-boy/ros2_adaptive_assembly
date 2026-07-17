@@ -4,10 +4,10 @@
 import argparse
 import math
 import os
+from pathlib import Path
 import signal
 import subprocess
 import time
-from pathlib import Path
 from typing import Dict, List, Optional
 
 from ament_index_python.packages import get_package_share_directory
@@ -31,12 +31,13 @@ from std_msgs.msg import Bool, String
 
 ROOT = Path(__file__).resolve().parents[1]
 STAGES = ('pre_grasp', 'grasp', 'lift', 'pre_place', 'place', 'retreat')
+GRASP_STAGES = ('pre_grasp', 'grasp')
 PANDA_JOINTS = tuple(f'panda_joint{index}' for index in range(1, 8))
 STATUS_TOPICS = (
     '/gazebo_target_object_pose_status',
     '/physical_grasp_preflight_status',
-    '/assembly_sequence_planning_status',
-    '/assembly_sequence_trajectory_status',
+    '/grasp_planning_status',
+    '/grasp_trajectory_status',
     '/physical_pick_place_stage_status',
     '/physical_pick_place_execution_status',
     '/grasp_verification_status',
@@ -52,8 +53,8 @@ MILESTONE_NAMES = (
     'valid_panda_joint_states',
     'target_object_pose_available',
     'physical_grasp_preflight_success',
-    'six_stage_sequence_planning_success',
-    'six_non_empty_trajectories_received',
+    'grasp_generation_planning_success',
+    'two_grasp_trajectories_received',
     'physical_executor_entered_pre_grasp',
     'arm_follow_joint_trajectory_goal_accepted',
     'panda_arm_joint_motion_observed',
@@ -160,15 +161,15 @@ class ArmMotionChecker(Node):
                     'physical_preflight_failed:'
                     + fields.get('reason', 'unknown')
                 )
-        elif topic == '/assembly_sequence_planning_status':
+        elif topic == '/grasp_planning_status':
             self.planning_success = (
                 event == 'success'
-                and fields.get('planned_stage_count') == '6'
-                and fields.get('requested_stage_count') == '6'
+                and fields.get('planned_stage_count') == '2'
+                and fields.get('requested_stage_count') == '2'
             )
             if event == 'failure':
                 self.failure_reason = (
-                    'six_stage_planning_failed:'
+                    'grasp_generation_planning_failed:'
                     + fields.get(
                         'reason', fields.get('failed_stage', 'unknown')
                     )
@@ -289,7 +290,7 @@ class ArmMotionChecker(Node):
             self.target_pose_available and self.target_pose_received,
             self.preflight_success,
             self.planning_success,
-            set(self.trajectories) == set(STAGES),
+            set(GRASP_STAGES).issubset(self.trajectories),
             self.executor_pre_grasp,
             self.arm_goal_accepted,
             self.max_joint_delta >= self.motion_threshold,
@@ -358,9 +359,9 @@ def timeout_reason(checker: ArmMotionChecker) -> str:
         'valid_panda_joint_states': 'missing_valid_panda_joint_states',
         'target_object_pose_available': 'missing_target_pose',
         'physical_grasp_preflight_success': 'missing_preflight_success',
-        'six_stage_sequence_planning_success': 'missing_planning_success',
-        'six_non_empty_trajectories_received': 'missing_trajectories:'
-        + ','.join(sorted(set(STAGES) - set(checker.trajectories))),
+        'grasp_generation_planning_success': 'missing_grasp_planning_success',
+        'two_grasp_trajectories_received': 'missing_trajectories:'
+        + ','.join(sorted(set(GRASP_STAGES) - set(checker.trajectories))),
         'physical_executor_entered_pre_grasp': (
             'executor_never_entered_pre_grasp'
         ),

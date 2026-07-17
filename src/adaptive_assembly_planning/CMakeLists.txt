@@ -22,6 +22,7 @@ find_package(moveit_ros_planning_interface REQUIRED)
 find_package(moveit_ros_planning REQUIRED)
 find_package(moveit_msgs REQUIRED)
 find_package(shape_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(trajectory_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
@@ -80,6 +81,7 @@ ament_target_dependencies(
   assembly_sequence_planning_node
   rclcpp
   geometry_msgs
+  sensor_msgs
   std_msgs
   moveit_ros_planning_interface
   moveit_ros_planning
@@ -143,6 +145,16 @@ ament_target_dependencies(
   moveit_msgs
 )
 
+add_executable(
+  payload_planning_scene_manager_node
+  src/payload_planning_scene_manager_node.cpp
+)
+ament_target_dependencies(
+  payload_planning_scene_manager_node
+  rclcpp geometry_msgs sensor_msgs std_msgs moveit_ros_planning moveit_msgs shape_msgs
+  tf2 tf2_ros tf2_geometry_msgs
+)
+
 install(
   TARGETS
     grasp_clearance_validation
@@ -151,6 +163,7 @@ install(
     assembly_sequence_planning_node
     static_planning_scene_node
     planning_scene_audit_node
+    payload_planning_scene_manager_node
     physical_target_planning_scene_node
     grasp_clearance_calibration_node
   EXPORT export_${PROJECT_NAME}
@@ -182,6 +195,10 @@ if(BUILD_TESTING)
     test_grasp_clearance_calibration
     test/test_grasp_clearance_calibration.py
     TIMEOUT 60
+  )
+  ament_add_pytest_test(
+    test_payload_planning_contract
+    test/test_payload_planning_contract.py
   )
   ament_add_gtest(test_planning_contract test/test_planning_contract.cpp)
   target_include_directories(test_planning_contract PRIVATE include)

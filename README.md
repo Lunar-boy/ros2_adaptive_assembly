@@ -24,25 +24,6 @@ The task is complete only when the simulated Panda:
 
 The final condition must be verified from Gazebo-observed object state. Planning success, controller success, gripper success, or executor completion alone is not end-to-end task success.
 
-## Current status
-
-| Capability | Status |
-|---|---|
-| Physical Gazebo workcell with Panda, support, dynamic target, and socket | Implemented |
-| Gazebo target-object pose observation | Implemented |
-| Six-stage MoveIt planning | Implemented; grasp uses validated Pilz `LIN` |
-| Immutable physical plan generation | Implemented; one volatile plan lock |
-| Dynamic target collision object | Implemented; cylinder, finger-only ACM |
-| Grasp hand-clearance validation | Implemented; real meshes, 5 mm minimum |
-| Gazebo `ros2_control` arm execution | Implemented |
-| Simulated gripper close/open | Implemented |
-| Bilateral contact-aware close handling | Implemented |
-| Grasp verification | Implemented |
-| Lift/slip verification | Implemented |
-| Final post-release socket insertion verification | **Not yet implemented** |
-
-The current executor publishes `/physical_pick_place_execution_success`. That topic means the configured execution sequence completed; it does **not** prove that the released object remains inside the socket.
-
 ## Runtime sequence
 
 ```text
@@ -74,10 +55,10 @@ assembly_task_node
         +--> retreat
         |
         v
-Panda pose adapters and MoveIt sequence planning
+Panda pose adapters and grasp-generation planning
         |
         v
-six RobotTrajectory topics
+pre_grasp + grasp trajectories and grasp plan lock
         |
         v
 physical_pick_place_executor_node
@@ -86,17 +67,21 @@ physical_pick_place_executor_node
         +--> initial gripper open before pre_grasp
         +--> gripper close after grasp
         +--> grasp verification
+        +--> world target -> attached payload
+        +--> payload-aware transport-generation planning and lock
         +--> lift/slip verification
         +--> gripper open after place
+        +--> attached payload -> Gazebo-observed world target
         +--> retreat
 ```
 
 The default stage order is:
 
 ```text
-initial open -> pre_grasp -> grasp -> close -> verify grasp
-          -> lift -> verify lift/slip
-          -> pre_place -> place -> open -> retreat
+initial open -> pre_grasp -> grasp -> close -> verify grasp -> attach
+          -> plan lift/pre_place/place/retreat from current state
+          -> lift -> verify lift/slip -> pre_place -> place -> open
+          -> detach using fresh Gazebo pose -> retreat
 ```
 
 The canonical MoveIt Panda description retains its standard second-finger

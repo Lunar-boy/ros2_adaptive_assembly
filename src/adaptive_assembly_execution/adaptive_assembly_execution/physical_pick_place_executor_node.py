@@ -125,6 +125,12 @@ class PhysicalPickPlaceExecutorNode(Node):
             'plan_lock_status_topic', '/assembly_sequence_plan_lock_status'
         )
         self.declare_parameter('plan_lock_timeout_sec', 10.0)
+        self.declare_parameter('two_phase_planning', False)
+        self.declare_parameter('grasp_plan_lock_status_topic', '/grasp_plan_lock_status')
+        self.declare_parameter('transport_plan_lock_status_topic', '/transport_plan_lock_status')
+        self.declare_parameter('payload_attachment_command_topic', '/payload_attachment_command')
+        self.declare_parameter('payload_attachment_status_topic', '/payload_attachment_status')
+        self.declare_parameter('payload_operation_timeout_sec', 5.0)
 
         self._stage_names = parse_stage_names(
             str(self.get_parameter('stage_names').value)
@@ -248,6 +254,24 @@ class PhysicalPickPlaceExecutorNode(Node):
         self._plan_lock_timeout_sec = float(
             self.get_parameter('plan_lock_timeout_sec').value
         )
+        self._two_phase_planning = bool(
+            self.get_parameter('two_phase_planning').value
+        )
+        self._grasp_plan_lock_status_topic = str(
+            self.get_parameter('grasp_plan_lock_status_topic').value
+        )
+        self._transport_plan_lock_status_topic = str(
+            self.get_parameter('transport_plan_lock_status_topic').value
+        )
+        self._payload_attachment_command_topic = str(
+            self.get_parameter('payload_attachment_command_topic').value
+        )
+        self._payload_attachment_status_topic = str(
+            self.get_parameter('payload_attachment_status_topic').value
+        )
+        self._payload_operation_timeout_sec = float(
+            self.get_parameter('payload_operation_timeout_sec').value
+        )
         self._expected_joints = [
             f'{self._expected_joint_prefix}{index}' for index in range(1, 8)
         ]
@@ -282,6 +306,9 @@ class PhysicalPickPlaceExecutorNode(Node):
         )
         self._verification_request_publisher = self.create_publisher(
             String, self._grasp_verification_request_topic, 10
+        )
+        self._payload_command_publisher = self.create_publisher(
+            String, self._payload_attachment_command_topic, 10
         )
         self.create_subscription(
             String,
@@ -324,6 +351,10 @@ class PhysicalPickPlaceExecutorNode(Node):
         self.create_subscription(
             JointState, self._joint_state_topic, self._joint_state_callback, 10
         )
+        self.create_subscription(
+            String, self._payload_attachment_status_topic,
+            self._payload_status_callback, retained_qos,
+        )
         self._trajectory_subscriptions = [
             self.create_subscription(
                 RobotTrajectory,
@@ -340,12 +371,22 @@ class PhysicalPickPlaceExecutorNode(Node):
             reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.VOLATILE,
         )
-        self._plan_lock_subscription = self.create_subscription(
-            String,
-            self._plan_lock_status_topic,
-            self._plan_lock_status_callback,
-            volatile_qos,
-        )
+        if self._two_phase_planning:
+            self._grasp_plan_lock_subscription = self.create_subscription(
+                String, self._grasp_plan_lock_status_topic,
+                lambda msg: self._phase_plan_lock_status_callback('grasp', msg),
+                volatile_qos,
+            )
+            self._transport_plan_lock_subscription = self.create_subscription(
+                String, self._transport_plan_lock_status_topic,
+                lambda msg: self._phase_plan_lock_status_callback('transport', msg),
+                volatile_qos,
+            )
+        else:
+            self._plan_lock_subscription = self.create_subscription(
+                String, self._plan_lock_status_topic,
+                self._plan_lock_status_callback, volatile_qos,
+            )
 
         self._action_client = ActionClient(
             self, FollowJointTrajectory, self._arm_controller_action_name
@@ -384,6 +425,20 @@ class PhysicalPickPlaceExecutorNode(Node):
         self._preflight_failure = False
         self._preflight_failure_reason = ''
         self._preflight_deadline: Optional[float] = None
+        self._phase_stages = {
+            'grasp': ['pre_grasp', 'grasp'],
+            'transport': ['lift', 'pre_place', 'place', 'retreat'],
+        }
+        self._phase_trajectories = {'grasp': {}, 'transport': {}}
+        self._phase_execution_trajectories = {'grasp': {}, 'transport': {}}
+        self._phase_plan_ids = {'grasp': None, 'transport': None}
+        self._phase_active_plan_ids = {'grasp': None, 'transport': None}
+        self._phase_lock_valid = {'grasp': False, 'transport': False}
+        self._payload_state = 'world'
+        self._payload_command_id = 0
+        self._active_payload_operation: Optional[str] = None
+        self._active_payload_command_id = ''
+        self._payload_deadline: Optional[float] = None
         self._timer = self.create_timer(0.1, self._timer_callback)
 
         self.get_logger().info(
@@ -448,11 +503,22 @@ class PhysicalPickPlaceExecutorNode(Node):
             )
         if self._plan_lock_timeout_sec <= 0.0:
             raise ValueError('plan_lock_timeout_sec must be greater than zero')
+        if self._payload_operation_timeout_sec <= 0.0:
+            raise ValueError('payload_operation_timeout_sec must be greater than zero')
+        if self._two_phase_planning and self._stage_names != parse_stage_names(
+            DEFAULT_STAGE_NAMES
+        ):
+            raise ValueError('two_phase_planning requires the canonical six stages')
+        if self._two_phase_planning and not self._require_grasp_verification:
+            raise ValueError('two_phase_planning requires grasp verification')
 
     def _trajectory_callback(
         self, stage: str, trajectory: RobotTrajectory
     ) -> None:
         """Buffer one trajectory per stage for the active plan generation."""
+        if self._two_phase_planning:
+            self._phase_trajectory_callback(stage, trajectory)
+            return
         if self._completed:
             return
         if self._started or self._trajectory_set_frozen:
@@ -474,6 +540,38 @@ class PhysicalPickPlaceExecutorNode(Node):
             return
         self._trajectories[stage] = trajectory
         self._try_start_sequence()
+
+    def _phase_trajectory_callback(
+        self, stage: str, trajectory: RobotTrajectory
+    ) -> None:
+        """Buffer a trajectory only in its immutable physical phase."""
+        if self._completed:
+            return
+        phase = 'grasp' if stage in self._phase_stages['grasp'] else 'transport'
+        if phase == 'grasp' and self._started:
+            return
+        if (
+            phase == 'transport'
+            and self._payload_state == 'world'
+            and self._active_payload_operation != 'attach'
+        ):
+            self._publish_stage_status(
+                f'event=ignored;mode={MODE};phase={phase};stage={stage};'
+                'action=trajectory;reason=transport_before_attachment;execution=false'
+            )
+            return
+        trajectories = self._phase_trajectories[phase]
+        if stage in trajectories:
+            self._publish_stage_status(
+                f'event=ignored;mode={MODE};phase={phase};stage={stage};'
+                'action=trajectory;reason=duplicate_trajectory;execution=false'
+            )
+            return
+        trajectories[stage] = trajectory
+        if phase == 'grasp':
+            self._try_start_sequence()
+        else:
+            self._try_start_transport()
 
     def _plan_lock_status_callback(self, message: String) -> None:
         """Track the volatile single-generation sequence-plan lock."""
@@ -560,6 +658,74 @@ class PhysicalPickPlaceExecutorNode(Node):
             ) else time.monotonic() + self._plan_lock_timeout_sec
         )
         self._try_start_sequence()
+
+    def _phase_plan_lock_status_callback(self, phase: str, message: String) -> None:
+        """Accept lock and trajectory delivery in either DDS order per phase."""
+        if self._completed or not self._require_plan_lock:
+            return
+        fields = parse_status(message.data)
+        if fields.get('mode') != 'sequence_plan_lock':
+            return
+        if fields.get('phase', phase) != phase:
+            return
+        event = fields.get('event', '')
+        try:
+            plan_id = int(fields.get('plan_id', ''))
+        except ValueError:
+            self._publish_failure(f'{phase}_plan_lock', 'plan_lock_invalid_status')
+            return
+        if event == 'waiting':
+            return
+        if plan_id <= 0:
+            self._publish_failure(f'{phase}_plan_lock', 'plan_lock_invalid_status')
+            return
+        expected = ','.join(self._phase_stages[phase])
+        if event == 'planning_started':
+            if (
+                phase == 'transport'
+                and self._payload_state != 'attached'
+                and self._active_payload_operation != 'attach'
+            ):
+                self._publish_failure('transport_plan_lock', 'transport_before_attachment')
+                return
+            self._phase_active_plan_ids[phase] = plan_id
+            self._phase_plan_ids[phase] = None
+            self._phase_lock_valid[phase] = False
+            self._phase_trajectories[phase].clear()
+            self._plan_lock_deadline = time.monotonic() + self._plan_lock_timeout_sec
+            return
+        active = self._phase_active_plan_ids[phase]
+        if active is not None and active != plan_id:
+            return
+        if event == 'failure':
+            self._phase_trajectories[phase].clear()
+            self._phase_lock_valid[phase] = False
+            if phase == 'transport':
+                self._publish_failure('transport_plan_lock', 'transport_planning_failed')
+            return
+        if event != 'locked':
+            return
+        try:
+            count = int(fields.get('planned_stage_count', ''))
+        except ValueError:
+            count = -1
+        if (
+            fields.get('locked') != 'true'
+            or fields.get('stage_sequence') != expected
+            or count != len(self._phase_stages[phase])
+        ):
+            self._publish_failure(f'{phase}_plan_lock', 'locked_plan_incomplete')
+            return
+        other = 'transport' if phase == 'grasp' else 'grasp'
+        if self._phase_plan_ids[other] == plan_id:
+            self._publish_failure(f'{phase}_plan_lock', 'plan_ids_not_distinct')
+            return
+        self._phase_plan_ids[phase] = plan_id
+        self._phase_lock_valid[phase] = True
+        if phase == 'grasp':
+            self._try_start_sequence()
+        else:
+            self._try_start_transport()
 
     def _joint_state_callback(self, joint_state: JointState) -> None:
         """Retain the latest complete finite Panda joint-state sample."""
@@ -754,9 +920,24 @@ class PhysicalPickPlaceExecutorNode(Node):
             and time.monotonic() >= self._preflight_deadline
         ):
             self._publish_failure('preflight', 'physical_grasp_preflight_timeout')
+        if (
+            self._payload_deadline is not None
+            and time.monotonic() >= self._payload_deadline
+        ):
+            operation = self._active_payload_operation or 'payload'
+            self._publish_failure(operation, f'payload_{operation}_timeout')
 
     def _normal_prerequisites_ready(self) -> bool:
         """Return whether trajectories and joint state are ready."""
+        if self._two_phase_planning:
+            if self._require_plan_lock and not self._phase_lock_valid['grasp']:
+                return False
+            if not all(
+                stage in self._phase_trajectories['grasp']
+                for stage in self._phase_stages['grasp']
+            ):
+                return False
+            return not self._require_joint_state or self._joint_state_received
         if self._require_plan_lock and not self._plan_lock_valid:
             return False
         if not all(stage in self._trajectories for stage in self._stage_names):
@@ -792,13 +973,24 @@ class PhysicalPickPlaceExecutorNode(Node):
                 )
             return
 
-        self._execution_trajectories = dict(self._trajectories)
+        if self._two_phase_planning:
+            self._execution_trajectories = dict(
+                self._phase_trajectories['grasp']
+            )
+            self._phase_execution_trajectories['grasp'] = dict(
+                self._phase_trajectories['grasp']
+            )
+            stages_to_validate = self._phase_stages['grasp']
+            self._locked_plan_id = self._phase_plan_ids['grasp']
+        else:
+            self._execution_trajectories = dict(self._trajectories)
+            stages_to_validate = self._stage_names
         self._trajectory_set_frozen = True
         self._plan_lock_deadline = None
         self._started = True
         self._state = 'EXEC_ARM_STAGE'
         self._sequence_start = time.monotonic()
-        for stage in self._stage_names:
+        for stage in stages_to_validate:
             valid, reason = self._validate_trajectory(
                 self._execution_trajectories[stage]
             )
@@ -819,6 +1011,65 @@ class PhysicalPickPlaceExecutorNode(Node):
             self._send_gripper_command('initial_open', 'open')
         else:
             self._send_current_arm_stage()
+
+    def _try_start_transport(self) -> None:
+        """Freeze and start transport only after verified attachment and lock."""
+        if (
+            not self._two_phase_planning
+            or self._completed
+            or self._payload_state != 'attached'
+            or self._current_stage_index != 2
+        ):
+            return
+        if self._require_plan_lock and not self._phase_lock_valid['transport']:
+            return
+        if not all(
+            stage in self._phase_trajectories['transport']
+            for stage in self._phase_stages['transport']
+        ):
+            return
+        frozen = dict(self._phase_trajectories['transport'])
+        for stage in self._phase_stages['transport']:
+            valid, reason = self._validate_trajectory(frozen[stage])
+            if not valid:
+                self._publish_failure(stage, reason)
+                return
+        first = frozen['lift']
+        max_delta = self._start_state_difference(first)
+        if max_delta is None:
+            self._publish_failure('lift', 'transport_start_state_unavailable')
+            return
+        self._publish_stage_status(
+            f'event=checked;mode={MODE};phase=transport;stage=lift;'
+            f'action=start_state;max_delta={max_delta:.6f};'
+            f'tolerance={self._start_state_tolerance:.6f};'
+            f'grasp_plan_id={self._phase_plan_ids["grasp"]};'
+            f'transport_plan_id={self._phase_plan_ids["transport"]};'
+            'payload_state=attached;execution=false'
+        )
+        if max_delta > self._start_state_tolerance:
+            self._publish_failure('lift', 'transport_start_state_mismatch')
+            return
+        self._phase_execution_trajectories['transport'] = frozen
+        self._execution_trajectories.update(frozen)
+        self._locked_plan_id = self._phase_plan_ids['transport']
+        self._plan_lock_deadline = None
+        self._send_current_arm_stage()
+
+    def _start_state_difference(
+        self, trajectory: RobotTrajectory
+    ) -> Optional[float]:
+        """Return max current-to-planned first-point joint difference."""
+        if (
+            not self._joint_state_received
+            or not trajectory.joint_trajectory.points
+        ):
+            return None
+        first = trajectory.joint_trajectory.points[0].positions
+        current = [
+            self._current_joint_positions[name] for name in self._expected_joints
+        ]
+        return max(abs(a - b) for a, b in zip(current, first))
 
     def _publish_preflight_failure(self) -> None:
         """Fail startup when the physical grasp preflight reports failure."""
@@ -1103,6 +1354,13 @@ class PhysicalPickPlaceExecutorNode(Node):
         if stage == 'initial_open':
             self._send_current_arm_stage()
             return
+        if (
+            self._two_phase_planning
+            and command == 'open'
+            and stage == self._open_after_stage
+        ):
+            self._request_payload_operation('detach')
+            return
         self._advance_to_next_arm_stage()
 
     def _request_verification(self, stage: str, verification: str) -> None:
@@ -1149,7 +1407,10 @@ class PhysicalPickPlaceExecutorNode(Node):
                 f'verification={verification};action=verification;'
                 'simulated=true;real_hardware=false'
             )
-            self._advance_to_next_arm_stage()
+            if self._two_phase_planning and verification == 'grasp':
+                self._request_payload_operation('attach')
+            else:
+                self._advance_to_next_arm_stage()
             return
 
         self._publish_stage_status(
@@ -1173,10 +1434,76 @@ class PhysicalPickPlaceExecutorNode(Node):
 
     def _advance_to_next_arm_stage(self) -> None:
         self._current_stage_index += 1
+        if self._two_phase_planning and self._current_stage_index == 2:
+            self._try_start_transport()
+            return
         if self._current_stage_index >= len(self._stage_names):
             self._publish_success()
             return
         self._send_current_arm_stage()
+
+    def _request_payload_operation(self, operation: str) -> None:
+        """Request one verified MoveIt-only payload scene transition."""
+        self._payload_command_id += 1
+        self._active_payload_command_id = str(self._payload_command_id)
+        self._active_payload_operation = operation
+        self._payload_deadline = time.monotonic() + self._payload_operation_timeout_sec
+        self._state = f'WAIT_PAYLOAD_{operation.upper()}'
+        message = String()
+        message.data = (
+            f'event=command;command={operation};'
+            f'command_id={self._active_payload_command_id};'
+            'source=physical_pick_place_executor;simulated=true'
+        )
+        self._publish_stage_status(
+            f'event=request;mode={MODE};stage={self._current_stage or operation};'
+            f'action=payload_{operation};payload_state={self._payload_state};'
+            f'command_id={self._active_payload_command_id};execution=false'
+        )
+        self._payload_command_publisher.publish(message)
+
+    def _payload_status_callback(self, message: String) -> None:
+        """Gate transport and retreat on the manager's verified result."""
+        if self._completed or self._active_payload_operation is None:
+            return
+        fields = parse_status(message.data)
+        if fields.get('mode') != 'payload_attachment':
+            return
+        if fields.get('operation') != self._active_payload_operation:
+            return
+        if fields.get('command_id') != self._active_payload_command_id:
+            return
+        event = fields.get('event', '')
+        if event == 'failure':
+            operation = self._active_payload_operation
+            self._publish_failure(
+                operation,
+                f'payload_{operation}_failed',
+                payload_reason=fields.get('reason', 'failure'),
+            )
+            return
+        if event != 'success':
+            return
+        operation = self._active_payload_operation
+        self._active_payload_operation = None
+        self._payload_deadline = None
+        self._payload_state = 'attached' if operation == 'attach' else 'world'
+        self._publish_stage_status(
+            f'event=success;mode={MODE};stage={self._current_stage};'
+            f'action=payload_{operation};payload_state={self._payload_state};'
+            f'grasp_plan_id={self._phase_plan_ids["grasp"]};'
+            f'transport_plan_id={self._phase_plan_ids["transport"]};'
+            f'attachment_link={fields.get("attachment_link", "unknown")};'
+            f'touch_links={fields.get("touch_links", "unknown")};execution=false'
+        )
+        if operation == 'attach':
+            self._current_stage_index = 2
+            self._plan_lock_deadline = (
+                time.monotonic() + self._plan_lock_timeout_sec
+            )
+            self._try_start_transport()
+        else:
+            self._advance_to_next_arm_stage()
 
     def _publish_failure(
         self,
@@ -1186,6 +1513,7 @@ class PhysicalPickPlaceExecutorNode(Node):
         preflight_reason: Optional[str] = None,
         gripper_result: Optional[str] = None,
         gripper_reason: Optional[str] = None,
+        payload_reason: Optional[str] = None,
     ) -> None:
         """Publish one retained terminal failure."""
         if self._sequence_start == 0.0:
@@ -1200,6 +1528,14 @@ class PhysicalPickPlaceExecutorNode(Node):
             status += f'gripper_result={gripper_result};'
         if gripper_reason is not None:
             status += f'gripper_reason={gripper_reason};'
+        if payload_reason is not None:
+            status += f'payload_reason={payload_reason};'
+        if self._two_phase_planning:
+            status += (
+                f'grasp_plan_id={self._phase_plan_ids["grasp"]};'
+                f'transport_plan_id={self._phase_plan_ids["transport"]};'
+                f'payload_state={self._payload_state};'
+            )
         status += (
             'execution=false;simulated_execution_only=true;'
             'real_hardware=false'
@@ -1225,6 +1561,12 @@ class PhysicalPickPlaceExecutorNode(Node):
             'execution=true;simulated_execution_only=true;'
             'real_hardware=false'
         )
+        if self._two_phase_planning:
+            status = status.rstrip(';') + (
+                f';grasp_plan_id={self._phase_plan_ids["grasp"]};'
+                f'transport_plan_id={self._phase_plan_ids["transport"]};'
+                f'payload_state={self._payload_state}'
+            )
         self._publish_final_result(True, status, duration_ms)
         self.get_logger().info(
             'Simulator-only physical pick-place execution completed.'

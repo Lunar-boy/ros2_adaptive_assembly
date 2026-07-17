@@ -25,6 +25,7 @@ public:
         "status_topic", "/planning_scene_audit_status")),
     ready_topic_(declare_parameter<std::string>(
         "ready_topic", "/planning_scene_audit_ready")),
+    target_object_id_(declare_parameter<std::string>("target_object_id", "target_object")),
     expected_object_ids_(split_csv(expected_object_ids_text_))
   {
     if (audit_period_sec_ <= 0.0) {
@@ -107,7 +108,10 @@ private:
 
   void run_audit()
   {
-    const auto objects = planning_scene_interface_.getObjects(expected_object_ids_);
+    auto query_ids = expected_object_ids_;
+    query_ids.push_back(target_object_id_);
+    const auto objects = planning_scene_interface_.getObjects(query_ids);
+    const auto attached = planning_scene_interface_.getAttachedObjects({target_object_id_});
 
     std::vector<std::string> present;
     std::vector<std::string> missing;
@@ -119,9 +123,14 @@ private:
       }
     }
 
-    const bool all_present = !expected_object_ids_.empty() && missing.empty();
+    const bool target_world = objects.find(target_object_id_) != objects.end();
+    const bool target_attached = attached.find(target_object_id_) != attached.end();
+    const bool target_exclusive = target_world != target_attached;
+    const std::string payload_phase = target_attached ? "attached" :
+      (target_world ? "world" : "missing");
+    const bool all_present = !expected_object_ids_.empty() && missing.empty() && target_exclusive;
     publish_ready(all_present);
-    publish_status(present, missing, all_present);
+    publish_status(present, missing, all_present, payload_phase, target_world, target_attached);
 
     RCLCPP_INFO(
       node_->get_logger(),
@@ -141,7 +150,8 @@ private:
   void publish_status(
     const std::vector<std::string> & present,
     const std::vector<std::string> & missing,
-    const bool all_present)
+    const bool all_present, const std::string & payload_phase,
+    const bool target_world, const bool target_attached)
   {
     std_msgs::msg::String message;
     std::ostringstream stream;
@@ -150,6 +160,10 @@ private:
     stream << ";present=" << join(present);
     stream << ";missing=" << join(missing);
     stream << ";all_present=" << (all_present ? "true" : "false");
+    stream << ";payload_phase=" << payload_phase;
+    stream << ";target_world_count=" << (target_world ? 1 : 0);
+    stream << ";target_attached_count=" << (target_attached ? 1 : 0);
+    stream << ";target_exclusive=" << ((target_world != target_attached) ? "true" : "false");
     message.data = stream.str();
     status_publisher_->publish(message);
   }
@@ -159,6 +173,7 @@ private:
   double audit_period_sec_;
   std::string status_topic_;
   std::string ready_topic_;
+  std::string target_object_id_;
   std::vector<std::string> expected_object_ids_;
   moveit::planning_interface::PlanningSceneInterface planning_scene_interface_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr ready_publisher_;

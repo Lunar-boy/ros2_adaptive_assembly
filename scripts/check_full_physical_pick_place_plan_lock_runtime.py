@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded headless regression for LIN planning and the physical plan lock."""
+"""Bounded headless regression for LIN planning and the grasp-generation lock."""
 
 import argparse
 import json
@@ -20,7 +20,7 @@ from std_msgs.msg import String
 
 
 ROOT = Path(__file__).resolve().parents[1]
-STAGES = ('pre_grasp', 'grasp', 'lift', 'pre_place', 'place', 'retreat')
+STAGES = ('pre_grasp', 'grasp')
 TRAJECTORY_TOPICS = {stage: f'/{stage}_trajectory' for stage in STAGES}
 
 
@@ -67,15 +67,15 @@ class PlanLockChecker(Node):
         self.grasp_arm_completed = False
         self.failure = ''
         self.create_subscription(
-            String, '/assembly_sequence_plan_lock_status',
+            String, '/grasp_plan_lock_status',
             self._lock, volatile,
         )
         self.create_subscription(
-            String, '/assembly_sequence_stage_status',
+            String, '/grasp_stage_planning_status',
             self._stage, 20,
         )
         self.create_subscription(
-            String, '/assembly_sequence_trajectory_status',
+            String, '/grasp_trajectory_status',
             self._trajectory_status, 20,
         )
         self.create_subscription(
@@ -344,7 +344,7 @@ def main():
                 print(f'FAIL: {reason}; artifacts={run_dir}')
                 return 1
             print(
-                'PASS: one locked LIN plan; '
+                'PASS: one locked LIN grasp generation; '
                 f'plan_id={result["plan_id"]}; '
                 f'trajectory_counts={result["trajectory_counts"]}; '
                 'target_xy_displacement_before_close_m='

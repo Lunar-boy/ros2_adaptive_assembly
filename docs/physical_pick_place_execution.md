@@ -59,20 +59,22 @@ finger collision meshes inward and requires bilateral target contact with no
 hand or arm contact. This is a geometric feasibility check, not force control
 or proof of a physical grasp.
 
-Every planning attempt copies all six fresh poses into one immutable,
-timestamp-coherent snapshot. Trajectories remain local candidates until all
-six stages and the LIN geometry check succeed, so a failed attempt publishes
-no executable trajectory. Success publishes one trajectory per stage and
-then one volatile `/assembly_sequence_plan_lock_status` `locked` event with a
-single `plan_id`. Later pose updates are diagnosed and ignored; restarting the
-single-shot planner begins another episode.
+The physical path uses two immutable, all-or-nothing generations. The grasp
+planner snapshots and publishes only `pre_grasp,grasp`, then locks
+`/grasp_plan_lock_status` (IDs start at `1`). After successful required grasp
+verification, the payload manager atomically moves the existing cylinder from
+the world to an `AttachedCollisionObject`. Only its verified retained
+`/payload_attachment_ready=true` can start the transport planner. That planner
+uses the current post-grasp robot state, publishes only the complete
+`lift,pre_place,place,retreat` set, and locks
+`/transport_plan_lock_status` (IDs start at `1000001`). No transport
+trajectory is published before attachment readiness.
 
-The physical executor requires that volatile lock, an exactly matching stage
-sequence, and all six trajectories. DDS delivery order does not matter: the
-lock may precede the last trajectory or follow the complete set. At start the
-executor copies the buffered set into its immutable execution dictionary and
-includes the locked `plan_id` in execution statuses. The generic executor
-default remains `require_plan_lock=false` for non-physical compatibility.
+The executor freezes each phase independently. DDS delivery order within a
+phase does not matter: its lock may precede or follow its complete trajectory
+set. Lift is additionally gated by a current-joint-state comparison against
+the first transport point. The generic planner and executor retain their
+single-generation defaults for non-physical compatibility.
 
 `physical_target_planning_scene_node` transforms the Gazebo-derived
 `/target_pose` into `panda_link0` and applies `target_object` as a MoveIt
@@ -80,17 +82,23 @@ cylinder with radius `0.035 m` and height `0.10 m`. Its ACM permits target
 contact with exactly `panda_leftfinger` and `panda_rightfinger`; contact with
 the hand, TCP, and all arm links remains collision-checked. On plan lock it
 retains the last applied scene pose and stops applying later target updates.
-This freezes only the planning-scene snapshot: it does not alter, attach, or
-freeze the actual Gazebo model or its physics.
+This freezes only the pre-grasp world pose. After grasp verification,
+`payload_planning_scene_manager_node` preserves that exact `0.035 m × 0.10 m`
+cylinder, measures its pose relative to `assembly_tcp` from the current MoveIt
+robot state, removes the world copy, and attaches it with touch links exactly
+`panda_leftfinger,panda_rightfinger`. Arm, hand, table, support, and socket
+payload collisions remain enabled. After successful open at `place`, detach
+requires a fresh `/gazebo_target_object_pose`, restores the cylinder in
+`panda_link0`, verifies world/attached exclusivity, and only then permits
+retreat. These MoveIt transitions do not add a Gazebo joint or freeze physics.
 
 The ACM also retains one unrelated physical-mount allowance between
 `panda_link0` and `work_table`, whose collision meshes overlap at the fixed
 base/table interface. This does not broaden the target-object allowlist.
 
-These contracts prove a bounded, collision-aware grasp approach and a
-single planner/executor generation. They do not prove gripper contact, a
-successful grasp or lift, placement, or socket insertion. Payload attachment
-and final Gazebo-state placement verification remain future work.
+These contracts provide payload-aware transport planning and execution
+gating. They still do not prove that the released object settles inside the
+socket; final Gazebo-state placement verification remains future work.
 
 It subscribes to `moveit_msgs/msg/RobotTrajectory` stages on:
 
@@ -164,6 +172,11 @@ Published executor topics:
 
 All status strings include `mode=physical_pick_place` and
 `real_hardware=false`.
+
+Physical terminal and stage statuses also report `grasp_plan_id`,
+`transport_plan_id`, and `payload_state`. Payload commands/status use
+`/payload_attachment_command`, `/payload_attachment_status`, and
+`/payload_attachment_ready`.
 
 When the simulated arm controller accepts a stage goal, the stage topic
 publishes an explicit acceptance transition:
@@ -379,6 +392,23 @@ Model parity, joint-space controller success, and Cartesian TCP success are
 distinct evidence. This checker supplies the third by measuring runtime TF;
 it does not claim gripper closure, contact grasp, lift, placement, retreat, or
 insertion success.
+
+For the bounded end-to-end payload-transition proof, run:
+
+```bash
+python3 scripts/check_full_physical_payload_transitions.py
+```
+
+This launches server-only Gazebo and independently queries the actual MoveIt
+PlanningScene at attachment, every transport stage, and detachment. It checks
+exclusive world/attached copies, exact cylinder geometry, link/touch links,
+an unchanged measured relative transform during transport, distinct phase
+IDs, current-to-transport start-state difference, and detach-before-retreat.
+The current physical run is expected to stop before transport lock because
+MoveIt's start-state collision check sees the exact attached cylinder touching
+`target_support`. `--controlled-verification` bypasses gripper actuation and
+injects verifier Bool results only to isolate this MoveIt path; it does not
+prove a physical grasp and currently reaches the same support-contact rejection.
 
 See `docs/gazebo_contact_grasp_verification.md` for the Gazebo contact sensor
 plumbing and verifier status schemas. This remains simulator-only. It does not

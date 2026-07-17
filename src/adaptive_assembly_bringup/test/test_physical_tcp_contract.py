@@ -115,12 +115,13 @@ def test_assembly_tcp_and_clearance_contract_remain_exact():
         'panda_leftfinger', 'panda_rightfinger'
     ]
 
-    launch_parameters = _literal_launch_parameters(PLANNING_LAUNCH)
-    assert launch_parameters['require_grasp_clearance_validation'] is True
-    assert launch_parameters['grasp_min_disallowed_clearance'] >= 0.005
-    assert launch_parameters['grasp_clearance_target_object_id'] == 'target_object'
-    assert launch_parameters['grasp_allowed_contact_links_csv'] == (
-        'panda_leftfinger,panda_rightfinger'
+    planning_source = PLANNING_LAUNCH.read_text(encoding='utf-8')
+    assert "'require_grasp_clearance_validation': True" in planning_source
+    assert "'grasp_min_disallowed_clearance': 0.005" in planning_source
+    assert "'grasp_clearance_target_object_id': 'target_object'" in planning_source
+    assert (
+        "'grasp_allowed_contact_links_csv': (" in planning_source
+        and "'panda_leftfinger,panda_rightfinger'" in planning_source
     )
 
 
